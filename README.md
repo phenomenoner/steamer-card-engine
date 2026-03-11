@@ -1,7 +1,7 @@
 # steamer-card-engine
 
 > **台股日內策略卡 runtime 種子專案**  
-> A docs-first seed runtime for Taiwan cash intraday strategy cards.
+> A docs-first seed runtime for Taiwan stock intraday strategy cards.
 
 `steamer-card-engine` 不是在賣「馬上可上線的自動交易系統」。
 
@@ -210,7 +210,7 @@ Roadmap and sequencing live in [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md
 
 ## English summary
 
-`steamer-card-engine` is a docs-first seed repository for a card-oriented runtime focused on Taiwan cash intraday strategy operations.
+`steamer-card-engine` is a docs-first seed repository for a card-oriented runtime focused on Taiwan stock intraday strategy operations.
 
 The repo does **not** claim live-trading readiness. Its job is to make the architecture legible and implementation-friendly:
 

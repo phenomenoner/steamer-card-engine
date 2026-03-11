@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "steamer-card-engine"
 version = "0.1.0"
-description = "Card-oriented runtime seed for Taiwan cash intraday strategy operations"
+description = "Card-oriented runtime seed for Taiwan stock intraday strategy operations"
 readme = "README.md"
 requires-python = ">=3.13"
 authors = [

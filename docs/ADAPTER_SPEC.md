@@ -4,7 +4,7 @@
 
 Adapters isolate the runtime from a specific market-data, broker, or account-service implementation.
 
-v0.1 is still anchored to Taiwan cash intraday needs, but the runtime should not assume one permanent vendor shape.
+v0.1 is still anchored to Taiwan stock intraday needs, but the runtime should not assume one permanent vendor shape.
 
 ## Adapter families
 

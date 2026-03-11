@@ -20,7 +20,7 @@ from steamer_card_engine.manifest import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="steamer-card-engine",
-        description="Card-oriented runtime seed for Taiwan cash intraday strategy operations.",
+        description="Card-oriented runtime seed for Taiwan stock intraday strategy operations.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

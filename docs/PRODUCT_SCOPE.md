@@ -2,7 +2,7 @@
 
 ## Thesis
 
-Build a product-shaped runtime for **card-based Taiwan cash intraday strategy operations**.
+Build a product-shaped runtime for **card-based Taiwan stock intraday strategy operations**.
 
 The runtime should let researchers and agents author cards, organize decks, validate manifests, and run replay/live-sim workflows through a stable CLI, while keeping live execution authority and risk governance under explicit operator control.
 
@@ -29,7 +29,7 @@ Helps draft cards, validate configs, prepare replay jobs, and assist configurati
 
 ## v0.1 scope
 
-- Taiwan cash intraday only
+- Taiwan stock intraday only
 - Shared auth/session module for marketdata + trading/account surfaces where supported
 - Shared market-data hub with subscription planning
 - Single runtime instance / single deck at a time

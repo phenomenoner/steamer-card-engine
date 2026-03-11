@@ -292,7 +292,7 @@ That implies:
 ## v0.1 simplifications
 
 - one engine / one deck active at a time
-- Taiwan cash intraday only
+- Taiwan stock intraday only
 - one active market-data adapter
 - one active broker adapter
 - no arbitrary runtime plugin discovery
