@@ -159,6 +159,17 @@ When a card is enabled:
 
 This supports cases where each strategy card watches a different tradable universe while still using shared market-data infrastructure.
 
+### Validation vs runtime enforcement (open decision)
+
+Deck/global policy will sometimes forbid parts of a card-declared `symbol_pool`.
+
+To avoid silent divergence, prefer an explicit rule:
+
+- **Strict authoring validation (recommended):** fail validation if a deck/global scope says a card may not use those symbols.
+- **Runtime permissive path:** if symbols are dropped, the runtime must emit a receipt/diagnostic (never drop silently).
+
+Similar “tighten vs widen” semantics should apply to risk/capital overlays: tightening is safe-by-default; widening should require explicit operator intent.
+
 ## Feature / synthesizer model
 
 Recommended design:

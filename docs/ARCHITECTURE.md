@@ -75,6 +75,22 @@ Engine-wide settings for:
 - replay/live-sim behavior
 - operator permissions
 
+### Policy overlays (draft tighten/widen rules)
+
+Deck and global config exist largely to **govern** cards.
+
+Recommended default rule (safety-first): **cards may propose; deck/global/operator may tighten; widening requires explicit operator intent** (future).
+
+| Policy area | Card declares | Deck may | Global may | Operator may |
+|---|---|---|---|---|
+| Symbol universe | `symbol_pool` (proposal) | allow/deny + merge rules | set market-wide scope/ceilings | clamp / override |
+| Capital controls | max notional/positions (proposal) | tighten ceilings | set global ceilings | tighten / flatten |
+| Risk policy | stop/take-profit/forced-exit (proposal) | tighten / reject | emergency stop + global gates | tighten + trigger guardrails |
+| Feature requirements | `feature_requirements` | add shared requirements | define available pipelines | (governance only) |
+| Live authority | (none) | select deck + intended posture | `live_enabled`, `dry_run` guardrails | arm/disarm / approve activation |
+
+This is still a doc-level rule at v0.1 (not fully implemented); it exists to prevent “policy merge” becoming implicit and unsafe later.
+
 ### AuthSessionManager
 A shared login/session module that authenticates once and shares session context across marketdata + trading/account surfaces where supported.
 

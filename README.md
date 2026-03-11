@@ -191,6 +191,7 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - Auth/session model: [`docs/AUTH_AND_SESSION_MODEL.md`](docs/AUTH_AND_SESSION_MODEL.md)
 - Day-trading guardrails: [`docs/DAYTRADING_GUARDRAILS.md`](docs/DAYTRADING_GUARDRAILS.md)
 - Migration plan from current engine: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md)
+- Topology / repo map: [`docs/TOPOLOGY.md`](docs/TOPOLOGY.md)
 
 ## Current status
 
@@ -203,10 +204,9 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow
 
-## TODO / NEXT（deferred by scope）
+## Roadmap
 
-1. Copilot CLI architecture/design pass（roadmap phases, test design, and execution ergonomics）
-2. Topology update（docs + memory alignment after executable contracts settle）
+Roadmap and sequencing live in [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md).
 
 ## English summary
 

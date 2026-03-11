@@ -107,6 +107,14 @@ The CLI should support:
 - structured JSON output for automation
 - stable exit codes
 
+### Exit codes (current + recommended)
+
+- `0`: success
+- `1`: CLI usage error / unhandled command / general failure
+- `2`: manifest validation failure (schema or semantic checks)
+
+(Tests already assert `2` for validation errors; keep this stable.)
+
 Suggested flags:
 
 - `--json`

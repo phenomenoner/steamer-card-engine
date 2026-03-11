@@ -90,6 +90,10 @@ Exit criteria:
 
 ### Phase 2 — Recordable market data and replay/live-sim path
 
+This phase should **freeze the core artifact / receipt contracts first** (events, features, intents, risk decisions, execution receipts).
+
+Only after those contracts are stable should we invest in adapter shims, otherwise we risk encoding legacy behavior into unstable schemas.
+
 Deliverables:
 
 - normalized market event schema
