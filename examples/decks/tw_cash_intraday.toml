@@ -1,0 +1,9 @@
+deck_id = "tw-cash-main"
+market = "TW_CASH"
+session = "intraday"
+
+cards = [
+  "gap-reclaim-v1",
+]
+
+symbol_scope = ["2330", "2317", "2454"]

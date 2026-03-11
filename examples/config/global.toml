@@ -1,0 +1,6 @@
+market = "TW_CASH"
+session = "intraday"
+live_enabled = false
+dry_run = true
+market_data_adapter = "tw-cash-marketdata"
+broker_adapter = "tw-cash-broker"

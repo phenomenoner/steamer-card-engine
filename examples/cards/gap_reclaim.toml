@@ -1,0 +1,11 @@
+card_id = "gap-reclaim-v1"
+name = "Gap Reclaim"
+version = "0.1.0"
+strategy_family = "open-drive-reversal"
+status = "replay-only"
+entry_module = "cards.gap_reclaim:build_card"
+
+[parameters]
+min_gap_pct = 2.5
+reclaim_window_seconds = 420
+max_chase_pct = 1.2
