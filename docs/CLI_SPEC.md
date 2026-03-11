@@ -37,7 +37,10 @@ Examples:
 steamer-card-engine author init-card gap-reclaim
 steamer-card-engine author validate-card ./cards/gap_reclaim.toml
 steamer-card-engine author validate-deck ./decks/tw_cash_intraday.toml
+steamer-card-engine author validate-global ./config/global.toml
 steamer-card-engine author inspect-card ./cards/gap_reclaim.toml
+steamer-card-engine author inspect-deck ./decks/tw_cash_intraday.toml --cards-dir ./cards
+steamer-card-engine author inspect-global ./config/global.toml
 ```
 
 Responsibilities:
@@ -127,16 +130,19 @@ The CLI should never make live authority ambiguous.
 
 ## v0.1 implementation notes
 
-This repo currently includes a small placeholder CLI to lock in vocabulary and package layout. It does not yet implement replay, session management, or operator control.
+Current implementation status:
 
-The placeholder should evolve in this order:
+- ✅ `auth validate-profile` / `auth inspect-profile`
+- ✅ `author validate-card` / `author inspect-card`
+- ✅ `author validate-deck` / `author inspect-deck`
+- ✅ `author validate-global` / `author inspect-global`
+- ⏳ replay/session/operator execution remains placeholder
 
-1. validate auth/card/deck manifests
-2. inspect cards/decks/profiles in human + JSON form
-3. validate symbol-pool and feature requirements
-4. launch replay jobs
-5. inspect replay/live-sim receipts
-6. expose guarded operator actions
+Next evolution order remains:
+
+1. launch replay jobs
+2. inspect replay/live-sim receipts
+3. expose guarded operator actions
 
 ## Suggested stable artifacts
 

@@ -16,3 +16,11 @@ enabled = true
 start_time = "13:25:00"
 end_time = "13:30:00"
 order_style = "reverse_side_limit_rod"
+
+[risk]
+max_daily_loss = 50000
+max_total_notional = 1500000
+
+[risk.emergency_stop]
+mode = "percent_from_open"
+value = 3.0

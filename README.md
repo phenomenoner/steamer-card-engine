@@ -146,8 +146,12 @@ steamer-card-engine/
 │   ├── decks/
 │   ├── config/
 │   └── profiles/
+├── tests/
+│   ├── test_cli.py
+│   └── test_manifests.py
 └── src/steamer_card_engine/
     ├── cli.py
+    ├── manifest.py
     ├── models.py
     ├── adapters/base.py
     ├── cards/base.py
@@ -160,9 +164,22 @@ steamer-card-engine/
 uv venv
 uv run steamer-card-engine --help
 uv run python -m steamer_card_engine --help
+
+# Validate example manifests
+uv run steamer-card-engine auth validate-profile examples/profiles/tw_cash_agent_assist.toml
+uv run steamer-card-engine author validate-card examples/cards/gap_reclaim.toml
+uv run steamer-card-engine author validate-deck examples/decks/tw_cash_intraday.toml
+uv run steamer-card-engine author validate-global examples/config/global.toml
+
+# Inspect example manifests
+uv run steamer-card-engine auth inspect-profile examples/profiles/tw_cash_agent_assist.toml
+uv run steamer-card-engine author inspect-card examples/cards/gap_reclaim.toml
+uv run steamer-card-engine author inspect-deck examples/decks/tw_cash_intraday.toml --cards-dir examples/cards
+uv run steamer-card-engine author inspect-global examples/config/global.toml
 ```
 
-目前 CLI 仍是 **placeholder scaffold**，存在的目的主要是固定命令面與 package 形狀，不代表 runtime 已完成。
+目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global）。
+Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 
 ## 文件導覽
 
@@ -181,10 +198,15 @@ uv run python -m steamer_card_engine --help
 - ✅ Core docs/spec contracts defined
 - ✅ Shared auth/session and day-trading guardrail docs added
 - ✅ Python package skeleton exists
-- ⏳ Manifest validation and inspect commands
+- ✅ Manifest validation + inspect commands（auth/card/deck/global）
 - ⏳ Replay runner MVP
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow
+
+## TODO / NEXT（deferred by scope）
+
+1. Copilot CLI architecture/design pass（roadmap phases, test design, and execution ergonomics）
+2. Topology update（docs + memory alignment after executable contracts settle）
 
 ## English summary
 

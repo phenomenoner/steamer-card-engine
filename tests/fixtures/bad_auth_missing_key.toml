@@ -1,0 +1,4 @@
+mode = "account_api_key_cert"
+account = "sample-account"
+cert_path_env = "STEAMER_CERT_PATH"
+cert_password_env = "STEAMER_CERT_PASSWORD"
