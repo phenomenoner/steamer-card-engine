@@ -2,10 +2,31 @@ card_id = "gap-reclaim-v1"
 name = "Gap Reclaim"
 version = "0.1.0"
 strategy_family = "open-drive-reversal"
+instrument_scope = ["TW_EQUITY"]
 status = "replay-only"
 entry_module = "cards.gap_reclaim:build_card"
+
+symbol_pool = ["2330", "2454", "3017"]
+feature_requirements = ["bars.1m", "indicator.macd.12_26_9"]
 
 [parameters]
 min_gap_pct = 2.5
 reclaim_window_seconds = 420
 max_chase_pct = 1.2
+
+[capital_controls]
+max_order_notional = 150000
+max_daily_notional = 500000
+max_open_positions = 2
+
+[risk_policy.stop_loss]
+mode = "percent_from_open"
+value = 1.8
+
+[risk_policy.take_profit]
+mode = "risk_reward_multiple"
+value = 1.5
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"

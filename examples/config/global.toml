@@ -4,3 +4,15 @@ live_enabled = false
 dry_run = true
 market_data_adapter = "tw-cash-marketdata"
 broker_adapter = "tw-cash-broker"
+auth_profile = "profiles/tw_cash_agent_assist.toml"
+active_account = "sample-account"
+
+[recording]
+enabled = true
+mode = "jsonl"
+
+[flatten_policy.final_auction]
+enabled = true
+start_time = "13:25:00"
+end_time = "13:30:00"
+order_style = "reverse_side_limit_rod"

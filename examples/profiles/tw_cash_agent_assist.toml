@@ -1,0 +1,9 @@
+mode = "account_api_key_cert"
+account = "sample-account"
+api_key_env = "STEAMER_API_KEY"
+cert_path_env = "STEAMER_CERT_PATH"
+cert_password_env = "STEAMER_CERT_PASSWORD"
+marketdata_enabled = true
+account_query_enabled = true
+trade_enabled = false
+notes = "Example agent-assisted profile with trading permission intentionally disabled."
