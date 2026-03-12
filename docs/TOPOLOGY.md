@@ -20,6 +20,7 @@ steamer-card-engine/
 │   ├── AUTH_AND_SESSION_MODEL.md
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
+│   ├── SIM_ARTIFACT_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
@@ -52,6 +53,7 @@ steamer-card-engine/
 - `docs/DAYTRADING_GUARDRAILS.md` — emergency stop / forced exit / flatten policy
 - `docs/CLI_SPEC.md` — intended CLI families + governance stance
 - `docs/MIGRATION_PLAN.md` — phase slicing and dependency ordering
+- `docs/SIM_ARTIFACT_SPEC.md` — simulation run artifacts, provenance, and checksum/index contract
 
 ### Executable seed (v0.1)
 
@@ -81,8 +83,8 @@ steamer-card-engine/
    - Card vs deck vs global policy merge/precedence rules (tighten vs widen) are described conceptually but not fully specified as executable semantics.
 
 3. **Replay credibility depends on receipts**
-   - Several docs assume recorder/replay artifacts exist.
-   - Until we define stable artifact schemas (event/feature/intent/risk/execution receipts), replay is a promise, not a capability.
+   - `docs/SIM_ARTIFACT_SPEC.md` now defines the target artifact contract (event/feature/intent/risk/execution + checksums).
+   - Runtime emission is still partial/placeholder, so replay remains a contract-first path rather than a complete capability.
 
 4. **Authority states need executable posture**
    - Docs strongly assert operator-governed live authority.
@@ -101,4 +103,5 @@ steamer-card-engine/
 
 - Architecture overview: `docs/ARCHITECTURE.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
+- SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
