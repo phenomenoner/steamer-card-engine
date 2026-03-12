@@ -58,9 +58,9 @@ Used for replay evaluation and live-sim execution paths with shared runtime cont
 Examples:
 
 ```bash
-steamer-card-engine replay run --deck ./examples/decks/tw_cash_intraday.toml --date 2026-03-11 --mode replay-sim
+steamer-card-engine replay run --deck ./examples/decks/tw_cash_intraday.toml --date 2026-03-11 --mode replay-sim --scenario-spec ./scenarios/tw-gap-reclaim-20260311.json
 steamer-card-engine replay inspect run-20260311-01
-steamer-card-engine sim run-live --deck ./examples/decks/tw_cash_intraday.toml --dry-run
+steamer-card-engine sim run-live --deck ./examples/decks/tw_cash_intraday.toml --dry-run --scenario-id tw-gap-reclaim.twse.2026-03-11.full-session
 ```
 
 Responsibilities:
@@ -69,6 +69,7 @@ Responsibilities:
 - run live-sim sessions without live broker execution
 - inspect replay/live-sim outputs
 - compare card variants
+- capture and echo ScenarioSpec identity (`scenario_id` + core scenario knobs)
 - export decision receipts
 
 ### 4. Operator commands
@@ -135,6 +136,27 @@ Preferred inputs:
 - explicit mode selection (`replay-sim`, `live-sim`, `live`)
 
 The CLI should never make live authority ambiguous.
+
+## Scenario identity inputs (contract target)
+
+Replay/live-sim submissions should eventually accept one of:
+
+- `--scenario-spec <path>` (preferred)
+- explicit identity flags that can be converted into ScenarioSpec-equivalent fields
+
+At minimum, submitted job metadata should carry:
+
+- `scenario_id`
+- symbol set identity
+- session date/slice
+- event source identity
+- timezone/calendar
+- execution/cost model knobs
+- determinism posture + seed
+
+Reference contract: `docs/SCENARIO_SPEC.md`.
+
+Current reality: this is a docs-level target; strict runtime enforcement is not complete yet.
 
 ## v0.1 implementation notes
 

@@ -96,6 +96,7 @@ Only after those contracts are stable should we invest in adapter shims, otherwi
 
 Deliverables:
 
+- ScenarioSpec contract freeze for cross-lane identity (`docs/SCENARIO_SPEC.md`)
 - normalized market event schema
 - recorder contract for market data, decisions, and order lifecycle events
 - replay runner skeleton
@@ -112,6 +113,7 @@ Exit criteria:
 
 - one or more existing strategy ideas can be expressed as replayable cards
 - market data can be recorded and replayed with stable contracts
+- baseline and candidate lanes can declare the same ScenarioSpec identity for a test run
 - replay sim and live sim are clearly differentiated from live
 
 ### Phase 3 — Adapter shim from current stack

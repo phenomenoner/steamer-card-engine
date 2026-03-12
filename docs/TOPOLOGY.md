@@ -21,6 +21,7 @@ steamer-card-engine/
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
 │   ├── SIM_ARTIFACT_SPEC.md
+│   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
@@ -54,6 +55,7 @@ steamer-card-engine/
 - `docs/CLI_SPEC.md` — intended CLI families + governance stance
 - `docs/MIGRATION_PLAN.md` — phase slicing and dependency ordering
 - `docs/SIM_ARTIFACT_SPEC.md` — simulation run artifacts, provenance, and checksum/index contract
+- `docs/SCENARIO_SPEC.md` — shared scenario identity contract for baseline-vs-candidate comparability
 
 ### Executable seed (v0.1)
 
@@ -86,7 +88,11 @@ steamer-card-engine/
    - `docs/SIM_ARTIFACT_SPEC.md` now defines the target artifact contract (event/feature/intent/risk/execution + checksums).
    - Runtime emission is still partial/placeholder, so replay remains a contract-first path rather than a complete capability.
 
-4. **Authority states need executable posture**
+4. **Scenario identity is now defined, but not yet enforced by runtime**
+   - `docs/SCENARIO_SPEC.md` defines the shared identity shape needed for baseline-vs-candidate comparisons.
+   - Current CLI/runtime paths may still accept loosely specified replay inputs; strict ScenarioSpec validation is a next-step implementation item.
+
+5. **Authority states need executable posture**
    - Docs strongly assert operator-governed live authority.
    - The actual state machine (disarmed / replay-only / live-sim / armed-live / degraded-session) is not implemented yet.
 
@@ -104,4 +110,5 @@ steamer-card-engine/
 - Architecture overview: `docs/ARCHITECTURE.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
+- Scenario identity contract: `docs/SCENARIO_SPEC.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`

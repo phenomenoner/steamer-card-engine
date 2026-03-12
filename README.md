@@ -154,6 +154,9 @@ steamer-card-engine/
 │   ├── ADAPTER_SPEC.md
 │   ├── CLI_SPEC.md
 │   ├── MIGRATION_PLAN.md
+│   ├── SIM_ARTIFACT_SPEC.md
+│   ├── SCENARIO_SPEC.md
+│   ├── TOPOLOGY.md
 │   ├── AUTH_AND_SESSION_MODEL.md
 │   └── DAYTRADING_GUARDRAILS.md
 ├── examples/
@@ -206,6 +209,8 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - Auth/session model: [`docs/AUTH_AND_SESSION_MODEL.md`](docs/AUTH_AND_SESSION_MODEL.md)
 - Day-trading guardrails: [`docs/DAYTRADING_GUARDRAILS.md`](docs/DAYTRADING_GUARDRAILS.md)
 - Migration plan from current engine: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md)
+- SIM artifact contract: [`docs/SIM_ARTIFACT_SPEC.md`](docs/SIM_ARTIFACT_SPEC.md)
+- Scenario identity contract: [`docs/SCENARIO_SPEC.md`](docs/SCENARIO_SPEC.md)
 - Topology / repo map: [`docs/TOPOLOGY.md`](docs/TOPOLOGY.md)
 - Narrative overview article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md)
 - External-facing launch-style article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md)

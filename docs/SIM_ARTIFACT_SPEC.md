@@ -38,6 +38,7 @@ Out of scope:
 ```text
 runs/<lane>/<session_date>/<run_id>/
   run-manifest.json
+  scenario-spec.json          # recommended in v1, required in a future version
   event-log.jsonl
   feature-provenance.jsonl
   intent-log.jsonl
@@ -64,6 +65,18 @@ Example:
 runs/steamer-card-engine/2026-03-11/replay-sim_tw-gap-reclaim_20260311T060102Z/
 ```
 
+## Scenario identity linkage
+
+Scenario identity is defined by `docs/SCENARIO_SPEC.md`.
+
+This artifact spec focuses on run outputs, but comparison reliability depends on both lanes using the same ScenarioSpec identity.
+
+v1 posture:
+
+- `scenario_id` remains required in `run-manifest.json`
+- `scenario-spec.json` is recommended (not yet required)
+- if `scenario-spec.json` is absent, ScenarioSpec-equivalent fields must stay explicit in `run-manifest.json`
+
 ## Required artifacts
 
 ### 1) `run-manifest.json` (required)
@@ -85,6 +98,11 @@ Minimum fields:
 - `execution_model`
 - `capability_posture`
 - `artifact_files` (relative paths)
+
+Recommended (v1, for stronger cross-lane checks):
+
+- `scenario_spec_version` (for example `"scenario-spec/v1"`)
+- `scenario_fingerprint` (hash of canonical ScenarioSpec payload)
 
 `provenance` minimum:
 
@@ -308,6 +326,7 @@ To support reliable diffs, keep IDs linkable across layers:
 
 At minimum, cross-lane comparison must be able to compute:
 
+- ScenarioSpec identity match (or explicit mismatch) before behavior diffs
 - first entry time/price
 - final exit time/price
 - fill sequence and quantities
@@ -334,3 +353,4 @@ A run is v1-compliant only if:
 3. every required file has a `sha256` entry in `file-index.json`
 4. intent/risk/execution/order/fill/position chain is linkable by IDs
 5. `pnl-summary.json` includes gross + net fields
+6. `scenario_id` is present, and if `scenario-spec.json` exists it is consistent with `run-manifest.json`

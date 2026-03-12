@@ -220,6 +220,7 @@ The explicit `active_account + user_def` filtering rule is a migration lesson fr
 Responsibilities:
 
 - feed historical or recorded events through the same core contracts
+- carry an explicit ScenarioSpec identity for cross-lane comparability
 - support deterministic analysis where feasible
 - simulate execution outcomes without touching live broker flow
 - produce comparable receipts and summaries for review
