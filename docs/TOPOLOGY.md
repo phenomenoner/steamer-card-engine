@@ -20,7 +20,9 @@ steamer-card-engine/
 │   ├── AUTH_AND_SESSION_MODEL.md
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
-│   └── CONSULTANT_REVIEW_COPILOT.md
+│   ├── CONSULTANT_REVIEW_COPILOT.md
+│   └── articles/
+│       └── 2026-03-12-steamer-card-engine-overview/
 ├── examples/
 │   ├── cards/     # example card manifests (TOML)
 │   ├── decks/     # example deck manifests (TOML)
