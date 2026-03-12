@@ -193,6 +193,7 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - Migration plan from current engine: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md)
 - Topology / repo map: [`docs/TOPOLOGY.md`](docs/TOPOLOGY.md)
 - Narrative overview article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md)
+- External-facing launch-style article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md)
 
 ## Current status
 
