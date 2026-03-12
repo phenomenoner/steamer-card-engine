@@ -3,7 +3,22 @@
 > **台股日內策略卡 runtime 種子專案**  
 > A docs-first seed runtime for Taiwan stock intraday strategy cards.
 
+## Quick glossary
+
+- **Card**: 一張可版本化的策略卡，描述單一日內策略的意圖、條件、限制與所需 features。
+- **Deck**: 一組一起啟用與治理的 cards，負責套用共用 universe、風控與覆寫。
+- **Intent**: card 產生的策略動作建議；會進入 risk / execution pipeline，但不等於直接下單。
+
 `steamer-card-engine` 不是在賣「馬上可上線的自動交易系統」。
+
+先講白：這裡說的 **Card**，不是通用業界名詞，比較像我們自己定義的**策略卡 / strategy card**。
+
+你可以把它理解成：
+- 一個可版本化的**最小策略單位**
+- 裡面描述某個日內策略需要看的標的、條件、風控限制、進出規則
+- 它會產生**策略意圖（intent）**，但**不直接碰 broker 下單權限**
+
+而多張 Card 可以被組成一個 **Deck**，由 Deck 決定哪些卡一起跑、怎麼套共用風控與 universe。
 
 它比較像一個**產品骨架**：先把 Card / Deck / Adapter / Session / Replay / Risk 這些邊界定清楚，讓後續實作能夠低延遲、可回放、可審核、可逐步接近 live，而不是把既有單體腳本越疊越重。
 
