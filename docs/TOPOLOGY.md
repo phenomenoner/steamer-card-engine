@@ -9,6 +9,7 @@ It’s intentionally practical: where things live, which files are contracts vs 
 ```text
 steamer-card-engine/
 ├── README.md
+├── AGENTS.md
 ├── pyproject.toml
 ├── uv.lock
 ├── docs/
@@ -17,6 +18,7 @@ steamer-card-engine/
 │   ├── CARD_SPEC.md
 │   ├── ADAPTER_SPEC.md
 │   ├── CLI_SPEC.md
+│   ├── SETUP.md
 │   ├── AUTH_AND_SESSION_MODEL.md
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
@@ -47,6 +49,8 @@ steamer-card-engine/
 
 ### Contracts (source of truth for semantics)
 
+- `AGENTS.md` — contributor/agent protocol for safe repo work and claims discipline
+- `docs/SETUP.md` — install/bootstrap and current safe command surface
 - `docs/ARCHITECTURE.md` — planes, boundaries, intended components
 - `docs/CARD_SPEC.md` — card + intent contract (fields + behavior rules)
 - `docs/ADAPTER_SPEC.md` — market/broker normalization + routing expectations
@@ -107,6 +111,8 @@ steamer-card-engine/
 
 ## Cross-links
 
+- Setup guide: `docs/SETUP.md`
+- Agent/contributor protocol: `AGENTS.md`
 - Architecture overview: `docs/ARCHITECTURE.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`

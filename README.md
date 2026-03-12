@@ -146,6 +146,7 @@ v0.1 docs 把這些列為一級需求：
 ```text
 steamer-card-engine/
 ├── README.md
+├── AGENTS.md
 ├── pyproject.toml
 ├── docs/
 │   ├── PRODUCT_SCOPE.md
@@ -153,6 +154,7 @@ steamer-card-engine/
 │   ├── CARD_SPEC.md
 │   ├── ADAPTER_SPEC.md
 │   ├── CLI_SPEC.md
+│   ├── SETUP.md
 │   ├── MIGRATION_PLAN.md
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
@@ -177,6 +179,8 @@ steamer-card-engine/
 ```
 
 ## Quickstart
+
+完整安裝/開發流程（含 agent 操作建議）請看 [`docs/SETUP.md`](docs/SETUP.md)。
 
 ```bash
 uv venv
@@ -206,6 +210,8 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - Card contract: [`docs/CARD_SPEC.md`](docs/CARD_SPEC.md)
 - Adapter contract: [`docs/ADAPTER_SPEC.md`](docs/ADAPTER_SPEC.md)
 - CLI contract: [`docs/CLI_SPEC.md`](docs/CLI_SPEC.md)
+- Setup guide (human + agent): [`docs/SETUP.md`](docs/SETUP.md)
+- Agent contribution protocol: [`AGENTS.md`](AGENTS.md)
 - Auth/session model: [`docs/AUTH_AND_SESSION_MODEL.md`](docs/AUTH_AND_SESSION_MODEL.md)
 - Day-trading guardrails: [`docs/DAYTRADING_GUARDRAILS.md`](docs/DAYTRADING_GUARDRAILS.md)
 - Migration plan from current engine: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md)
