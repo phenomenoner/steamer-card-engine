@@ -116,6 +116,8 @@ Suggested `compare-manifest.json` (minimal):
 
 `status` is a string enum: `pass` | `fail`. If `status=pass`, `hard_fail_reasons` must be empty.
 
+`execution_model.*.hash` should be a stable hash of the canonicalized `execution_model` disclosure from each lane’s `run-manifest.json` (so mismatch is a hard gate even before deeper diffs).
+
 Suggested `diff.json` fields (minimum, reviewable):
 
 - counts: fills, orders, intents, risk decisions
@@ -179,6 +181,7 @@ Note: these stages intentionally align with the phased path in `docs/MILESTONE_M
 
 Exit gate:
 - Baseline v1 emission strategy is chosen (native emission vs converter) and recorded.
+- Comparator produces a deterministic summary diff for two pre-existing bundles (smoke test of the contract).
 - A written evidence manifest exists listing canonical ScenarioSpecs, expected run paths, and comparator report filenames.
 
 ### Stage 1 — Contract freeze (schema + semantics lock)
@@ -191,7 +194,12 @@ Exit gate:
 **C1.3 Qualitative comparability rubric**
 - define what must match vs can differ
 
+**C1.4 M1 evidence strictness**
+- require `scenario-spec.json` + `scenario_fingerprint` for evidence runs
+- enforce `execution_model` match as a hard stop for comparison
+
 Exit gate:
+- version strings and evidence strictness rules are pinned in contract docs.
 - validator rejects malformed bundles; comparator fails fast on scenario/execution_model mismatch.
 
 ### Stage 2 — Replay-sim comparable candidate lane (must come before live-sim)
@@ -204,6 +212,9 @@ Exit gate:
 - deterministic fill model + explicit `execution_model`
 - capability posture stays `trade_enabled=false`
 
+**R2.4 Artifact completeness**
+- generate all required files + `file-index.json` + `config-snapshot.json`
+
 Exit gate:
 - candidate bundle passes validator for at least 1 canonical ScenarioSpec.
 
@@ -213,12 +224,14 @@ This stage is allowed only after Stage 2 is green.
 
 **S3.1 Live-sim event ingestion + normalization**
 - emit normalized `event-log.jsonl`
-- detect feed drift (missing ticks / symbol gaps / out-of-order) and emit `anomalies.json`
 
 **S3.2 Capability posture enforcement**
 - `trade_enabled=false` remains enforced
 - execution remains **simulated** (explicit `execution_model` disclosure)
 - any broker-submission semantics/signals ⇒ treat as **milestone failure**
+
+**S3.3 Drift detection**
+- detect feed drift (missing ticks / symbol gaps / out-of-order) and emit `anomalies.json`
 
 Exit gate:
 - live-sim-attached run emits a v1 bundle with explicit capability posture and explicit anomalies for feed drift.

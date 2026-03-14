@@ -38,7 +38,7 @@ Out of scope:
 ```text
 runs/<lane>/<session_date>/<run_id>/
   run-manifest.json
-  scenario-spec.json          # recommended in v1, required in a future version
+  scenario-spec.json          # recommended in base v1; required for M1 evidence packs (see M1 comparability posture below)
   event-log.jsonl
   feature-provenance.jsonl
   intent-log.jsonl
