@@ -100,6 +100,8 @@ Current implementation receipt (2026-03-14):
 - First replay-sim comparability plumbing receipt is now archived (same-source baseline/candidate normalization; validates gates/reporting wiring):
   - note: `docs/receipts/2026-03-14_m1-stage3-first-replay-sim-comparable.md`
   - comparator: `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/summary.md`
+- Stage 4 candidate-engine-emitted attempt is now receipted as a blocker: replay CLI/runtime still does not emit a candidate v1 bundle path (`replay run` remains placeholder), so Stage 4 compare could not be run honestly.
+  - note: `docs/receipts/2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md`
 
 ### Phase 1 — Contract freeze (schema + semantics lock)
 

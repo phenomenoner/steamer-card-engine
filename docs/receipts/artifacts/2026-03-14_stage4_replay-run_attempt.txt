@@ -1,0 +1,3 @@
+$ uv run steamer-card-engine replay run --deck examples/decks/tw_cash_intraday.toml --date 2026-03-06
+warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+Placeholder replay job for deck=examples/decks/tw_cash_intraday.toml date=2026-03-06
