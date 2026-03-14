@@ -97,6 +97,10 @@ The comparator produces:
 - `summary.md` (human review)
 - `diff.json` (machine diff for key metrics)
 
+Recommended output location:
+- `comparisons/<baseline_run_id>__<candidate_run_id>/` containing `compare-manifest.json`, `summary.md`, `diff.json`
+- an evidence-pack index (future) can link to these folders
+
 Suggested `compare-manifest.json` (minimal):
 
 ```json
@@ -108,13 +112,15 @@ Suggested `compare-manifest.json` (minimal):
   "candidate": {"run_id": "...", "lane": "steamer-card-engine"},
   "scenario": {"scenario_id": "...", "scenario_fingerprint": "..."},
   "execution_model": {
-    "baseline": {"hash": "...", "fill_model": "sim-fill-model/v1"},
-    "candidate": {"hash": "...", "fill_model": "sim-fill-model/v1"}
+    "baseline": {"hash": "...", "fill_model": "sim-fill-v1"},
+    "candidate": {"hash": "...", "fill_model": "sim-fill-v1"}
   }
 }
 ```
 
 `status` is a string enum: `pass` | `fail`. If `status=pass`, `hard_fail_reasons` must be empty.
+
+Do not confuse comparator status (`pass|fail`) with run status in `run-manifest.json` (`success|failed|partial`).
 
 `execution_model.*.hash` should be a stable hash of the canonicalized `execution_model` disclosure from each lane’s `run-manifest.json` (so mismatch is a hard gate even before deeper diffs).
 

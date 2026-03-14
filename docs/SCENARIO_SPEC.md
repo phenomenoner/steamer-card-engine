@@ -106,6 +106,41 @@ Suggested composition:
 
 Use a separate hash/fingerprint (if needed) for strict equality checks; avoid making `scenario_id` itself unreadable.
 
+## `scenario_fingerprint` (v1; required for M1 evidence)
+
+For M1 evidence runs, `scenario_fingerprint` is the **hard equality key** (not `scenario_id`).
+
+Definition (normative):
+
+- `scenario_fingerprint` = `sha256_hex(canonical_json_bytes(ScenarioSpec))`
+- the canonical JSON is produced by:
+  - UTF‑8 encoding
+  - object keys **sorted**
+  - **no insignificant whitespace**
+  - arrays preserved in-order
+  - excluding any `scenario_fingerprint` field itself (if present in a wrapper)
+
+Practical rule:
+
+- If you have `scenario-spec.json`, compute the fingerprint as the SHA256 of its **canonicalized** JSON payload.
+- If ScenarioSpec is embedded in `run-manifest.json`, compute the fingerprint over the embedded ScenarioSpec object with the same canonicalization rules.
+
+Reference pseudocode:
+
+```python
+import hashlib, json
+
+def canonical_json_bytes(obj) -> bytes:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+def scenario_fingerprint(spec_obj: dict) -> str:
+    return hashlib.sha256(canonical_json_bytes(spec_obj)).hexdigest()
+```
+
+Comparator rule:
+
+- Evidence comparisons must fail fast if `scenario_fingerprint` differs between baseline and candidate.
+
 ## Determinism posture
 
 - `fixed-seed`: random seed pinned; expected for baseline comparisons.
