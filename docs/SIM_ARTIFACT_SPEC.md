@@ -296,6 +296,7 @@ Minimum fields:
 
 - `anomalies` (array)
 - each anomaly: `anomaly_id`, `severity`, `category`, `message`, `related_ids`, `detected_at_utc`
+- `severity` values: `critical` | `major` | `minor` | `info`
 
 ### 12) `config-snapshot.json` (required)
 

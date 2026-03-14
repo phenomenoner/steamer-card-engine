@@ -103,20 +103,18 @@ Suggested `compare-manifest.json` (minimal):
 {
   "compare_version": "m1-compare/v0",
   "status": "pass",
-  "hard_fail_reasons": ["scenario_fingerprint_mismatch"],
+  "hard_fail_reasons": [],
   "baseline": {"run_id": "...", "lane": "baseline-bot"},
   "candidate": {"run_id": "...", "lane": "steamer-card-engine"},
   "scenario": {"scenario_id": "...", "scenario_fingerprint": "..."},
   "execution_model": {
-    "baseline_hash": "...",
-    "candidate_hash": "...",
-    "baseline_fill_model": "sim-fill-model/v1",
-    "candidate_fill_model": "sim-fill-model/v1"
+    "baseline": {"hash": "...", "fill_model": "sim-fill-model/v1"},
+    "candidate": {"hash": "...", "fill_model": "sim-fill-model/v1"}
   }
 }
 ```
 
-`status` is a string enum: `pass` | `fail`.
+`status` is a string enum: `pass` | `fail`. If `status=pass`, `hard_fail_reasons` must be empty.
 
 Suggested `diff.json` fields (minimum, reviewable):
 
@@ -127,7 +125,7 @@ Suggested `diff.json` fields (minimum, reviewable):
 - PnL (reported, not a gate): gross / fees / taxes / net
 - anomalies: by severity and category
 
-Severity vocabulary (v0 suggestion; keep consistent with milestone wording): `critical` | `major` | `minor` | `info`.
+Severity vocabulary (see `SIM_ARTIFACT_SPEC` anomalies section): `critical` | `major` | `minor` | `info`.
 
 ## Gap map (baseline-bot → v1 bundle)
 
@@ -223,7 +221,7 @@ This stage is allowed only after Stage 2 is green.
 - any broker-submission semantics/signals ⇒ treat as **milestone failure**
 
 Exit gate:
-- live-sim-attached run emits a v1 bundle with explicit anomalies for feed drift.
+- live-sim-attached run emits a v1 bundle with explicit capability posture and explicit anomalies for feed drift.
 
 ### Stage 4 — Evidence pack acceptance (3+ scenarios)
 
