@@ -94,6 +94,9 @@ This phase should **freeze the core artifact / receipt contracts first** (events
 
 Only after those contracts are stable should we invest in adapter shims, otherwise we risk encoding legacy behavior into unstable schemas.
 
+Concrete acceptance target for this phase:
+- Milestone M1 — SIM comparability (replay-sim first, then live-sim-attached): `docs/MILESTONE_M1_SIM_COMPARABILITY.md`
+
 Deliverables:
 
 - ScenarioSpec contract freeze for cross-lane identity (`docs/SCENARIO_SPEC.md`)
@@ -114,6 +117,7 @@ Exit criteria:
 - one or more existing strategy ideas can be expressed as replayable cards
 - market data can be recorded and replayed with stable contracts
 - baseline and candidate lanes can declare the same ScenarioSpec identity for a test run
+- comparisons fail fast unless ScenarioSpec fingerprint and `execution_model` disclosure match
 - replay sim and live sim are clearly differentiated from live
 
 ### Phase 3 — Adapter shim from current stack

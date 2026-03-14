@@ -77,6 +77,11 @@ v1 posture:
 - `scenario-spec.json` is recommended (not yet required)
 - if `scenario-spec.json` is absent, ScenarioSpec-equivalent fields must stay explicit in `run-manifest.json`
 
+M1 comparability posture (stricter than base v1):
+
+- for M1 evidence packs, `scenario-spec.json` is **required** in both lanes
+- for M1 evidence packs, `scenario_fingerprint` is **required** in `run-manifest.json`
+
 ## Required artifacts
 
 ### 1) `run-manifest.json` (required)
@@ -128,6 +133,10 @@ Recommended (v1, for stronger cross-lane checks):
 - `rounding_rule`
 - `fill_model`
 - `random_seed` (nullable but explicit)
+
+Note:
+- `fill_model` must make the execution posture explicit (simulated vs anything broker-backed).
+- For M1 evidence packs, `fill_model` must be a simulator (no broker submission semantics).
 
 `capability_posture` minimum:
 

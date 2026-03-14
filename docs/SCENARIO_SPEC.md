@@ -119,6 +119,7 @@ For baseline-vs-candidate parity checks, prefer `fixed-seed` whenever the simula
 - `run-manifest.json` remains the canonical run envelope.
 - ScenarioSpec defines **what scenario was intended**; run-manifest/log files show **what happened**.
 - Comparator should fail fast when ScenarioSpec identity mismatches before computing PnL/fill diffs.
+- For M1 SIM-comparability evidence runs, equality of a ScenarioSpec fingerprint/hash should be treated as a hard requirement; human-readable `scenario_id` alone is not sufficient.
 
 ## Adoption note (current reality)
 

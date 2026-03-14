@@ -22,6 +22,7 @@ steamer-card-engine/
 │   ├── AUTH_AND_SESSION_MODEL.md
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
+│   ├── MILESTONE_M1_SIM_COMPARABILITY.md
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
@@ -58,6 +59,7 @@ steamer-card-engine/
 - `docs/DAYTRADING_GUARDRAILS.md` — emergency stop / forced exit / flatten policy
 - `docs/CLI_SPEC.md` — intended CLI families + governance stance
 - `docs/MIGRATION_PLAN.md` — phase slicing and dependency ordering
+- `docs/MILESTONE_M1_SIM_COMPARABILITY.md` — bounded milestone plan for replay/live-sim artifact comparability
 - `docs/SIM_ARTIFACT_SPEC.md` — simulation run artifacts, provenance, and checksum/index contract
 - `docs/SCENARIO_SPEC.md` — shared scenario identity contract for baseline-vs-candidate comparability
 
@@ -94,11 +96,13 @@ steamer-card-engine/
 
 4. **Scenario identity is now defined, but not yet enforced by runtime**
    - `docs/SCENARIO_SPEC.md` defines the shared identity shape needed for baseline-vs-candidate comparisons.
+   - M1 SIM-comparability evidence runs require `scenario-spec.json` + `scenario_fingerprint`, but enforcement is not implemented yet.
    - Current CLI/runtime paths may still accept loosely specified replay inputs; strict ScenarioSpec validation is a next-step implementation item.
 
 5. **Authority states need executable posture**
    - Docs strongly assert operator-governed live authority.
    - The actual state machine (disarmed / replay-only / live-sim / armed-live / degraded-session) is not implemented yet.
+   - Until then, any sim attachment must remain explicitly `trade_enabled=false` with simulated execution disclosed in artifacts.
 
 ## Where to put new work (when v0.2 starts)
 
