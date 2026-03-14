@@ -27,6 +27,8 @@ steamer-card-engine/
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
+│   ├── receipts/
+│   │   └── 2026-03-14_m1-stage3-first-replay-sim-comparable.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
 ├── examples/
@@ -42,6 +44,13 @@ steamer-card-engine/
 │   ├── adapters/base.py
 │   ├── cards/base.py
 │   └── runtime/components.py
+├── runs/
+│   ├── baseline-bot/
+│   │   └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/
+│   └── steamer-card-engine/
+│       └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
+├── comparisons/
+│   └── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
 └── tests/
     ├── test_cli.py
     ├── test_manifests.py
@@ -79,6 +88,9 @@ steamer-card-engine/
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
+- `runs/...` + `comparisons/...`
+  - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for canonical scenarios
+  - current first receipt is plumbing-focused (same-source normalization in both lanes), useful for contract/gate verification
 
 ### Intentional placeholders (not yet “real runtime”)
 

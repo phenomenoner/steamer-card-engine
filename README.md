@@ -241,6 +241,7 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - ✅ Shared auth/session and day-trading guardrail docs added
 - ✅ Python package skeleton exists
 - ✅ Manifest validation + inspect commands（auth/card/deck/global）
+- ✅ First replay-sim comparability **plumbing** receipt landed for M1 Stage 3 (canonical scenario `tw-paper-sim.twse.2026-03-06.full-session`; baseline/candidate both normalized from the same legacy source)
 - ⏳ Replay runner MVP
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow

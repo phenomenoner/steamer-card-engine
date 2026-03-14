@@ -97,6 +97,9 @@ Current implementation receipt (2026-03-14):
 - CLI added: `sim normalize-baseline` and `sim compare`.
 - Baseline conversion currently focuses on honest normalization + placeholders where legacy artifacts lack order/fill/position detail.
 - Comparator now hard-fails on `execution_model` mismatch and emits scaffold compare outputs.
+- First replay-sim comparability plumbing receipt is now archived (same-source baseline/candidate normalization; validates gates/reporting wiring):
+  - note: `docs/receipts/2026-03-14_m1-stage3-first-replay-sim-comparable.md`
+  - comparator: `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/summary.md`
 
 ### Phase 1 — Contract freeze (schema + semantics lock)
 

@@ -1,0 +1,29 @@
+{
+  "baseline": {
+    "bundle_dir": "/root/.openclaw/workspace/steamer-card-engine/runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z",
+    "lane": "baseline-bot",
+    "run_id": "replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z"
+  },
+  "candidate": {
+    "bundle_dir": "/root/.openclaw/workspace/steamer-card-engine/runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z",
+    "lane": "steamer-card-engine",
+    "run_id": "replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z"
+  },
+  "compare_version": "m1-compare/v0",
+  "execution_model": {
+    "baseline": {
+      "fill_model": "sim-fill-v1",
+      "hash": "a2a2587964a530fc8b683e6bcb13009fc14dbd65e40ce80f16661f35a91743fc"
+    },
+    "candidate": {
+      "fill_model": "sim-fill-v1",
+      "hash": "a2a2587964a530fc8b683e6bcb13009fc14dbd65e40ce80f16661f35a91743fc"
+    }
+  },
+  "hard_fail_reasons": [],
+  "scenario": {
+    "scenario_fingerprint": "b6d0df4a4635e7cbebf83677bedf69a97e1ed339061b9c9af1d89908765ec9df",
+    "scenario_id": "tw-paper-sim.twse.2026-03-06.full-session"
+  },
+  "status": "pass"
+}

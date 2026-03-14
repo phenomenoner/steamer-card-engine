@@ -1,0 +1,21 @@
+{
+  "cards": [
+    {
+      "card_id": "legacy-baseline-card",
+      "card_version": "legacy/v0"
+    }
+  ],
+  "config_hash": "720c7977849c7ab32dfe41f7b4a20dd46ccaf6ed1ee0f3a9ce4298363edf0836",
+  "deck_id": "legacy-baseline-deck",
+  "deck_version": "legacy/v0",
+  "global_config_version": "legacy/v0",
+  "normalizer": {
+    "event_sources": [
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-06/trades_20260306T003819Z_part0000.jsonl"
+    ],
+    "name": "steamer-card-engine sim normalize-baseline",
+    "source_dir": "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-paper-sim/2026-03-06",
+    "version": "m1-normalizer/v0"
+  },
+  "scenario_id": "tw-paper-sim.twse.2026-03-06.full-session"
+}

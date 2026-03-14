@@ -1,0 +1,75 @@
+{
+  "files": [
+    {
+      "bytes": 1863,
+      "path": "run-manifest.json",
+      "sha256": "49b64eaaf48aeb4304fb3d7aa2bb15680467e427a8f2218a63d41ba8b6619709"
+    },
+    {
+      "bytes": 1995,
+      "path": "scenario-spec.json",
+      "sha256": "4d58c4828c545940f20a18f4057343e6465acb44535fb8c8159de93c42361afd"
+    },
+    {
+      "bytes": 1008619,
+      "path": "event-log.jsonl",
+      "sha256": "cd1e1d2134bc6973f524ec6a8366f1b7c2b47be46cdf0489f3d60f5ed5875180"
+    },
+    {
+      "bytes": 35036,
+      "path": "feature-provenance.jsonl",
+      "sha256": "8bedb5725425de451df1f31e1f6289a45e17b51104858ab0be380d0afbe643c3"
+    },
+    {
+      "bytes": 66295,
+      "path": "intent-log.jsonl",
+      "sha256": "606b4c0594e7e9b763c64afb429756480b671bd054b169e46439677ce8a45c3d"
+    },
+    {
+      "bytes": 26948,
+      "path": "risk-receipts.jsonl",
+      "sha256": "d92cea060e63a0e0566e2e823e4d2e33a275ee0a788db1a4c0981d50505721db"
+    },
+    {
+      "bytes": 1380,
+      "path": "execution-log.jsonl",
+      "sha256": "6c85cb482cf76756b2013b99fda5418a0f9d28479b0ec1b95de7ed4ddda7daf2"
+    },
+    {
+      "bytes": 0,
+      "path": "order-lifecycle.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "fills.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "positions.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 254,
+      "path": "pnl-summary.json",
+      "sha256": "8e16cf42026aad463b57c4450c9327d3c43190699983ff865b593d742b41d119"
+    },
+    {
+      "bytes": 320,
+      "path": "anomalies.json",
+      "sha256": "324d1dd85837d802cfed7c4126f31ef747298436c8c99d1b820d98153c29d078"
+    },
+    {
+      "bytes": 807,
+      "path": "config-snapshot.json",
+      "sha256": "dbd15dc7ac4d242ab82b3086383e10e9bf2484b12523aac7259f07d748e04228"
+    }
+  ],
+  "generated_at_utc": "2026-03-14T20:02:06.491Z",
+  "notes": [
+    "file-index.json self-hash is intentionally omitted to avoid recursive checksum instability"
+  ],
+  "run_id": "replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z",
+  "schema_version": "sim-artifacts/v1"
+}

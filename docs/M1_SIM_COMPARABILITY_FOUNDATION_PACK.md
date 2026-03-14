@@ -194,6 +194,8 @@ Implementation receipt (2026-03-14):
 - `steamer-card-engine sim normalize-baseline` now exists as the first bounded converter path (legacy baseline artifacts → v1-shaped bundle with explicit anomalies/placeholders).
 - `steamer-card-engine sim compare` now exists as the comparator skeleton (hard-fail gates + scaffold `compare-manifest.json` / `diff.json` / `summary.md`).
 - `execution_model` hash mismatch is enforced as a hard stop in comparator output status.
+- First replay-sim comparability plumbing receipt (single canonical scenario; baseline/candidate both normalized from same legacy source) is now archived with real bundles + comparator outputs:
+  - `docs/receipts/2026-03-14_m1-stage3-first-replay-sim-comparable.md`
 
 ### Stage 1 — Contract freeze (schema + semantics lock)
 
