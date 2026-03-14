@@ -23,6 +23,7 @@ steamer-card-engine/
 │   ├── DAYTRADING_GUARDRAILS.md
 │   ├── MIGRATION_PLAN.md
 │   ├── MILESTONE_M1_SIM_COMPARABILITY.md
+│   ├── M1_SIM_COMPARABILITY_FOUNDATION_PACK.md
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
@@ -60,6 +61,7 @@ steamer-card-engine/
 - `docs/CLI_SPEC.md` — intended CLI families + governance stance
 - `docs/MIGRATION_PLAN.md` — phase slicing and dependency ordering
 - `docs/MILESTONE_M1_SIM_COMPARABILITY.md` — bounded milestone plan for replay/live-sim artifact comparability
+- `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md` — baseline inventory + comparison contract v0 + sprint-ready stage ordering for M1 execution
 - `docs/SIM_ARTIFACT_SPEC.md` — simulation run artifacts, provenance, and checksum/index contract
 - `docs/SCENARIO_SPEC.md` — shared scenario identity contract for baseline-vs-candidate comparability
 

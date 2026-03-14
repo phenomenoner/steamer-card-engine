@@ -62,6 +62,9 @@ This plan is deliberately ordered to avoid “build runtime first, then invent c
 
 **Goal:** make comparability *possible* before writing runtime.
 
+Execution pack (recommended starting point):
+- `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md`
+
 Work packages:
 
 - **F0.1: Baseline artifact inventory**
