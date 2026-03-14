@@ -93,6 +93,11 @@ Receipts:
 - Comparator produces a deterministic summary for two pre-existing bundles
 - A frozen **evidence manifest** listing canonical ScenarioSpecs, expected artifact paths, and comparator report filenames
 
+Current implementation receipt (2026-03-14):
+- CLI added: `sim normalize-baseline` and `sim compare`.
+- Baseline conversion currently focuses on honest normalization + placeholders where legacy artifacts lack order/fill/position detail.
+- Comparator now hard-fails on `execution_model` mismatch and emits scaffold compare outputs.
+
 ### Phase 1 — Contract freeze (schema + semantics lock)
 
 **Goal:** freeze the *interfaces* so runtime work cannot drift.

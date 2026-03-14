@@ -72,7 +72,33 @@ Responsibilities:
 - capture and echo ScenarioSpec identity (`scenario_id` + core scenario knobs)
 - export decision receipts
 
-### 4. Operator commands
+### 4. SIM comparability commands (M1 foundation)
+
+Used for baseline normalization and baseline-vs-candidate bundle comparison in the sim-only M1 lane.
+
+Examples:
+
+```bash
+steamer-card-engine sim normalize-baseline \
+  --baseline-dir /path/to/legacy/baseline/day \
+  --output-dir /tmp/baseline-bundle \
+  --session-date 2026-03-13 \
+  --scenario-id tw-paper-sim.twse.2026-03-13.full-session
+
+steamer-card-engine sim compare \
+  --baseline /tmp/baseline-bundle \
+  --candidate /tmp/candidate-bundle \
+  --output-dir /tmp/compare
+```
+
+Responsibilities:
+
+- normalize legacy baseline artifacts (`decisions.jsonl` + tick/trade sources) into a v1-shaped bundle
+- keep capability posture explicit (`trade_enabled=false`)
+- emit comparator hard-fail reasons for scenario/execution-model mismatches
+- write scaffold compare outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
+
+### 5. Operator commands
 
 Used for controlled runtime and live-adjacent governance.
 
@@ -112,7 +138,8 @@ The CLI should support:
 
 - `0`: success
 - `1`: CLI usage error / unhandled command / general failure
-- `2`: manifest validation failure (schema or semantic checks)
+- `2`: validation/normalization failure (manifest or sim command input/schema errors)
+- `3`: comparison completed but failed hard gates (`sim compare` status=`fail`)
 
 (Tests already assert `2` for validation errors; keep this stable.)
 
@@ -166,6 +193,8 @@ Current implementation status:
 - ✅ `author validate-card` / `author inspect-card`
 - ✅ `author validate-deck` / `author inspect-deck`
 - ✅ `author validate-global` / `author inspect-global`
+- ✅ `sim normalize-baseline` (legacy baseline → v1-shaped M1 bundle)
+- ✅ `sim compare` (hard-fail gates + scaffold compare report)
 - ⏳ replay/session/operator execution remains placeholder
 
 Next evolution order remains:

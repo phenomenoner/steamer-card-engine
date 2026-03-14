@@ -190,6 +190,11 @@ Exit gate:
 - Comparator produces a deterministic summary diff for two pre-existing bundles (smoke test of the contract).
 - A written evidence manifest exists listing canonical ScenarioSpecs, expected run paths, and comparator report filenames.
 
+Implementation receipt (2026-03-14):
+- `steamer-card-engine sim normalize-baseline` now exists as the first bounded converter path (legacy baseline artifacts → v1-shaped bundle with explicit anomalies/placeholders).
+- `steamer-card-engine sim compare` now exists as the comparator skeleton (hard-fail gates + scaffold `compare-manifest.json` / `diff.json` / `summary.md`).
+- `execution_model` hash mismatch is enforced as a hard stop in comparator output status.
+
 ### Stage 1 — Contract freeze (schema + semantics lock)
 
 **C1.1 Pin version strings** (`scenario-spec/v1`, `sim-artifacts/v1`)

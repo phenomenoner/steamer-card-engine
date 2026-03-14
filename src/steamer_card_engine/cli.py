@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from steamer_card_engine.manifest import (
     ManifestValidationError,
@@ -14,6 +15,11 @@ from steamer_card_engine.manifest import (
     summarize_card_manifest,
     summarize_deck_manifest,
     summarize_global_config,
+)
+from steamer_card_engine.sim_compare import (
+    SimCompareError,
+    compare_bundles,
+    normalize_baseline_bundle,
 )
 
 
@@ -76,6 +82,35 @@ def build_parser() -> argparse.ArgumentParser:
     replay_run.add_argument("--deck", required=True)
     replay_run.add_argument("--date", required=True)
     replay_run.add_argument("--dry-run", action="store_true")
+
+    sim = subparsers.add_parser("sim", help="SIM artifact normalization/comparison commands")
+    sim_sub = sim.add_subparsers(dest="sim_command", required=True)
+
+    normalize = sim_sub.add_parser(
+        "normalize-baseline",
+        help="Normalize legacy baseline artifacts into an M1-compatible SIM bundle",
+    )
+    normalize.add_argument("--baseline-dir", required=True)
+    normalize.add_argument("--output-dir", required=True)
+    normalize.add_argument("--session-date", required=True)
+    normalize.add_argument("--scenario-id", required=True)
+    normalize.add_argument("--run-id")
+    normalize.add_argument("--lane", default="baseline-bot")
+    normalize.add_argument("--scenario-spec")
+    normalize.add_argument("--max-events", type=int)
+    normalize.add_argument("--max-decisions", type=int)
+    normalize.add_argument("--fill-model", default="sim-fill-v1")
+    normalize.add_argument("--json", action="store_true", dest="as_json")
+
+    compare = sim_sub.add_parser(
+        "compare",
+        help="Compare two SIM bundles with M1 hard-stop checks",
+    )
+    compare.add_argument("--baseline", required=True)
+    compare.add_argument("--candidate", required=True)
+    compare.add_argument("--output-dir", required=True)
+    compare.add_argument("--allow-missing-fingerprint", action="store_true")
+    compare.add_argument("--json", action="store_true", dest="as_json")
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
@@ -240,8 +275,51 @@ def main(argv: list[str] | None = None) -> int:
                 _print_global_summary(summary)
             return 0
 
+        if args.command == "sim" and args.sim_command == "normalize-baseline":
+            summary = normalize_baseline_bundle(
+                baseline_dir=Path(args.baseline_dir),
+                output_dir=Path(args.output_dir),
+                session_date=args.session_date,
+                scenario_id=args.scenario_id,
+                run_id=args.run_id,
+                lane=args.lane,
+                scenario_spec_path=Path(args.scenario_spec) if args.scenario_spec else None,
+                max_events=args.max_events,
+                max_decisions=args.max_decisions,
+                fill_model=args.fill_model,
+            )
+            if args.as_json:
+                _print_json(summary)
+            else:
+                print(
+                    "Normalized baseline bundle "
+                    f"run_id={summary['run_id']} output={summary['bundle_dir']} "
+                    f"anomalies={summary['counts']['anomalies']}"
+                )
+            return 0
+
+        if args.command == "sim" and args.sim_command == "compare":
+            summary = compare_bundles(
+                baseline=Path(args.baseline),
+                candidate=Path(args.candidate),
+                output_dir=Path(args.output_dir),
+                require_scenario_fingerprint=not args.allow_missing_fingerprint,
+            )
+            if args.as_json:
+                _print_json(summary)
+            else:
+                print(
+                    "Comparator "
+                    f"status={summary['status']} output={summary['output_dir']} "
+                    f"hard_fails={len(summary['hard_fail_reasons'])}"
+                )
+            return 0 if summary["status"] == "pass" else 3
+
     except ManifestValidationError as error:
         return _handle_manifest_error(error)
+    except SimCompareError as error:
+        print(f"SIM comparability command failed: {error}", flush=True)
+        return 2
 
     if args.command == "replay" and args.replay_command == "run":
         mode = "dry-run" if args.dry_run else "replay"

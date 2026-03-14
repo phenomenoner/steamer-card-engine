@@ -198,9 +198,22 @@ uv run steamer-card-engine auth inspect-profile examples/profiles/tw_cash_agent_
 uv run steamer-card-engine author inspect-card examples/cards/gap_reclaim.toml
 uv run steamer-card-engine author inspect-deck examples/decks/tw_cash_intraday.toml --cards-dir examples/cards
 uv run steamer-card-engine author inspect-global examples/config/global.toml
+
+# M1 foundation: baseline normalization + comparator skeleton
+uv run steamer-card-engine sim normalize-baseline \
+  --baseline-dir /path/to/baseline/day \
+  --output-dir /tmp/sce-baseline-bundle \
+  --session-date 2026-03-13 \
+  --scenario-id tw-paper-sim.twse.2026-03-13.full-session
+
+uv run steamer-card-engine sim compare \
+  --baseline /tmp/sce-baseline-bundle \
+  --candidate /tmp/sce-candidate-bundle \
+  --output-dir /tmp/sce-compare
 ```
 
-目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global）。
+目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global）
+以及 M1 基礎實作：`sim normalize-baseline` / `sim compare`。
 Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 
 ## 文件導覽

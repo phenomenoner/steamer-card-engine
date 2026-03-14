@@ -38,12 +38,14 @@ steamer-card-engine/
 │   ├── cli.py
 │   ├── manifest.py
 │   ├── models.py
+│   ├── sim_compare.py         # M1 baseline normalizer + comparator skeleton
 │   ├── adapters/base.py
 │   ├── cards/base.py
 │   └── runtime/components.py
 └── tests/
     ├── test_cli.py
     ├── test_manifests.py
+    ├── test_sim_compare.py
     └── fixtures/
 ```
 
@@ -69,10 +71,14 @@ steamer-card-engine/
 
 - `src/steamer_card_engine/manifest.py`
   - TOML loading + validation for: auth profile / card / deck / global
+- `src/steamer_card_engine/sim_compare.py`
+  - M1 foundation tooling:
+    - baseline artifact normalizer (`sim normalize-baseline`)
+    - comparator skeleton (`sim compare`) with hard gates + scaffold report outputs
 - `src/steamer_card_engine/cli.py`
-  - validate/inspect CLI for those manifests (plus placeholders for replay/operator)
-- `tests/test_cli.py`, `tests/test_manifests.py`
-  - pin current CLI behaviors and validation rules
+  - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
+- `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
+  - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 
 ### Intentional placeholders (not yet “real runtime”)
 
@@ -95,6 +101,7 @@ steamer-card-engine/
 3. **Replay credibility depends on receipts**
    - `docs/SIM_ARTIFACT_SPEC.md` now defines the target artifact contract (event/feature/intent/risk/execution + checksums).
    - Runtime emission is still partial/placeholder, so replay remains a contract-first path rather than a complete capability.
+   - M1 baseline normalization is now implemented, but currently uses conservative placeholders for unknown legacy fields (for example qty/fill/position details when baseline artifacts do not expose them).
 
 4. **Scenario identity is now defined, but not yet enforced by runtime**
    - `docs/SCENARIO_SPEC.md` defines the shared identity shape needed for baseline-vs-candidate comparisons.
