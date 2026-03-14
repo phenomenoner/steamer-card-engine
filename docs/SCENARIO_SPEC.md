@@ -104,7 +104,7 @@ Suggested composition:
 
 `<strategy_or_deck>.<market>.<session_date>.<slice_label>[.<variant>]`
 
-Use a separate hash/fingerprint (if needed) for strict equality checks; avoid making `scenario_id` itself unreadable.
+Use a separate fingerprint for strict equality checks (required for M1 evidence runs; see `scenario_fingerprint` below); avoid making `scenario_id` itself unreadable.
 
 ## `scenario_fingerprint` (v1; required for M1 evidence)
 
@@ -117,6 +117,7 @@ Definition (normative):
   - UTF‑8 encoding
   - object keys **sorted**
   - **no insignificant whitespace**
+  - non-ASCII characters kept as-is (NOT `\uXXXX` escaped)
   - arrays preserved in-order
   - excluding any `scenario_fingerprint` field itself (if present in a wrapper)
 
