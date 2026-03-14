@@ -47,7 +47,7 @@ For M1 comparison, both lanes must produce bundles conforming to:
 At minimum, a *comparable* pair must include (see `SIM_ARTIFACT_SPEC` for exact fields):
 
 - `run-manifest.json`
-- `scenario-spec.json` (**required for M1 evidence packs**)
+- `scenario-spec.json` (**required for M1 evidence packs**; recommended-only in base `SIM_ARTIFACT_SPEC` v1)
 - `event-log.jsonl`
 - `feature-provenance.jsonl`
 - `intent-log.jsonl`
@@ -102,14 +102,21 @@ Suggested `compare-manifest.json` (minimal):
 ```json
 {
   "compare_version": "m1-compare/v0",
-  "status": "pass|fail",
+  "status": "pass",
   "hard_fail_reasons": ["scenario_fingerprint_mismatch"],
   "baseline": {"run_id": "...", "lane": "baseline-bot"},
   "candidate": {"run_id": "...", "lane": "steamer-card-engine"},
   "scenario": {"scenario_id": "...", "scenario_fingerprint": "..."},
-  "execution_model": {"baseline_hash": "...", "candidate_hash": "..."}
+  "execution_model": {
+    "baseline_hash": "...",
+    "candidate_hash": "...",
+    "baseline_fill_model": "sim-fill-model/v1",
+    "candidate_fill_model": "sim-fill-model/v1"
+  }
 }
 ```
+
+`status` is a string enum: `pass` | `fail`.
 
 Suggested `diff.json` fields (minimum, reviewable):
 
@@ -119,6 +126,8 @@ Suggested `diff.json` fields (minimum, reviewable):
 - exit-reason distribution (if available)
 - PnL (reported, not a gate): gross / fees / taxes / net
 - anomalies: by severity and category
+
+Severity vocabulary (v0 suggestion; keep consistent with milestone wording): `critical` | `major` | `minor` | `info`.
 
 ## Gap map (baseline-bot → v1 bundle)
 
@@ -154,6 +163,8 @@ Either way, the *output contract* is identical: v1 bundle + integrity index.
 
 This ordering is intended to prevent a common failure mode: building “runtime” first and inventing comparability later.
 
+Note: these stages intentionally align with the phased path in `docs/MILESTONE_M1_SIM_COMPARABILITY.md` (same order; this doc is the more execution-oriented breakdown).
+
 ### Stage 0 — Foundation (pre-sprint, serial)
 
 **F0.1 Baseline inventory + mapping**
@@ -169,6 +180,7 @@ This ordering is intended to prevent a common failure mode: building “runtime�
 - comparator: fail-fast gates + summary report shape
 
 Exit gate:
+- Baseline v1 emission strategy is chosen (native emission vs converter) and recorded.
 - A written evidence manifest exists listing canonical ScenarioSpecs, expected run paths, and comparator report filenames.
 
 ### Stage 1 — Contract freeze (schema + semantics lock)
@@ -197,23 +209,34 @@ Exit gate:
 Exit gate:
 - candidate bundle passes validator for at least 1 canonical ScenarioSpec.
 
-### Stage 3 — Evidence pack acceptance (3+ scenarios)
-
-**A3.1 Baseline v1 bundle production for those ScenarioSpecs**
-
-**A3.2 Candidate v1 bundle production for those ScenarioSpecs**
-
-**A3.3 Comparator report + human review notes**
-
-Exit gate:
-- evidence pack exists; each scenario has baseline+candidate bundles + comparator + short review note.
-
-### Stage 4 — Live-sim attached ingestion (still simulated execution)
+### Stage 3 — Live-sim attached ingestion (still simulated execution)
 
 This stage is allowed only after Stage 2 is green.
 
+**S3.1 Live-sim event ingestion + normalization**
+- emit normalized `event-log.jsonl`
+- detect feed drift (missing ticks / symbol gaps / out-of-order) and emit `anomalies.json`
+
+**S3.2 Capability posture enforcement**
+- `trade_enabled=false` remains enforced
+- execution remains **simulated** (explicit `execution_model` disclosure)
+- any broker-submission semantics/signals ⇒ treat as **milestone failure**
+
 Exit gate:
-- live-sim-attached run emits v1 bundle with explicit anomalies for feed drift (gaps/out-of-order/missing symbols).
+- live-sim-attached run emits a v1 bundle with explicit anomalies for feed drift.
+
+### Stage 4 — Evidence pack acceptance (3+ scenarios)
+
+Stage 4 is the M1 acceptance evidence pack.
+
+**A4.1 Baseline v1 bundle production for canonical ScenarioSpecs**
+
+**A4.2 Candidate v1 bundle production for canonical ScenarioSpecs**
+
+**A4.3 Comparator report + human review notes**
+
+Exit gate:
+- evidence pack exists; each scenario has baseline+candidate bundles + comparator + short review note.
 
 ## Cross-links
 
