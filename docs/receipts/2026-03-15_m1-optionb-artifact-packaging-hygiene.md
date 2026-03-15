@@ -82,6 +82,12 @@ Topology status:
 - result: no critical issue; one medium guardrail on cross-lane canonical deletion risk
 - accepted fix: `docs/EVIDENCE_PACKAGING_HYGIENE.md` now explicitly forbids deleting/moving canonical copies before re-pointing incoming symlinks
 
+## Docs memory ingest receipt
+
+- receipt: `docs/receipts/artifacts/2026-03-15_optionb_docs_memory_ingest.json`
+- targeted ingest to `steamer-card-engine/docs` was allowlist-blocked (`source_roots_not_allowlisted`)
+- fallback default-allowlist ingest executed successfully and limitation is recorded in receipt
+
 ## Risk note
 
 Symlinked artifact paths are safe inside repo checks/validation, but standalone bundle exports should dereference symlinks:

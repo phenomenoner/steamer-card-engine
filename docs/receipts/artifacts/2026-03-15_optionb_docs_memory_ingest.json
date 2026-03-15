@@ -1,0 +1,28 @@
+{
+  "date_utc": "2026-03-15",
+  "target_repo": "steamer-card-engine",
+  "attempts": [
+    {
+      "mode": "targeted",
+      "source_roots": [
+        "/root/.openclaw/workspace/steamer-card-engine/docs"
+      ],
+      "source_globs": [
+        "**/*.md"
+      ],
+      "result": "warning",
+      "warning": "source_roots_not_allowlisted"
+    },
+    {
+      "mode": "fallback_default_allowlist",
+      "source_roots": null,
+      "result": "ok",
+      "details": {
+        "files": 1571,
+        "batches": 14,
+        "changed": 0
+      }
+    }
+  ],
+  "limitation": "Current docs-cold-lane allowlist does not permit direct ingest from steamer-card-engine/docs, so this pass records the block and uses default-allowlist ingest as best truthful fallback."
+}
