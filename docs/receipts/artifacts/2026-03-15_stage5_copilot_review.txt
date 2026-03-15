@@ -1,0 +1,126 @@
+● Get full git diff
+  $ cd /root/.openclaw/workspace/steamer-card-engine && git --no-pager diff HEAD && echo
+  "---STAGED---" && git --no-pager diff --cached HEAD
+  └ 417 lines...
+
+● Recent commit history
+  $ cd /root/.openclaw/workspace/steamer-card-engine && git --no-pager log --oneline -10
+  └ 11 lines...
+
+● Check what normalize_baseline_bundle returns
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n "^def
+  normalize_baseline_bundle\|return summary\|summary\[.lane.\]\|\"lane\"\|bundle_dir"
+  src/steamer_card_engine/sim_compare.py | head -30
+  └ 31 lines...
+
+● Check key references in cli.py
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "bundle_dir\|lane\|_emit_replay\|normalize_baseline_bundle\|SimCompareError"
+  src/steamer_card_engine/cli.py | head -40
+  └ 14 lines...
+
+● Run existing tests
+  $ cd /root/.openclaw/workspace/steamer-card-engine && uv run pytest tests/ -x -q 2>&1 | tail -40
+  └ 4 lines...
+
+● Read src/steamer_card_engine/sim_compare.py lines 650-690
+  └ 41 lines read
+
+● Check summary keys in sim_compare.py
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n "counts\|anomalies\|run_id"
+  src/steamer_card_engine/sim_compare.py | grep -v "#" | head -30
+  └ 31 lines...
+
+● Check scenario_spec_path handling in normalize_baseline_bundle
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "scenario_spec_path\|fill_model\|max_events\|max_decisions" src/steamer_card_engine/sim_compare.py
+   | head -20
+  └ 21 lines...
+
+● Check hardcoded path in _default_baseline_dir
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "parents\[3\]\|__file__\|_default_baseline" src/steamer_card_engine/cli.py
+  └ 4 lines...
+
+● Check SIM_ARTIFACT_SPEC for normalizer/emitter field contract
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n "normalizer\|emitter"
+  docs/SIM_ARTIFACT_SPEC.md | head -20
+  └ 1 line...
+
+● Read src/steamer_card_engine/cli.py lines 233-244
+  └ 10 lines read
+
+● Check SIM_ARTIFACT_SPEC for config-snapshot contract
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "normalizer\|emitter\|config.snapshot\|config_snapshot" docs/SIM_ARTIFACT_SPEC.md | head -20
+  └ 3 lines...
+
+● Read docs/SIM_ARTIFACT_SPEC.md lines 295-340
+  └ 46 lines read
+
+Here's my code review of the replay-run candidate bundle emission path:
+
+---
+
+## 🔴 Critical Issues
+
+### 1. `_default_baseline_dir` hardcodes a dev-environment path
+**File:** `src/steamer_card_engine/cli.py:233–242`
+
+```python
+def _default_baseline_dir(session_date: str) -> Path:
+    return (
+        Path(__file__).resolve().parents[3]
+        / "openclaw-async-coding-playbook"
+        / "projects" / "trading-research" / "artifacts"
+        / "tw-paper-sim" / session_date
+    )
+```
+
+`parents[3]` from a package source file is the workspace root — then it navigates to a sibling project `openclaw-async-coding-playbook`. This path works only in the specific development environment. Anyone running `replay run` without `--baseline-dir` on another machine (or with the package installed to site-packages) gets a `SimCompareError: candidate replay baseline source not found` pointing to a nonsensical path. Since `--baseline-dir` is not marked `required=True` in the parser, this is a silent footgun.
+
+**Fix:** Either make `--baseline-dir` required, or remove the default fallback entirely and fail fast with an explicit "must provide --baseline-dir" message.
+
+---
+
+### 2. `normalize_baseline_bundle` reused as candidate emitter — schema key `normalizer` bleeds into candidate artifacts
+**File:** `src/steamer_card_engine/cli.py:278–292`, `sim_compare.py:568–578`
+
+The candidate bundle's `config-snapshot.json` will emit:
+```json
+{ "normalizer": { "name": "steamer-card-engine replay run", "version": "m1-replay-runner/v0", ... } }
+```
+Calling the emitter field `"normalizer"` in a candidate artifact is a semantic contract violation. The SIM_ARTIFACT_SPEC.md doesn't define a `normalizer` field for `config-snapshot.json`, meaning this is uncontrolled schema drift. Future tooling (comparator, auditors) reading `config_snapshot["normalizer"]` cannot distinguish baseline normalizer from candidate emitter.
+
+**Fix:** Rename the field key — either add an `emitter` key in parallel (or gate the field name on `lane` type), or introduce a separate `emit_candidate_bundle()` function with properly named schema fields.
+
+---
+
+## 🟡 Medium Issues
+
+### 3. No test for the missing-baseline-dir error branch
+`_emit_replay_candidate_bundle` raises `SimCompareError` when `baseline_dir` doesn't exist, but there is no test covering this path. The `SimCompareError` is also caught in `main()` and returns exit code 2 — that behavior is untested for this code path.
+
+### 4. `--scenario-spec` path is accepted but not pre-validated
+If `--scenario-spec` points to a non-existent file, the failure happens deep in `_parse_json()` inside `normalize_baseline_bundle` with a generic I/O error, not a clean `SimCompareError`. A simple `if not Path(args.scenario_spec).exists(): raise SimCompareError(...)` guard in `_emit_replay_candidate_bundle` would give a much clearer user-facing error.
+
+### 5. `--max-events`, `--max-decisions`, `--fill-model` are wired but untested
+These three new CLI args are passed through to `normalize_baseline_bundle`, but neither new test verifies the passthrough. A truncation test (e.g. `--max-events 1`) would validate the wiring and guard against future regressions.
+
+---
+
+## 🔵 Optional Improvements
+
+### 6. `_run_timestamp_utc()` duplicates `now_utc_iso()` logic
+`sim_compare.py` already has `now_utc_iso()`. The new `_run_timestamp_utc()` in `cli.py` uses a different format (`strftime("%Y%m%dT%H%M%SZ")` vs full ISO). The compact form is intentional for run IDs, but this is worth consolidating or at least cross-referencing to avoid future drift.
+
+### 7. `test_replay_run_emits_candidate_bundle` missing `scenario_fingerprint` assertion
+The summary returned by `normalize_baseline_bundle` includes `scenario_fingerprint` (a key field in the artifact contract per `SIM_ARTIFACT_SPEC.md`). The new test asserts `lane`, `mode`, `bundle_dir`, `engine_name`, and `normalizer.name/version`, but never asserts `payload["scenario_fingerprint"]` is present and non-null.
+
+### 8. `--output-root` defaults to relative `"runs"` string
+Consistent with `sim normalize-baseline`, but CWD-dependent. Not a bug, but worth a note in CLI_SPEC.md that output resolution is relative to CWD.
+
+---
+
+**Tests pass as-is (12/12)**, but critical issue #1 means the code is only correct in the specific development environment, and critical issue #2 is a latent schema contract problem that will surface when the comparator reads candidate `config-snapshot.json` artifacts.
+

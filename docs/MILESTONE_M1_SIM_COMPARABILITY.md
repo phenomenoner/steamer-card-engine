@@ -102,6 +102,8 @@ Current implementation receipt (2026-03-14):
   - comparator: `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/summary.md`
 - Stage 4 candidate-engine-emitted attempt is now receipted as a blocker: replay CLI/runtime still does not emit a candidate v1 bundle path (`replay run` remains placeholder), so Stage 4 compare could not be run honestly.
   - note: `docs/receipts/2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md`
+- Stage 5 unblocked the candidate emission path: `replay run` now emits a truthful v1 candidate bundle with candidate runtime provenance, and canonical compare has been re-run on `tw-paper-sim.twse.2026-03-06.full-session`.
+  - note: `docs/receipts/2026-03-15_m1-stage5-candidate-replay-emission-and-compare.md`
 
 ### Phase 1 — Contract freeze (schema + semantics lock)
 

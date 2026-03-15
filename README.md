@@ -213,8 +213,8 @@ uv run steamer-card-engine sim compare \
 ```
 
 目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global）
-以及 M1 基礎實作：`sim normalize-baseline` / `sim compare`。
-Replay/operator 仍是 placeholder，尚未接上實際 runtime。
+以及 M1 基礎實作：`sim normalize-baseline` / `sim compare` / `replay run`（候選 bundle 發射路徑）。
+`operator` 仍是 placeholder，尚未接上實際 runtime。
 
 ## 文件導覽
 
@@ -242,7 +242,8 @@ Replay/operator 仍是 placeholder，尚未接上實際 runtime。
 - ✅ Python package skeleton exists
 - ✅ Manifest validation + inspect commands（auth/card/deck/global）
 - ✅ First replay-sim comparability **plumbing** receipt landed for M1 Stage 3 (canonical scenario `tw-paper-sim.twse.2026-03-06.full-session`; baseline/candidate both normalized from the same legacy source)
-- ⏳ Replay runner MVP
+- ✅ Stage 5: `replay run` now emits truthful candidate v1 bundles with explicit candidate provenance, and canonical compare rerun is receipted
+- ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow
 

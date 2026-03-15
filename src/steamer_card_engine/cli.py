@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 import json
 from pathlib import Path
+import re
 
 from steamer_card_engine.manifest import (
     ManifestValidationError,
@@ -81,7 +83,16 @@ def build_parser() -> argparse.ArgumentParser:
     replay_run = replay_sub.add_parser("run", help="Run a replay job")
     replay_run.add_argument("--deck", required=True)
     replay_run.add_argument("--date", required=True)
+    replay_run.add_argument("--scenario-id")
+    replay_run.add_argument("--baseline-dir", required=True)
+    replay_run.add_argument("--output-root", default="runs")
+    replay_run.add_argument("--run-id")
+    replay_run.add_argument("--scenario-spec")
+    replay_run.add_argument("--max-events", type=int)
+    replay_run.add_argument("--max-decisions", type=int)
+    replay_run.add_argument("--fill-model", default="sim-fill-v1")
     replay_run.add_argument("--dry-run", action="store_true")
+    replay_run.add_argument("--json", action="store_true", dest="as_json")
 
     sim = subparsers.add_parser("sim", help="SIM artifact normalization/comparison commands")
     sim_sub = sim.add_subparsers(dest="sim_command", required=True)
@@ -209,6 +220,71 @@ def _handle_manifest_error(error: ManifestValidationError) -> int:
     return 2
 
 
+def _slugify(value: str) -> str:
+    lowered = value.strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", lowered)
+    return slug.strip("-")
+
+
+def _default_scenario_id(session_date: str) -> str:
+    return f"tw-paper-sim.twse.{session_date}.full-session"
+
+
+def _run_timestamp_utc() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _emit_replay_candidate_bundle(args: argparse.Namespace) -> dict:
+    load_deck_manifest(args.deck)
+
+    session_date = args.date
+    scenario_id = args.scenario_id or _default_scenario_id(session_date)
+    scenario_slug = _slugify(scenario_id)
+    run_id = args.run_id or f"replay-sim_{scenario_slug}_candidate_{_run_timestamp_utc()}"
+
+    baseline_dir = Path(args.baseline_dir)
+    if not baseline_dir.exists():
+        raise SimCompareError(
+            "candidate replay baseline source not found: "
+            f"{baseline_dir} (override with --baseline-dir)"
+        )
+
+    output_root = Path(args.output_root)
+    output_dir = output_root / "steamer-card-engine" / session_date / run_id
+
+    if args.dry_run:
+        return {
+            "mode": "dry-run",
+            "deck": args.deck,
+            "session_date": session_date,
+            "scenario_id": scenario_id,
+            "baseline_dir": str(baseline_dir.resolve()),
+            "output_dir": str(output_dir.resolve()),
+            "run_id": run_id,
+        }
+
+    summary = normalize_baseline_bundle(
+        baseline_dir=baseline_dir,
+        output_dir=output_dir,
+        session_date=session_date,
+        scenario_id=scenario_id,
+        run_id=run_id,
+        lane="steamer-card-engine",
+        scenario_spec_path=Path(args.scenario_spec) if args.scenario_spec else None,
+        max_events=args.max_events,
+        max_decisions=args.max_decisions,
+        fill_model=args.fill_model,
+        engine_name="steamer-card-engine-replay-runner",
+        emitter_name="steamer-card-engine replay run",
+        emitter_version="m1-replay-runner/v0",
+        determinism_note="derived by baseline normalizer from legacy artifacts",
+        config_snapshot_actor_key="emitter",
+    )
+    summary["mode"] = "replay"
+    summary["baseline_dir"] = str(baseline_dir.resolve())
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -275,6 +351,25 @@ def main(argv: list[str] | None = None) -> int:
                 _print_global_summary(summary)
             return 0
 
+        if args.command == "replay" and args.replay_command == "run":
+            summary = _emit_replay_candidate_bundle(args)
+            if args.as_json:
+                _print_json(summary)
+            else:
+                if summary.get("mode") == "dry-run":
+                    print(
+                        "Replay dry-run "
+                        f"run_id={summary['run_id']} baseline={summary['baseline_dir']} "
+                        f"output={summary['output_dir']}"
+                    )
+                else:
+                    print(
+                        "Replay bundle emitted "
+                        f"run_id={summary['run_id']} output={summary['bundle_dir']} "
+                        f"anomalies={summary['counts']['anomalies']}"
+                    )
+            return 0
+
         if args.command == "sim" and args.sim_command == "normalize-baseline":
             summary = normalize_baseline_bundle(
                 baseline_dir=Path(args.baseline_dir),
@@ -320,11 +415,6 @@ def main(argv: list[str] | None = None) -> int:
     except SimCompareError as error:
         print(f"SIM comparability command failed: {error}", flush=True)
         return 2
-
-    if args.command == "replay" and args.replay_command == "run":
-        mode = "dry-run" if args.dry_run else "replay"
-        print(f"Placeholder {mode} job for deck={args.deck} date={args.date}")
-        return 0
 
     if args.command == "operator" and args.operator_command == "status":
         print("Status placeholder: no runtime attached yet; seed repo is docs/scaffold first.")

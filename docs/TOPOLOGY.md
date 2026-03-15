@@ -28,7 +28,9 @@ steamer-card-engine/
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
 │   ├── receipts/
-│   │   └── 2026-03-14_m1-stage3-first-replay-sim-comparable.md
+│   │   ├── 2026-03-14_m1-stage3-first-replay-sim-comparable.md
+│   │   ├── 2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md
+│   │   └── 2026-03-15_m1-stage5-candidate-replay-emission-and-compare.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
 ├── examples/
@@ -46,11 +48,14 @@ steamer-card-engine/
 │   └── runtime/components.py
 ├── runs/
 │   ├── baseline-bot/
-│   │   └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/
+│   │   ├── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/
+│   │   └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z/
 │   └── steamer-card-engine/
-│       └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
+│       ├── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
+│       └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/
 ├── comparisons/
-│   └── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
+│   ├── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
+│   └── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/
 └── tests/
     ├── test_cli.py
     ├── test_manifests.py
@@ -86,6 +91,7 @@ steamer-card-engine/
     - comparator skeleton (`sim compare`) with hard gates + scaffold report outputs
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
+  - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
@@ -96,8 +102,6 @@ steamer-card-engine/
 
 - `src/steamer_card_engine/runtime/components.py`
   - **names** the future components, but does not implement conflict resolution / risk / execution
-- `steamer-card-engine replay run ...`
-  - placeholder output only (no receipts/artifacts yet)
 - `steamer-card-engine operator ...`
   - placeholder output only (no runtime attached yet)
 
@@ -110,10 +114,10 @@ steamer-card-engine/
 2. **Overlay semantics are not yet frozen**
    - Card vs deck vs global policy merge/precedence rules (tighten vs widen) are described conceptually but not fully specified as executable semantics.
 
-3. **Replay credibility depends on receipts**
-   - `docs/SIM_ARTIFACT_SPEC.md` now defines the target artifact contract (event/feature/intent/risk/execution + checksums).
-   - Runtime emission is still partial/placeholder, so replay remains a contract-first path rather than a complete capability.
-   - M1 baseline normalization is now implemented, but currently uses conservative placeholders for unknown legacy fields (for example qty/fill/position details when baseline artifacts do not expose them).
+3. **Replay credibility still depends on receipts**
+   - `docs/SIM_ARTIFACT_SPEC.md` defines the target artifact contract (event/feature/intent/risk/execution + checksums).
+   - `replay run` now emits a real candidate v1 bundle path, but current M1 behavior is still a legacy-bridge emitter rather than full native runtime behavior parity.
+   - M1 baseline/candidate emission currently uses conservative placeholders for unknown legacy fields (for example qty/fill/position details when baseline artifacts do not expose them).
 
 4. **Scenario identity is now defined, but not yet enforced by runtime**
    - `docs/SCENARIO_SPEC.md` defines the shared identity shape needed for baseline-vs-candidate comparisons.

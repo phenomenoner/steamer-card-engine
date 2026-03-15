@@ -1,0 +1,12 @@
+{
+  "anomalies": [
+    {
+      "anomaly_id": "anom-0001",
+      "category": "baseline-orders-missing",
+      "detected_at_utc": "2026-03-15T03:54:02.387Z",
+      "message": "orders.jsonl not found; order-lifecycle/fills/positions emitted as placeholders.",
+      "related_ids": [],
+      "severity": "minor"
+    }
+  ]
+}

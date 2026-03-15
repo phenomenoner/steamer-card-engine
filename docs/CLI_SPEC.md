@@ -58,7 +58,7 @@ Used for replay evaluation and live-sim execution paths with shared runtime cont
 Examples:
 
 ```bash
-steamer-card-engine replay run --deck ./examples/decks/tw_cash_intraday.toml --date 2026-03-11 --mode replay-sim --scenario-spec ./scenarios/tw-gap-reclaim-20260311.json
+steamer-card-engine replay run --deck ./examples/decks/tw_cash_intraday.toml --date 2026-03-11 --baseline-dir /path/to/legacy/baseline/day --scenario-spec ./scenarios/tw-gap-reclaim-20260311.json
 steamer-card-engine replay inspect run-20260311-01
 steamer-card-engine sim run-live --deck ./examples/decks/tw_cash_intraday.toml --dry-run --scenario-id tw-gap-reclaim.twse.2026-03-11.full-session
 ```
@@ -195,7 +195,8 @@ Current implementation status:
 - ✅ `author validate-global` / `author inspect-global`
 - ✅ `sim normalize-baseline` (legacy baseline → v1-shaped M1 bundle)
 - ✅ `sim compare` (hard-fail gates + scaffold compare report)
-- ⏳ replay/session/operator execution remains placeholder
+- ✅ `replay run` emits candidate v1 bundles (legacy-bridge emitter for M1, with explicit provenance)
+- ⏳ operator execution remains placeholder
 
 Next evolution order remains:
 

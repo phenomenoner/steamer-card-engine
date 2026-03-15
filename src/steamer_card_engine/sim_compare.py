@@ -214,6 +214,11 @@ def normalize_baseline_bundle(
     max_events: int | None = None,
     max_decisions: int | None = None,
     fill_model: str = "sim-fill-v1",
+    engine_name: str = "steamer-card-engine-baseline-normalizer",
+    emitter_name: str = "steamer-card-engine sim normalize-baseline",
+    emitter_version: str = "m1-normalizer/v0",
+    determinism_note: str = "derived by baseline normalizer from legacy artifacts",
+    config_snapshot_actor_key: str = "normalizer",
 ) -> dict[str, Any]:
     baseline_dir = baseline_dir.resolve()
     output_dir = output_dir.resolve()
@@ -528,7 +533,7 @@ def normalize_baseline_bundle(
             "determinism": {
                 "mode": "best-effort",
                 "random_seed": None,
-                "notes": "derived by baseline normalizer from legacy artifacts",
+                "notes": determinism_note,
             },
         }
 
@@ -560,6 +565,10 @@ def normalize_baseline_bundle(
 
     _write_json(output_dir / "pnl-summary.json", pnl_summary)
 
+    actor_key = config_snapshot_actor_key.strip()
+    if not actor_key:
+        raise SimCompareError("config_snapshot_actor_key must be non-empty")
+
     config_snapshot = {
         "scenario_id": scenario_id,
         "deck_id": "legacy-baseline-deck",
@@ -567,9 +576,9 @@ def normalize_baseline_bundle(
         "cards": [{"card_id": "legacy-baseline-card", "card_version": "legacy/v0"}],
         "global_config_version": "legacy/v0",
         "config_hash": _hash_text(f"{baseline_dir}:{session_date}"),
-        "normalizer": {
-            "name": "steamer-card-engine sim normalize-baseline",
-            "version": "m1-normalizer/v0",
+        actor_key: {
+            "name": emitter_name,
+            "version": emitter_version,
             "source_dir": str(baseline_dir),
             "event_sources": [str(path) for path in event_sources],
         },
@@ -608,7 +617,7 @@ def normalize_baseline_bundle(
         "ended_at_utc": max_event_time or now_utc_iso(),
         "status": "partial" if anomalies else "success",
         "provenance": {
-            "engine_name": "steamer-card-engine-baseline-normalizer",
+            "engine_name": engine_name,
             "engine_git_sha": "unknown",
             "dependency_lock_hash": "unknown",
             "config_hash": config_snapshot["config_hash"],

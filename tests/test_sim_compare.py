@@ -282,3 +282,72 @@ def test_sim_compare_passes_when_hard_gates_match(tmp_path: Path, capsys) -> Non
     diff = _load_json(compare_out / "diff.json")
     assert diff["counts"]["intents"]["baseline"] >= 1
     assert diff["scaffold_placeholders"]["per_symbol_totals"] == "pending"
+
+
+def test_replay_run_emits_candidate_bundle(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    output_root = tmp_path / "runs"
+
+    code = main(
+        [
+            "replay",
+            "run",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(output_root),
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert code == 0
+    assert payload["mode"] == "replay"
+    assert payload["lane"] == "steamer-card-engine"
+
+    bundle_dir = Path(payload["bundle_dir"])
+    run_manifest = _load_json(bundle_dir / "run-manifest.json")
+    config_snapshot = _load_json(bundle_dir / "config-snapshot.json")
+
+    assert run_manifest["provenance"]["engine_name"] == "steamer-card-engine-replay-runner"
+    assert config_snapshot["emitter"]["name"] == "steamer-card-engine replay run"
+    assert config_snapshot["emitter"]["version"] == "m1-replay-runner/v0"
+
+
+def test_replay_run_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    output_root = tmp_path / "runs"
+
+    code = main(
+        [
+            "replay",
+            "run",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert code == 0
+    assert payload["mode"] == "dry-run"
+    assert not Path(payload["output_dir"]).exists()

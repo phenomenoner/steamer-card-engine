@@ -12,9 +12,9 @@ What is working today:
 
 What is still placeholder/stub:
 
-- `replay run` (placeholder output)
 - `operator status/inspect` (placeholder output)
 - runtime component split is mostly structural naming, not full execution behavior
+- `replay run` is now available for M1 candidate bundle emission, but still uses a legacy-bridge path (not full native runtime parity)
 
 Do not present this repo as live-trading ready.
 
@@ -104,7 +104,7 @@ Agents can safely:
 Agents should **not** claim yet:
 
 - live execution readiness
-- real replay artifact generation from runtime
+- full native runtime behavior parity in replay (current path is a legacy-bridge emitter)
 - operator governance state machine completeness
 - broker-integrated execution behavior
 
