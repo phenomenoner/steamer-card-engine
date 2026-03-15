@@ -1,0 +1,81 @@
+{
+  "generated_at_utc": "2026-03-15T08:51:51Z",
+  "tracked_files_count": 250,
+  "tracked_total_bytes_worktree": 187970325,
+  "runs_dir_bytes_worktree": 187617987,
+  "event_log_duplicate_groups": [
+    {
+      "sha256": "277259a9b2043f56dd08f127372f05806729bcbf661887bef95cd747c96f07ec",
+      "copies": 2,
+      "total_bytes": 160557776,
+      "paths": [
+        "runs/baseline-bot/2026-03-10/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z/event-log.jsonl",
+        "runs/steamer-card-engine/2026-03-10/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z/event-log.jsonl"
+      ]
+    },
+    {
+      "sha256": "66d486f68dccbc3c3513e071a1d9723795b05d777af0df78598099f6d83606d0",
+      "copies": 2,
+      "total_bytes": 19612606,
+      "paths": [
+        "runs/baseline-bot/2026-03-12/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z/event-log.jsonl",
+        "runs/steamer-card-engine/2026-03-12/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/event-log.jsonl"
+      ]
+    },
+    {
+      "sha256": "cd1e1d2134bc6973f524ec6a8366f1b7c2b47be46cdf0489f3d60f5ed5875180",
+      "copies": 6,
+      "total_bytes": 6051714,
+      "paths": [
+        "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/event-log.jsonl",
+        "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z/event-log.jsonl",
+        "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T082717Z/event-log.jsonl",
+        "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/event-log.jsonl",
+        "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/event-log.jsonl",
+        "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z/event-log.jsonl"
+      ]
+    }
+  ],
+  "large_tracked_files_gte_1mb": [
+    {
+      "path": "runs/baseline-bot/2026-03-10/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z/event-log.jsonl",
+      "bytes": 80278888
+    },
+    {
+      "path": "runs/steamer-card-engine/2026-03-10/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z/event-log.jsonl",
+      "bytes": 80278888
+    },
+    {
+      "path": "runs/baseline-bot/2026-03-12/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z/event-log.jsonl",
+      "bytes": 9806303
+    },
+    {
+      "path": "runs/steamer-card-engine/2026-03-12/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/event-log.jsonl",
+      "bytes": 9806303
+    },
+    {
+      "path": "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/event-log.jsonl",
+      "bytes": 1008619
+    },
+    {
+      "path": "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z/event-log.jsonl",
+      "bytes": 1008619
+    },
+    {
+      "path": "runs/baseline-bot/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T082717Z/event-log.jsonl",
+      "bytes": 1008619
+    },
+    {
+      "path": "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/event-log.jsonl",
+      "bytes": 1008619
+    },
+    {
+      "path": "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/event-log.jsonl",
+      "bytes": 1008619
+    },
+    {
+      "path": "runs/steamer-card-engine/2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z/event-log.jsonl",
+      "bytes": 1008619
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "date_utc": "2026-03-15",
+  "checks": [
+    {
+      "name": "validate_bundle_all_runs",
+      "command": "uv run python - <<'PY' ... validate_bundle ... PY",
+      "result": "pass",
+      "details": {
+        "bundles_checked": 10,
+        "bundle_failures": 0
+      }
+    },
+    {
+      "name": "pytest_sim_compare",
+      "command": "uv run pytest tests/test_sim_compare.py -q",
+      "result": "pass",
+      "details": {
+        "passed": 9,
+        "failed": 0
+      }
+    },
+    {
+      "name": "sim_compare_recheck_2026_03_10",
+      "command": "uv run steamer-card-engine sim compare --baseline runs/baseline-bot/2026-03-10/... --candidate runs/steamer-card-engine/2026-03-10/... --output-dir /tmp/steamer-optionb-compare-check --json",
+      "result": "pass",
+      "details": {
+        "status": "pass",
+        "hard_fail_reasons": []
+      }
+    }
+  ]
+}

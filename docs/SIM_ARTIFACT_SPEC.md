@@ -53,6 +53,12 @@ runs/<lane>/<session_date>/<run_id>/
   file-index.json
 ```
 
+Repository packaging note (does not change artifact semantics):
+
+- A required artifact path may be a symlink in the repo when its content is byte-identical to a canonical copy.
+- Compliance is determined by resolved file content + `file-index.json` hashes, not by whether a path is symlinked.
+- Export standalone bundles with symlink dereference to keep the archive self-contained.
+
 ### Naming rules
 
 - `lane`: `baseline-bot` | `steamer-card-engine`

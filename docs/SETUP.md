@@ -125,6 +125,12 @@ Operator checks before claiming acceptance:
 - candidate manifest keeps `trade_enabled=false`
 - per-scenario review note + artifact pointers are written under `docs/receipts/`
 
+Artifact packaging hygiene for committed evidence:
+
+- follow `docs/EVIDENCE_PACKAGING_HYGIENE.md`
+- duplicate `event-log.jsonl` payloads may be symlinked to a canonical copy only when content hash is identical
+- when exporting a standalone run bundle, use `tar --dereference` so symlinked logs are materialized in the archive
+
 > Note: `/abs/path/to/tw-paper-sim/YYYY-MM-DD` is intentionally a placeholder for your local or mounted baseline artifact root.
 
 ## Where contracts live

@@ -232,6 +232,7 @@ uv run steamer-card-engine sim compare \
 - Scenario identity contract: [`docs/SCENARIO_SPEC.md`](docs/SCENARIO_SPEC.md)
 - M1 evidence-pack acceptance contract: [`docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`](docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md)
 - M1 evidence-pack index: [`docs/M1_EVIDENCE_PACK_INDEX.md`](docs/M1_EVIDENCE_PACK_INDEX.md)
+- M1 evidence packaging hygiene policy: [`docs/EVIDENCE_PACKAGING_HYGIENE.md`](docs/EVIDENCE_PACKAGING_HYGIENE.md)
 - Topology / repo map: [`docs/TOPOLOGY.md`](docs/TOPOLOGY.md)
 - Narrative overview article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md)
 - External-facing launch-style article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md)
@@ -247,6 +248,7 @@ uv run steamer-card-engine sim compare \
 - ✅ Stage 5: `replay run` now emits truthful candidate v1 bundles with explicit candidate provenance, and canonical compare rerun is receipted
 - ✅ M1 evidence pack expanded to 3 scenarios with per-scenario baseline/candidate/compare receipts
 - ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
+- ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow

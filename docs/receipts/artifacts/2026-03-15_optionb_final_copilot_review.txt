@@ -1,0 +1,36 @@
+All 7 symlinks resolve and hash-verify. Here's the review:
+
+---
+
+## 1) Critical Issues
+
+**None.** All symlinks resolve, all 7 symlinked `event-log.jsonl` files hash-verify against their bundle's `file-index.json`. No broken links, no checksum violations.
+
+---
+
+## 2) Medium Issues
+
+**Cross-lane symlinks (candidate → baseline-bot) are semantically surprising.** Five candidate-lane bundles under `runs/steamer-card-engine/` point to `runs/baseline-bot/` canonical copies. This is fine *today* because hashes match, but it encodes a cross-lane dependency that could silently break if the baseline canonical is ever deleted or moved. The policy doc doesn't explicitly call out the cross-lane case or warn against deleting canonicals. Worth a one-liner guardrail in `EVIDENCE_PACKAGING_HYGIENE.md`: *"Do not delete canonical copies; check for incoming symlinks before any cleanup."*
+
+**New files are untracked, not staged.** `docs/EVIDENCE_PACKAGING_HYGIENE.md` and the four receipt artifacts are `??` in `git status`. The README and TOPOLOGY diffs reference them directly. If the commit lands without `git add`-ing these, the repo will have dangling doc references. This must be resolved at commit time — not a diff flaw, but a commit hygiene risk to flag.
+
+---
+
+## 3) Optional Improvements
+
+- **`.gitattributes` symlink note:** Consider documenting (or asserting in CI) that Git must not be configured with `core.symlinks=false` on Windows clones, or the symlinks will materialize as text files with the target path. No action required for Linux-only flows.
+- **Validation receipt timestamp:** `docs/receipts/artifacts/2026-03-15_optionb_validation.json` captures the run but isn't linked from the main receipt's `Validation receipts` section (it is referenced in the handoff receipt). Low impact.
+- **`tar --dereference` note placement:** The export instruction appears in SETUP.md, EVIDENCE_PACKAGING_HYGIENE.md, and the receipt. Consistent but slightly scattered — no action needed.
+
+---
+
+## 4) Verdict
+
+**Safe to ship for pre-sprint.** The change is bounded hygiene only:
+- Zero semantic/runtime/trust-boundary changes
+- All 7 symlinks verified live and hash-stable
+- Docs are accurate, consistent, and don't overclaim
+- The one commit-time risk (untracked new files) is a staging concern, not a diff defect
+
+Flag at commit: `git add docs/EVIDENCE_PACKAGING_HYGIENE.md docs/receipts/` before finalizing, and add the cross-lane deletion guardrail note to the hygiene policy if the team expects frequent artifact rotation.
+

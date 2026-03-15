@@ -10,6 +10,13 @@ This index is the operator-facing entrypoint for the current M1 pre-sprint evide
 - authority posture: `trade_enabled=false`
 - bundle contract: `sim-artifacts/v1`
 - acceptance contract: `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
+- packaging hygiene policy: `docs/EVIDENCE_PACKAGING_HYGIENE.md`
+
+Packaging note:
+
+- Some `event-log.jsonl` files are symlink-deduped when byte-identical.
+- `file-index.json` content hashes remain the source of truth.
+- For standalone exports, dereference symlinks (`tar --dereference`).
 
 ## Scenario set (3)
 
