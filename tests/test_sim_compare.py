@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
+
+import pytest
 
 from steamer_card_engine.cli import main
 
@@ -351,3 +354,266 @@ def test_replay_run_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None:
     assert code == 0
     assert payload["mode"] == "dry-run"
     assert not Path(payload["output_dir"]).exists()
+
+
+def test_sim_compare_hard_fails_scenario_mismatch(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    baseline_bundle = tmp_path / "baseline_bundle"
+    candidate_bundle = tmp_path / "candidate_bundle"
+
+    assert (
+        main(
+            [
+                "sim",
+                "normalize-baseline",
+                "--baseline-dir",
+                str(baseline),
+                "--output-dir",
+                str(baseline_bundle),
+                "--session-date",
+                "2026-03-13",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-13.full-session",
+                "--lane",
+                "baseline-bot",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "sim",
+                "normalize-baseline",
+                "--baseline-dir",
+                str(baseline),
+                "--output-dir",
+                str(candidate_bundle),
+                "--session-date",
+                "2026-03-14",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-14.full-session",
+                "--lane",
+                "steamer-card-engine",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    compare_out = tmp_path / "compare_scenario_mismatch"
+    compare_code = main(
+        [
+            "sim",
+            "compare",
+            "--baseline",
+            str(baseline_bundle),
+            "--candidate",
+            str(candidate_bundle),
+            "--output-dir",
+            str(compare_out),
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert compare_code == 3
+    assert payload["status"] == "fail"
+    assert any("scenario_id mismatch" in reason for reason in payload["hard_fail_reasons"])
+
+
+def test_replay_run_requires_baseline_dir() -> None:
+    with pytest.raises(SystemExit) as ex:
+        main(
+            [
+                "replay",
+                "run",
+                "--deck",
+                "examples/decks/tw_cash_intraday.toml",
+                "--date",
+                "2026-03-13",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-13.full-session",
+            ]
+        )
+    assert ex.value.code == 2
+
+
+def test_sim_compare_hard_fails_scenario_mismatch_with_replay_candidate(
+    tmp_path: Path, capsys
+) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    baseline_bundle = tmp_path / "baseline_bundle"
+    output_root = tmp_path / "runs"
+
+    assert (
+        main(
+            [
+                "sim",
+                "normalize-baseline",
+                "--baseline-dir",
+                str(baseline),
+                "--output-dir",
+                str(baseline_bundle),
+                "--session-date",
+                "2026-03-13",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-13.full-session",
+                "--lane",
+                "baseline-bot",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    replay_code = main(
+        [
+            "replay",
+            "run",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--date",
+            "2026-03-14",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-14.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(output_root),
+            "--run-id",
+            "candidate-mismatch-run",
+            "--json",
+        ]
+    )
+    assert replay_code == 0
+    replay_payload = json.loads(capsys.readouterr().out)
+
+    compare_out = tmp_path / "compare_scenario_mismatch_replay"
+    compare_code = main(
+        [
+            "sim",
+            "compare",
+            "--baseline",
+            str(baseline_bundle),
+            "--candidate",
+            replay_payload["bundle_dir"],
+            "--output-dir",
+            str(compare_out),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert compare_code == 3
+    assert payload["status"] == "fail"
+    assert any("scenario_id mismatch" in reason for reason in payload["hard_fail_reasons"])
+
+
+def test_sim_compare_allow_missing_fingerprint_flag(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    baseline_bundle = tmp_path / "baseline_bundle"
+    candidate_bundle = tmp_path / "candidate_bundle"
+
+    assert (
+        main(
+            [
+                "sim",
+                "normalize-baseline",
+                "--baseline-dir",
+                str(baseline),
+                "--output-dir",
+                str(baseline_bundle),
+                "--session-date",
+                "2026-03-13",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-13.full-session",
+                "--lane",
+                "baseline-bot",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "sim",
+                "normalize-baseline",
+                "--baseline-dir",
+                str(baseline),
+                "--output-dir",
+                str(candidate_bundle),
+                "--session-date",
+                "2026-03-13",
+                "--scenario-id",
+                "tw-gap-reclaim.twse.2026-03-13.full-session",
+                "--lane",
+                "steamer-card-engine",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    candidate_manifest_path = candidate_bundle / "run-manifest.json"
+    candidate_manifest = _load_json(candidate_manifest_path)
+    candidate_manifest.pop("scenario_fingerprint", None)
+    candidate_manifest_path.write_text(
+        json.dumps(candidate_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    file_index_path = candidate_bundle / "file-index.json"
+    file_index = _load_json(file_index_path)
+    for entry in file_index.get("files", []):
+        if entry.get("path") == "run-manifest.json":
+            entry["sha256"] = hashlib.sha256(candidate_manifest_path.read_bytes()).hexdigest()
+            entry["bytes"] = candidate_manifest_path.stat().st_size
+            break
+    file_index_path.write_text(
+        json.dumps(file_index, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    compare_out_strict = tmp_path / "compare_missing_fingerprint_strict"
+    strict_code = main(
+        [
+            "sim",
+            "compare",
+            "--baseline",
+            str(baseline_bundle),
+            "--candidate",
+            str(candidate_bundle),
+            "--output-dir",
+            str(compare_out_strict),
+            "--json",
+        ]
+    )
+    strict_payload = json.loads(capsys.readouterr().out)
+    assert strict_code == 3
+    assert any("scenario_fingerprint missing" in reason for reason in strict_payload["hard_fail_reasons"])
+
+    compare_out_relaxed = tmp_path / "compare_missing_fingerprint_relaxed"
+    relaxed_code = main(
+        [
+            "sim",
+            "compare",
+            "--baseline",
+            str(baseline_bundle),
+            "--candidate",
+            str(candidate_bundle),
+            "--output-dir",
+            str(compare_out_relaxed),
+            "--allow-missing-fingerprint",
+            "--json",
+        ]
+    )
+    relaxed_payload = json.loads(capsys.readouterr().out)
+    assert relaxed_code == 0
+    assert relaxed_payload["status"] == "pass"

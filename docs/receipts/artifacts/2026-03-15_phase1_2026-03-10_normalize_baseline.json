@@ -1,0 +1,19 @@
+{
+  "bundle_dir": "/root/.openclaw/workspace/steamer-card-engine/runs/baseline-bot/2026-03-10/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z",
+  "counts": {
+    "anomalies": 1,
+    "decisions": 600,
+    "events": 170851,
+    "execution_requests": 30,
+    "features": 100,
+    "fills": 0,
+    "intents": 200,
+    "order_lifecycle": 0,
+    "positions": 0,
+    "risk_receipts": 100
+  },
+  "lane": "baseline-bot",
+  "run_id": "replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z",
+  "scenario_fingerprint": "33f7a78636a1a3fcb1fb567a75aacc8aa531f95acd098fe22df574cabec1f368",
+  "scenario_id": "tw-paper-sim.twse.2026-03-10.full-session"
+}

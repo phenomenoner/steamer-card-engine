@@ -24,13 +24,20 @@ steamer-card-engine/
 │   ├── MIGRATION_PLAN.md
 │   ├── MILESTONE_M1_SIM_COMPARABILITY.md
 │   ├── M1_SIM_COMPARABILITY_FOUNDATION_PACK.md
+│   ├── M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md
+│   ├── M1_EVIDENCE_PACK_INDEX.md
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
 │   ├── receipts/
 │   │   ├── 2026-03-14_m1-stage3-first-replay-sim-comparable.md
 │   │   ├── 2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md
-│   │   └── 2026-03-15_m1-stage5-candidate-replay-emission-and-compare.md
+│   │   ├── 2026-03-15_m1-stage5-candidate-replay-emission-and-compare.md
+│   │   ├── 2026-03-15_m1-phase1-evidence-pack-3-scenarios.md
+│   │   ├── 2026-03-15_m1-phase2-acceptance-contract-freeze.md
+│   │   ├── 2026-03-15_m1-phase3-repeatability-anti-fluke.md
+│   │   ├── 2026-03-15_m1-phase4-operatorization-doc-hygiene.md
+│   │   └── 2026-03-15_m1-pre-sprint-serial-closure.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
 ├── examples/
@@ -48,14 +55,19 @@ steamer-card-engine/
 │   └── runtime/components.py
 ├── runs/
 │   ├── baseline-bot/
-│   │   ├── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z/
-│   │   └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z/
+│   │   ├── 2026-03-06/
+│   │   ├── 2026-03-10/
+│   │   └── 2026-03-12/
 │   └── steamer-card-engine/
-│       ├── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
-│       └── 2026-03-06/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/
+│       ├── 2026-03-06/
+│       ├── 2026-03-10/
+│       └── 2026-03-12/
 ├── comparisons/
-│   ├── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260314T200700Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260314T200700Z/
-│   └── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T035401Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T040424Z/
+│   ├── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_.../
+│   ├── replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_.../
+│   ├── replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_.../
+│   ├── phase3_mismatch_2026-03-06_vs_2026-03-12/
+│   └── phase3_recheck_2026-03-10/
 └── tests/
     ├── test_cli.py
     ├── test_manifests.py
@@ -95,8 +107,8 @@ steamer-card-engine/
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
-  - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for canonical scenarios
-  - current first receipt is plumbing-focused (same-source normalization in both lanes), useful for contract/gate verification
+  - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for a 3-scenario pre-sprint evidence pack
+  - include both passing comparable pairs and explicit phase-3 mismatch replayability checks for hard-gate verification
 
 ### Intentional placeholders (not yet “real runtime”)
 
@@ -146,4 +158,6 @@ steamer-card-engine/
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
+- M1 evidence-pack acceptance contract: `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
+- M1 evidence-pack index: `docs/M1_EVIDENCE_PACK_INDEX.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`

@@ -1,0 +1,91 @@
+● Get full diff and status
+  $ cd /root/.openclaw/workspace/steamer-card-engine && git --no-pager diff && git --no-pager diff
+  --cached && git --no-pager status
+  └ 354 lines...
+
+● Read new acceptance contract doc
+  $ cd /root/.openclaw/workspace/steamer-card-engine && cat
+  docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md
+  └ 75 lines...
+
+● Check phase3 artifact receipts
+  $ cd /root/.openclaw/workspace/steamer-card-engine && cat
+  docs/receipts/artifacts/2026-03-15_phase3_scenario_mismatch_compare.json 2>/dev/null && cat
+  docs/receipts/artifacts/2026-03-15_phase3_baseline_dir_enforcement.json 2>/dev/null
+  └ 22 lines...
+
+● Run affected tests
+  $ cd /root/.openclaw/workspace/steamer-card-engine && uv run pytest tests/test_sim_compare.py -q
+  2>&1 | tail -30
+  └ 4 lines...
+
+● Check evidence pack index and topology receipts listing
+  $ cd /root/.openclaw/workspace/steamer-card-engine && cat docs/M1_EVIDENCE_PACK_INDEX.md && echo
+  "---" && cat docs/TOPOLOGY.md | grep -A5 "phase2\|phase3\|phase4" | head -30
+  └ 75 lines...
+
+● Verify compare artifacts status
+  $ cd /root/.openclaw/workspace/steamer-card-engine && python -c "
+  import json, pathlib
+  for p in sorted(pathlib.Path('comparisons').glob('*/compare-manifest.json')):
+      d = json.loads(p.read_text())
+      print(p.parent.name[:80], d.get('status'), d.get('hard_fail_reasons', []))...
+  └ 3 lines...
+
+● Check if TOPOLOGY.md lists phase2-4 receipts
+  $ cd /root/.openclaw/workspace/steamer-card-engine && cat docs/TOPOLOGY.md | grep -c
+  "phase2\|phase3\|phase4" && grep "phase2\|phase3\|phase4" docs/TOPOLOGY.md
+  └ 3 lines...
+
+● Verify all compare artifact statuses
+  $ cd /root/.openclaw/workspace/steamer-card-engine && uv run python -c "
+  import json, pathlib
+  for p in sorted(pathlib.Path('comparisons').glob('*/compare-manifest.json')):
+      d = json.loads(p.read_text())
+      print(p.parent.name[:80], '|', d.get('status'), '|', d.get('hard_fail_reasons', []))...
+  └ 10 lines...
+
+● Check receipts listing in TOPOLOGY.md
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n "receipts" docs/TOPOLOGY.md
+  └ 3 lines...
+
+● Check CLI hard-fail implementation against contract
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "scenario_fingerprint\|execution_model" src/steamer_card_engine/cli.py | head -20 && grep -n
+  "hard_fail" src/steamer_card_engine/cli.py | head -20
+  └ 3 lines...
+
+● Check sim_compare hard-fail logic
+  $ cd /root/.openclaw/workspace/steamer-card-engine && grep -n
+  "scenario_fingerprint\|execution_model\|hard_fail" src/steamer_card_engine/sim_compare.py | head
+  -40
+  └ 41 lines...
+
+Now I have enough to deliver a thorough review.
+
+---
+
+## Review: M1 Evidence-Pack Acceptance Contract Changes
+
+### ✅ No Critical Issues
+
+All new tests pass. Hard-fail logic in `sim_compare.py` correctly covers all three contract gates (§2): `scenario_id`, `scenario_fingerprint`, and `execution_model` hash.
+
+---
+
+### ⚠️ Medium Issues
+
+1. **TOPOLOGY.md receipts listing is stale** — only lists `phase1` receipt under `docs/receipts/`, but 4 new receipts are untracked (`phase1`–`phase4`). Also `phase3_recheck_2026-03-10/` comparison dir isn't listed. The topology file explicitly declares itself a repo map so drift here is contract-violating per AGENTS.md §3.
+
+2. **`test_sim_compare_hard_fails_scenario_mismatch` uses `normalize-baseline` for both lanes** — the candidate bundle is created via `normalize-baseline --lane steamer-card-engine`, not via `replay run`. This tests scenario-mismatch detection correctly, but a companion test using actual `replay run` for the candidate side would cover the full acceptance workflow path (contract §3 provenance requirements).
+
+3. **`--allow-missing-fingerprint` flag has no test coverage** — the contract (§2) makes `scenario_fingerprint` a hard gate, but the escape hatch `require_scenario_fingerprint=not args.allow_missing_fingerprint` is untested. If it regresses to always-false, evidence packs could be silently accepted without fingerprint checks.
+
+---
+
+### 💡 Optional Improvements
+
+- **`M1_EVIDENCE_PACK_INDEX.md` is missing per-scenario short review notes** — contract §5.4 requires a review note stating scenario id, run ids, comparator status, and any anomaly caveats. The index has artifact pointers but no inline review note text (they may exist in the receipt `.md` files but the index doesn't reference them).
+- **SETUP.md operator workflow** — the `--baseline-dir` example paths use `/abs/path/to/tw-paper-sim/YYYY-MM-DD` which is a placeholder that doesn't exist in the repo. Worth noting it requires an external data source.
+- **`comparisons/` directory uses `...` ellipsis in TOPOLOGY.md** — fine for readability, but now inconsistent since the old format showed full run IDs. Minor, but could confuse first-time readers trying to navigate.
+

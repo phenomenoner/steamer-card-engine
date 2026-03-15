@@ -1,0 +1,12 @@
+warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+usage: steamer-card-engine replay run [-h] --deck DECK --date DATE
+                                      [--scenario-id SCENARIO_ID]
+                                      --baseline-dir BASELINE_DIR
+                                      [--output-root OUTPUT_ROOT]
+                                      [--run-id RUN_ID]
+                                      [--scenario-spec SCENARIO_SPEC]
+                                      [--max-events MAX_EVENTS]
+                                      [--max-decisions MAX_DECISIONS]
+                                      [--fill-model FILL_MODEL] [--dry-run]
+                                      [--json]
+steamer-card-engine replay run: error: the following arguments are required: --baseline-dir

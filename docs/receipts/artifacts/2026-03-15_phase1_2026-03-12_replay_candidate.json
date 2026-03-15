@@ -1,0 +1,21 @@
+{
+  "baseline_dir": "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-paper-sim/2026-03-12",
+  "bundle_dir": "/root/.openclaw/workspace/steamer-card-engine/runs/steamer-card-engine/2026-03-12/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z",
+  "counts": {
+    "anomalies": 1,
+    "decisions": 600,
+    "events": 21002,
+    "execution_requests": 34,
+    "features": 100,
+    "fills": 0,
+    "intents": 200,
+    "order_lifecycle": 0,
+    "positions": 0,
+    "risk_receipts": 100
+  },
+  "lane": "steamer-card-engine",
+  "mode": "replay",
+  "run_id": "replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z",
+  "scenario_fingerprint": "6cd13ee0982eb797a21c3514294f2fb077a5dcdf177d94c3b6fd113189da4768",
+  "scenario_id": "tw-paper-sim.twse.2026-03-12.full-session"
+}

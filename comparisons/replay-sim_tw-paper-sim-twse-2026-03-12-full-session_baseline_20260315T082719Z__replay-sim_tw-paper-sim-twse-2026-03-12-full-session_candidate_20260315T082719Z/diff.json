@@ -1,0 +1,51 @@
+{
+  "anomalies": {
+    "baseline": {
+      "critical": 0,
+      "info": 0,
+      "major": 0,
+      "minor": 1
+    },
+    "candidate": {
+      "critical": 0,
+      "info": 0,
+      "major": 0,
+      "minor": 1
+    }
+  },
+  "compare_version": "m1-compare/v0",
+  "counts": {
+    "fills": {
+      "baseline": 0,
+      "candidate": 0
+    },
+    "intents": {
+      "baseline": 200,
+      "candidate": 200
+    },
+    "orders": {
+      "baseline": 0,
+      "candidate": 0
+    },
+    "risk_decisions": {
+      "baseline": 100,
+      "candidate": 100
+    }
+  },
+  "pnl_reported": {
+    "baseline": {
+      "realized_pnl_gross": 0.0,
+      "realized_pnl_net": 0.0
+    },
+    "candidate": {
+      "realized_pnl_gross": 0.0,
+      "realized_pnl_net": 0.0
+    }
+  },
+  "scaffold_placeholders": {
+    "exit_reason_distribution": "pending",
+    "max_exposure": "pending",
+    "per_symbol_totals": "pending"
+  },
+  "status": "pass"
+}

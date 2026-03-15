@@ -1,0 +1,6 @@
+{
+  "command": "uv run steamer-card-engine replay run --deck ... --date 2026-03-13 --scenario-id ... --json",
+  "exit_code": 2,
+  "stdout": "docs/receipts/artifacts/2026-03-15_phase3_baseline_dir_enforcement.out",
+  "stderr": "docs/receipts/artifacts/2026-03-15_phase3_baseline_dir_enforcement.err"
+}

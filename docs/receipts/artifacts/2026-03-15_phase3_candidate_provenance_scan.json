@@ -1,0 +1,32 @@
+{
+  "all_engine_name_expected": true,
+  "all_have_emitter": true,
+  "all_lane_steamer_card_engine": true,
+  "all_trade_disabled": true,
+  "rows": [
+    {
+      "candidate_run_id": "replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z",
+      "engine_name": "steamer-card-engine-replay-runner",
+      "has_emitter_block": true,
+      "lane": "steamer-card-engine",
+      "scenario_id": "tw-paper-sim.twse.2026-03-06.full-session",
+      "trade_enabled": false
+    },
+    {
+      "candidate_run_id": "replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z",
+      "engine_name": "steamer-card-engine-replay-runner",
+      "has_emitter_block": true,
+      "lane": "steamer-card-engine",
+      "scenario_id": "tw-paper-sim.twse.2026-03-12.full-session",
+      "trade_enabled": false
+    },
+    {
+      "candidate_run_id": "replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z",
+      "engine_name": "steamer-card-engine-replay-runner",
+      "has_emitter_block": true,
+      "lane": "steamer-card-engine",
+      "scenario_id": "tw-paper-sim.twse.2026-03-10.full-session",
+      "trade_enabled": false
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "compare_manifest": "/root/.openclaw/workspace/steamer-card-engine/comparisons/phase3_recheck_2026-03-10/compare-manifest.json",
+  "diff": "/root/.openclaw/workspace/steamer-card-engine/comparisons/phase3_recheck_2026-03-10/diff.json",
+  "hard_fail_reasons": [],
+  "output_dir": "/root/.openclaw/workspace/steamer-card-engine/comparisons/phase3_recheck_2026-03-10",
+  "status": "pass",
+  "summary": "/root/.openclaw/workspace/steamer-card-engine/comparisons/phase3_recheck_2026-03-10/summary.md"
+}

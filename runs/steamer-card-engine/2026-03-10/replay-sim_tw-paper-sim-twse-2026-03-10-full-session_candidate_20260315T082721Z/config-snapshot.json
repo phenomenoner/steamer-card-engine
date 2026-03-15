@@ -1,0 +1,26 @@
+{
+  "cards": [
+    {
+      "card_id": "legacy-baseline-card",
+      "card_version": "legacy/v0"
+    }
+  ],
+  "config_hash": "3d9c641f69450d1d32c8cce21d4b26d23b13359786965d72856f68077fdd0d16",
+  "deck_id": "legacy-baseline-deck",
+  "deck_version": "legacy/v0",
+  "emitter": {
+    "event_sources": [
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0000.jsonl",
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0001.jsonl",
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0002.jsonl",
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0003.jsonl",
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0004.jsonl",
+      "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-trades/2026-03-10/trades_20260310T004100Z_part0005.jsonl"
+    ],
+    "name": "steamer-card-engine replay run",
+    "source_dir": "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-paper-sim/2026-03-10",
+    "version": "m1-replay-runner/v0"
+  },
+  "global_config_version": "legacy/v0",
+  "scenario_id": "tw-paper-sim.twse.2026-03-10.full-session"
+}

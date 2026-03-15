@@ -104,6 +104,14 @@ Current implementation receipt (2026-03-14):
   - note: `docs/receipts/2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md`
 - Stage 5 unblocked the candidate emission path: `replay run` now emits a truthful v1 candidate bundle with candidate runtime provenance, and canonical compare has been re-run on `tw-paper-sim.twse.2026-03-06.full-session`.
   - note: `docs/receipts/2026-03-15_m1-stage5-candidate-replay-emission-and-compare.md`
+- Phase 1 evidence-pack expansion is now receipted with 3 scenarios (anchor + 2 additional), each with baseline/candidate bundles + compare outputs + short review notes.
+  - note: `docs/receipts/2026-03-15_m1-phase1-evidence-pack-3-scenarios.md`
+- Phase 2 acceptance contract is now frozen with anti-gaming gates.
+  - note: `docs/receipts/2026-03-15_m1-phase2-acceptance-contract-freeze.md`
+- Phase 3 repeatability/anti-fluke checks are now receipted (baseline-dir enforcement, scenario mismatch hard-fails, provenance scan, deterministic compare recheck) and covered by added regression tests.
+  - note: `docs/receipts/2026-03-15_m1-phase3-repeatability-anti-fluke.md`
+- Phase 4 operatorization/doc hygiene is now receipted with an explicit evidence-pack index and setup runbook path.
+  - note: `docs/receipts/2026-03-15_m1-phase4-operatorization-doc-hygiene.md`
 
 ### Phase 1 — Contract freeze (schema + semantics lock)
 
@@ -252,4 +260,5 @@ Receipts:
 
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
 - Artifact contract + acceptance checklist: `docs/SIM_ARTIFACT_SPEC.md`
+- Evidence-pack acceptance freeze (anti-gaming gate): `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
 - Migration sequencing context: `docs/MIGRATION_PLAN.md`

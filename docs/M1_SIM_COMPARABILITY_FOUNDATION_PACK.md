@@ -267,3 +267,4 @@ Exit gate:
 - Milestone plan: `docs/MILESTONE_M1_SIM_COMPARABILITY.md`
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
 - Artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
+- Evidence-pack acceptance freeze (anti-gaming gate): `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`

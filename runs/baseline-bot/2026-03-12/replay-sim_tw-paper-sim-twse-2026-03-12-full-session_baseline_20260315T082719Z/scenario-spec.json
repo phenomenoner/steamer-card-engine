@@ -1,0 +1,92 @@
+{
+  "determinism": {
+    "mode": "best-effort",
+    "notes": "derived by baseline normalizer from legacy artifacts",
+    "random_seed": null
+  },
+  "event_source": {
+    "adjustment_mode": "raw",
+    "source_id": "legacy-baseline-source",
+    "source_kind": "recorded-stream",
+    "source_ref": "/root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-paper-sim/2026-03-12",
+    "time_range_utc": {
+      "end": "2026-03-12T01:04:47.454Z",
+      "start": "2026-03-12T00:31:42.036Z"
+    }
+  },
+  "execution_model": {
+    "fee_model": "legacy-fee-model-v0",
+    "fill_model": "sim-fill-v1",
+    "rounding_rule": "legacy-rounding-unknown",
+    "slippage_model": "legacy-slippage-unknown",
+    "tax_model": "legacy-tax-model-v0"
+  },
+  "market_clock": {
+    "calendar": "TWSE",
+    "timezone": "Asia/Taipei"
+  },
+  "scenario_id": "tw-paper-sim.twse.2026-03-12.full-session",
+  "scenario_spec_version": "scenario-spec/v1",
+  "session_slice": {
+    "end_local": "13:30:00",
+    "session_date": "2026-03-12",
+    "slice_label": "full-session",
+    "start_local": "09:00:00"
+  },
+  "symbol_set": {
+    "mode": "explicit-list",
+    "symbol_set_id": "legacy-derived",
+    "symbols": [
+      "0050",
+      "0052",
+      "0056",
+      "00632R",
+      "00637L",
+      "00642U",
+      "00664R",
+      "00665L",
+      "00673R",
+      "00679B",
+      "00680L",
+      "00687B",
+      "00712",
+      "00715L",
+      "00738U",
+      "00751B",
+      "00753L",
+      "00795B",
+      "00830",
+      "00878",
+      "00881",
+      "00891",
+      "00918",
+      "00919",
+      "00922",
+      "00923",
+      "00929",
+      "00933B",
+      "00937B",
+      "00940",
+      "00948B",
+      "00950B",
+      "00953B",
+      "00955",
+      "009805",
+      "00980A",
+      "009815",
+      "00981A",
+      "00981B",
+      "00982A",
+      "00988A",
+      "00990A",
+      "00991A",
+      "00992A",
+      "1101",
+      "1301",
+      "1303",
+      "1314",
+      "1326",
+      "1402"
+    ]
+  }
+}

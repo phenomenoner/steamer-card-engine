@@ -230,6 +230,8 @@ uv run steamer-card-engine sim compare \
 - Migration plan from current engine: [`docs/MIGRATION_PLAN.md`](docs/MIGRATION_PLAN.md)
 - SIM artifact contract: [`docs/SIM_ARTIFACT_SPEC.md`](docs/SIM_ARTIFACT_SPEC.md)
 - Scenario identity contract: [`docs/SCENARIO_SPEC.md`](docs/SCENARIO_SPEC.md)
+- M1 evidence-pack acceptance contract: [`docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`](docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md)
+- M1 evidence-pack index: [`docs/M1_EVIDENCE_PACK_INDEX.md`](docs/M1_EVIDENCE_PACK_INDEX.md)
 - Topology / repo map: [`docs/TOPOLOGY.md`](docs/TOPOLOGY.md)
 - Narrative overview article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/10-steamer-card-engine-overview.zh-TW.md)
 - External-facing launch-style article (zh-TW): [`docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md`](docs/articles/2026-03-12-steamer-card-engine-overview/11-steamer-card-engine-launch-style.zh-TW.md)
@@ -243,6 +245,8 @@ uv run steamer-card-engine sim compare \
 - ✅ Manifest validation + inspect commands（auth/card/deck/global）
 - ✅ First replay-sim comparability **plumbing** receipt landed for M1 Stage 3 (canonical scenario `tw-paper-sim.twse.2026-03-06.full-session`; baseline/candidate both normalized from the same legacy source)
 - ✅ Stage 5: `replay run` now emits truthful candidate v1 bundles with explicit candidate provenance, and canonical compare rerun is receipted
+- ✅ M1 evidence pack expanded to 3 scenarios with per-scenario baseline/candidate/compare receipts
+- ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Controlled live-sim / operator workflow

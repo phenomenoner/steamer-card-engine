@@ -97,6 +97,7 @@ Responsibilities:
 - keep capability posture explicit (`trade_enabled=false`)
 - emit comparator hard-fail reasons for scenario/execution-model mismatches
 - write scaffold compare outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
+- support M1 evidence-pack acceptance workflow defined in `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
 
 ### 5. Operator commands
 

@@ -77,6 +77,56 @@ uv run pytest
 uv run ruff check .
 ```
 
+## M1 evidence-pack operator workflow (sim-only)
+
+Current pre-sprint evidence index:
+
+- `docs/M1_EVIDENCE_PACK_INDEX.md`
+
+Acceptance gate (frozen):
+
+- `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
+
+Minimal workflow to add one new scenario:
+
+```bash
+# 1) emit baseline bundle
+uv run steamer-card-engine sim normalize-baseline \
+  --baseline-dir /abs/path/to/tw-paper-sim/YYYY-MM-DD \
+  --output-dir runs/baseline-bot/YYYY-MM-DD/<baseline_run_id> \
+  --session-date YYYY-MM-DD \
+  --scenario-id tw-paper-sim.twse.YYYY-MM-DD.full-session \
+  --run-id <baseline_run_id> \
+  --json
+
+# 2) emit candidate bundle (truthful candidate provenance)
+uv run steamer-card-engine replay run \
+  --deck examples/decks/tw_cash_intraday.toml \
+  --date YYYY-MM-DD \
+  --scenario-id tw-paper-sim.twse.YYYY-MM-DD.full-session \
+  --baseline-dir /abs/path/to/tw-paper-sim/YYYY-MM-DD \
+  --output-root runs \
+  --run-id <candidate_run_id> \
+  --json
+
+# 3) compare
+uv run steamer-card-engine sim compare \
+  --baseline runs/baseline-bot/YYYY-MM-DD/<baseline_run_id> \
+  --candidate runs/steamer-card-engine/YYYY-MM-DD/<candidate_run_id> \
+  --output-dir comparisons/<baseline_run_id>__<candidate_run_id> \
+  --json
+```
+
+Operator checks before claiming acceptance:
+
+- comparator `status=pass`
+- no hard-fail reasons
+- scenario identity and execution model are consistent
+- candidate manifest keeps `trade_enabled=false`
+- per-scenario review note + artifact pointers are written under `docs/receipts/`
+
+> Note: `/abs/path/to/tw-paper-sim/YYYY-MM-DD` is intentionally a placeholder for your local or mounted baseline artifact root.
+
 ## Where contracts live
 
 If behavior, semantics, and implementation seem to disagree, treat these docs as the contract target:

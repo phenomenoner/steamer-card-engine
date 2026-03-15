@@ -1,0 +1,59 @@
+{
+  "artifact_files": [
+    "run-manifest.json",
+    "scenario-spec.json",
+    "event-log.jsonl",
+    "feature-provenance.jsonl",
+    "intent-log.jsonl",
+    "risk-receipts.jsonl",
+    "execution-log.jsonl",
+    "order-lifecycle.jsonl",
+    "fills.jsonl",
+    "positions.jsonl",
+    "pnl-summary.json",
+    "anomalies.json",
+    "config-snapshot.json",
+    "file-index.json"
+  ],
+  "capability_posture": {
+    "account_query_enabled": false,
+    "market_data_enabled": true,
+    "trade_enabled": false
+  },
+  "ended_at_utc": "2026-03-12T01:04:47.454Z",
+  "execution_model": {
+    "fee_model": "legacy-fee-model-v0",
+    "fill_model": "sim-fill-v1",
+    "random_seed": null,
+    "rounding_rule": "legacy-rounding-unknown",
+    "slippage_model": "legacy-slippage-unknown",
+    "tax_model": "legacy-tax-model-v0"
+  },
+  "lane": "steamer-card-engine",
+  "market_event_source": {
+    "adjustment_mode": "raw",
+    "calendar": "TWSE",
+    "source_id": "legacy-baseline-source",
+    "time_range": {
+      "end": "2026-03-12T01:04:47.454Z",
+      "start": "2026-03-12T00:31:42.036Z"
+    },
+    "timezone": "Asia/Taipei"
+  },
+  "provenance": {
+    "config_hash": "d5b8996f4f96cae156a362ce97aa801f15bbe6b1d7dad979ab13dafb5b0b6111",
+    "dependency_lock_hash": "unknown",
+    "engine_git_sha": "unknown",
+    "engine_name": "steamer-card-engine-replay-runner",
+    "python_version": "3.13.12"
+  },
+  "run_id": "replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z",
+  "run_type": "replay-sim",
+  "scenario_fingerprint": "6cd13ee0982eb797a21c3514294f2fb077a5dcdf177d94c3b6fd113189da4768",
+  "scenario_id": "tw-paper-sim.twse.2026-03-12.full-session",
+  "scenario_spec_version": "scenario-spec/v1",
+  "schema_version": "sim-artifacts/v1",
+  "session_date": "2026-03-12",
+  "started_at_utc": "2026-03-12T00:31:42.036Z",
+  "status": "partial"
+}

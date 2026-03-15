@@ -1,0 +1,13 @@
+{
+  "currency": "TWD",
+  "entry_count": 30,
+  "exit_count": 0,
+  "exit_reason_counts": {},
+  "fees_total": 0.0,
+  "loss_count": 0,
+  "max_position_qty": 0.0,
+  "realized_pnl_gross": 0.0,
+  "realized_pnl_net": 0.0,
+  "taxes_total": 0.0,
+  "win_count": 0
+}

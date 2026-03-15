@@ -1,0 +1,30 @@
+{
+  "initial_attempt": {
+    "targeted": {
+      "sourceRoots": ["/root/.openclaw/workspace/steamer-card-engine"],
+      "sourceGlobs": ["docs/**/*.md", "README.md"],
+      "result": "warning",
+      "warning": "source_roots_not_allowlisted"
+    },
+    "fallback_default": {
+      "result": "success",
+      "files": 1570,
+      "batches": 14,
+      "changed": 28
+    }
+  },
+  "final_attempt_after_copilot_fixes": {
+    "targeted": {
+      "sourceRoots": ["/root/.openclaw/workspace/steamer-card-engine"],
+      "sourceGlobs": ["docs/**/*.md", "README.md"],
+      "result": "warning",
+      "warning": "source_roots_not_allowlisted"
+    },
+    "fallback_default": {
+      "result": "success",
+      "files": 1570,
+      "batches": 14,
+      "changed": 0
+    }
+  }
+}

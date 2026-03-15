@@ -1,0 +1,8 @@
+{
+  "compare_manifest": "/root/.openclaw/workspace/steamer-card-engine/comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/compare-manifest.json",
+  "diff": "/root/.openclaw/workspace/steamer-card-engine/comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/diff.json",
+  "hard_fail_reasons": [],
+  "output_dir": "/root/.openclaw/workspace/steamer-card-engine/comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z",
+  "status": "pass",
+  "summary": "/root/.openclaw/workspace/steamer-card-engine/comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/summary.md"
+}
