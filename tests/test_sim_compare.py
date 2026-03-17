@@ -356,6 +356,73 @@ def test_replay_run_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None:
     assert not Path(payload["output_dir"]).exists()
 
 
+def test_sim_run_live_emits_live_sim_bundle(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    output_root = tmp_path / "runs"
+
+    code = main(
+        [
+            "sim",
+            "run-live",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-live-sim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(output_root),
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert code == 0
+    assert payload["mode"] == "live-sim"
+
+    bundle_dir = Path(payload["bundle_dir"])
+    run_manifest = _load_json(bundle_dir / "run-manifest.json")
+
+    assert run_manifest["run_type"] == "live-sim"
+    assert run_manifest["capability_posture"]["trade_enabled"] is False
+
+
+def test_sim_run_live_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None:
+    baseline = _build_minimal_baseline(tmp_path)
+    output_root = tmp_path / "runs"
+
+    code = main(
+        [
+            "sim",
+            "run-live",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-live-sim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert code == 0
+    assert payload["mode"] == "dry-run"
+    assert payload["run_type"] == "live-sim"
+    assert not Path(payload["output_dir"]).exists()
+
+
 def test_sim_compare_hard_fails_scenario_mismatch(tmp_path: Path, capsys) -> None:
     baseline = _build_minimal_baseline(tmp_path)
     baseline_bundle = tmp_path / "baseline_bundle"

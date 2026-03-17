@@ -60,7 +60,7 @@ Examples:
 ```bash
 steamer-card-engine replay run --deck ./examples/decks/tw_cash_intraday.toml --date 2026-03-11 --baseline-dir /path/to/legacy/baseline/day --scenario-spec ./scenarios/tw-gap-reclaim-20260311.json
 steamer-card-engine replay inspect run-20260311-01
-steamer-card-engine sim run-live --deck ./examples/decks/tw_cash_intraday.toml --dry-run --scenario-id tw-gap-reclaim.twse.2026-03-11.full-session
+steamer-card-engine sim run-live --deck ./examples/decks/tw_cash_intraday.toml --session-date 2026-03-11 --baseline-dir /path/to/captured/baseline/day --dry-run --scenario-id tw-live-sim.twse.2026-03-11.full-session
 ```
 
 Responsibilities:

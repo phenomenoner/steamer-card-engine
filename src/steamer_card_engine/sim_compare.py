@@ -208,6 +208,10 @@ def normalize_baseline_bundle(
     output_dir: Path,
     session_date: str,
     scenario_id: str,
+    run_type: str = "replay-sim",
+    market_event_source_id: str = "legacy-baseline-source",
+    market_event_source_kind: str = "recorded-stream",
+    market_event_source_ref: str | None = None,
     run_id: str | None = None,
     lane: str = "baseline-bot",
     scenario_spec_path: Path | None = None,
@@ -221,6 +225,7 @@ def normalize_baseline_bundle(
     config_snapshot_actor_key: str = "normalizer",
 ) -> dict[str, Any]:
     baseline_dir = baseline_dir.resolve()
+    market_event_source_ref = market_event_source_ref or str(baseline_dir)
     output_dir = output_dir.resolve()
 
     decisions_path = baseline_dir / "decisions.jsonl"
@@ -510,9 +515,9 @@ def normalize_baseline_bundle(
                 "end_local": "13:30:00",
             },
             "event_source": {
-                "source_id": "legacy-baseline-source",
-                "source_kind": "recorded-stream",
-                "source_ref": str(baseline_dir),
+                "source_id": market_event_source_id,
+                "source_kind": market_event_source_kind,
+                "source_ref": market_event_source_ref,
                 "time_range_utc": {
                     "start": min_event_time,
                     "end": max_event_time,
@@ -608,7 +613,7 @@ def normalize_baseline_bundle(
         "schema_version": "sim-artifacts/v1",
         "run_id": run_id,
         "lane": lane,
-        "run_type": "replay-sim",
+        "run_type": run_type,
         "scenario_id": scenario_id,
         "scenario_spec_version": scenario_spec.get("scenario_spec_version"),
         "scenario_fingerprint": scenario_fingerprint,
@@ -624,7 +629,9 @@ def normalize_baseline_bundle(
             "python_version": sys.version.split()[0],
         },
         "market_event_source": {
-            "source_id": "legacy-baseline-source",
+            "source_id": market_event_source_id,
+            "source_kind": market_event_source_kind,
+            "source_ref": market_event_source_ref,
             "timezone": "Asia/Taipei",
             "calendar": "TWSE",
             "time_range": {

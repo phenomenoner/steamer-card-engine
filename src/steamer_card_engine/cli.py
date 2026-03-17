@@ -113,6 +113,30 @@ def build_parser() -> argparse.ArgumentParser:
     normalize.add_argument("--fill-model", default="sim-fill-v1")
     normalize.add_argument("--json", action="store_true", dest="as_json")
 
+    run_live = sim_sub.add_parser(
+        "run-live",
+        help=(
+            "Run a market-data-attached live-sim session (sim-only) and emit a v1 bundle. "
+            "(M1 bridge implementation: consumes a captured baseline directory.)"
+        ),
+    )
+    run_live.add_argument("--deck", required=True)
+    run_live.add_argument("--session-date", required=True)
+    run_live.add_argument("--scenario-id")
+    run_live.add_argument(
+        "--baseline-dir",
+        required=True,
+        help="Captured baseline directory containing ticks.jsonl + decisions.jsonl",
+    )
+    run_live.add_argument("--output-root", default="runs")
+    run_live.add_argument("--run-id")
+    run_live.add_argument("--scenario-spec")
+    run_live.add_argument("--max-events", type=int)
+    run_live.add_argument("--max-decisions", type=int)
+    run_live.add_argument("--fill-model", default="sim-fill-v1")
+    run_live.add_argument("--dry-run", action="store_true")
+    run_live.add_argument("--json", action="store_true", dest="as_json")
+
     compare = sim_sub.add_parser(
         "compare",
         help="Compare two SIM bundles with M1 hard-stop checks",
@@ -230,6 +254,10 @@ def _default_scenario_id(session_date: str) -> str:
     return f"tw-paper-sim.twse.{session_date}.full-session"
 
 
+def _default_live_scenario_id(session_date: str) -> str:
+    return f"tw-live-sim.twse.{session_date}.full-session"
+
+
 def _run_timestamp_utc() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
@@ -281,6 +309,68 @@ def _emit_replay_candidate_bundle(args: argparse.Namespace) -> dict:
         config_snapshot_actor_key="emitter",
     )
     summary["mode"] = "replay"
+    summary["baseline_dir"] = str(baseline_dir.resolve())
+    return summary
+
+
+def _emit_live_sim_bundle(args: argparse.Namespace) -> dict:
+    load_deck_manifest(args.deck)
+
+    session_date = args.session_date
+    scenario_id = args.scenario_id or _default_live_scenario_id(session_date)
+    scenario_slug = _slugify(scenario_id)
+    run_id = args.run_id or f"live-sim_{scenario_slug}_candidate_{_run_timestamp_utc()}"
+
+    baseline_dir = Path(args.baseline_dir)
+    if not baseline_dir.exists():
+        raise SimCompareError(
+            "live-sim baseline capture not found: "
+            f"{baseline_dir} (override with --baseline-dir)"
+        )
+
+    output_root = Path(args.output_root)
+    output_dir = output_root / "steamer-card-engine" / session_date / run_id
+
+    if args.dry_run:
+        return {
+            "mode": "dry-run",
+            "run_type": "live-sim",
+            "deck": args.deck,
+            "session_date": session_date,
+            "scenario_id": scenario_id,
+            "baseline_dir": str(baseline_dir.resolve()),
+            "output_dir": str(output_dir.resolve()),
+            "run_id": run_id,
+            "capability_posture": {"trade_enabled": False},
+        }
+
+    market_source_id = f"live-sim-capture:{baseline_dir.resolve()}"
+
+    summary = normalize_baseline_bundle(
+        baseline_dir=baseline_dir,
+        output_dir=output_dir,
+        session_date=session_date,
+        scenario_id=scenario_id,
+        run_type="live-sim",
+        market_event_source_id=market_source_id,
+        market_event_source_kind="recorded-stream",
+        market_event_source_ref=str(baseline_dir.resolve()),
+        run_id=run_id,
+        lane="steamer-card-engine",
+        scenario_spec_path=Path(args.scenario_spec) if args.scenario_spec else None,
+        max_events=args.max_events,
+        max_decisions=args.max_decisions,
+        fill_model=args.fill_model,
+        engine_name="steamer-card-engine-live-sim-runner",
+        emitter_name="steamer-card-engine sim run-live",
+        emitter_version="m1-live-sim-runner/v0",
+        determinism_note=(
+            "derived from a captured market-event stream; M1 bridge uses offline consumption "
+            "(no broker submission semantics)"
+        ),
+        config_snapshot_actor_key="emitter",
+    )
+    summary["mode"] = "live-sim"
     summary["baseline_dir"] = str(baseline_dir.resolve())
     return summary
 
@@ -365,6 +455,25 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     print(
                         "Replay bundle emitted "
+                        f"run_id={summary['run_id']} output={summary['bundle_dir']} "
+                        f"anomalies={summary['counts']['anomalies']}"
+                    )
+            return 0
+
+        if args.command == "sim" and args.sim_command == "run-live":
+            summary = _emit_live_sim_bundle(args)
+            if args.as_json:
+                _print_json(summary)
+            else:
+                if summary.get("mode") == "dry-run":
+                    print(
+                        "Live-sim dry-run "
+                        f"run_id={summary['run_id']} capture={summary['baseline_dir']} "
+                        f"output={summary['output_dir']}"
+                    )
+                else:
+                    print(
+                        "Live-sim bundle emitted "
                         f"run_id={summary['run_id']} output={summary['bundle_dir']} "
                         f"anomalies={summary['counts']['anomalies']}"
                     )
