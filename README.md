@@ -199,7 +199,7 @@ uv run steamer-card-engine author inspect-card examples/cards/gap_reclaim.toml
 uv run steamer-card-engine author inspect-deck examples/decks/tw_cash_intraday.toml --cards-dir examples/cards
 uv run steamer-card-engine author inspect-global examples/config/global.toml
 
-# M1 foundation: baseline normalization + comparator skeleton
+# M1 foundation: baseline normalization + decision-grade compare outputs
 uv run steamer-card-engine sim normalize-baseline \
   --baseline-dir /path/to/baseline/day \
   --output-dir /tmp/sce-baseline-bundle \
@@ -212,8 +212,9 @@ uv run steamer-card-engine sim compare \
   --output-dir /tmp/sce-compare
 ```
 
-目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global）
+目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global），
 以及 M1 基礎實作：`sim normalize-baseline` / `sim compare` / `replay run`（候選 bundle 發射路徑）。
+其中 `sim compare` 會落地 `compare-manifest.json`、`diff.json`、`summary.md` 這組 decision-grade 比對輸出。
 `operator` 仍是 placeholder，尚未接上實際 runtime。
 
 ## 文件導覽
@@ -246,6 +247,7 @@ uv run steamer-card-engine sim compare \
 - ✅ Manifest validation + inspect commands（auth/card/deck/global）
 - ✅ First replay-sim comparability **plumbing** receipt landed for M1 Stage 3 (canonical scenario `tw-paper-sim.twse.2026-03-06.full-session`; baseline/candidate both normalized from the same legacy source)
 - ✅ Stage 5: `replay run` now emits truthful candidate v1 bundles with explicit candidate provenance, and canonical compare rerun is receipted
+- ✅ `sim compare` now emits decision-grade compare artifacts (`compare-manifest.json` / `diff.json` / `summary.md`) instead of a planning-only placeholder
 - ✅ M1 evidence pack expanded to 3 scenarios with per-scenario baseline/candidate/compare receipts
 - ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
 - ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy

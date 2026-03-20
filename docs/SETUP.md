@@ -109,13 +109,19 @@ uv run steamer-card-engine replay run \
   --run-id <candidate_run_id> \
   --json
 
-# 3) compare
+# 3) compare (decision-grade outputs)
 uv run steamer-card-engine sim compare \
   --baseline runs/baseline-bot/YYYY-MM-DD/<baseline_run_id> \
   --candidate runs/steamer-card-engine/YYYY-MM-DD/<candidate_run_id> \
   --output-dir comparisons/<baseline_run_id>__<candidate_run_id> \
   --json
 ```
+
+The compare step should materialize:
+
+- `compare-manifest.json` — pass/fail posture + hard-gate reasons
+- `diff.json` — machine-readable decision-grade diff payload
+- `summary.md` — human review summary
 
 Operator checks before claiming acceptance:
 

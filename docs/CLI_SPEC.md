@@ -96,7 +96,7 @@ Responsibilities:
 - normalize legacy baseline artifacts (`decisions.jsonl` + tick/trade sources) into a v1-shaped bundle
 - keep capability posture explicit (`trade_enabled=false`)
 - emit comparator hard-fail reasons for scenario/execution-model mismatches
-- write scaffold compare outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
+- write decision-grade compare outputs (`compare-manifest.json`, `diff.json`, `summary.md`) with reviewable mismatch reasons and machine-readable deltas
 - support M1 evidence-pack acceptance workflow defined in `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
 
 ### 5. Operator commands
@@ -195,7 +195,7 @@ Current implementation status:
 - ✅ `author validate-deck` / `author inspect-deck`
 - ✅ `author validate-global` / `author inspect-global`
 - ✅ `sim normalize-baseline` (legacy baseline → v1-shaped M1 bundle)
-- ✅ `sim compare` (hard-fail gates + scaffold compare report)
+- ✅ `sim compare` (hard-fail gates + decision-grade compare report)
 - ✅ `replay run` emits candidate v1 bundles (legacy-bridge emitter for M1, with explicit provenance)
 - ⏳ operator execution remains placeholder
 

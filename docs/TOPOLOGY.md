@@ -51,7 +51,7 @@ steamer-card-engine/
 │   ├── cli.py
 │   ├── manifest.py
 │   ├── models.py
-│   ├── sim_compare.py         # M1 baseline normalizer + comparator skeleton
+│   ├── sim_compare.py         # M1 baseline normalizer + decision-grade comparator
 │   ├── adapters/base.py
 │   ├── cards/base.py
 │   └── runtime/components.py
@@ -59,17 +59,22 @@ steamer-card-engine/
 │   ├── baseline-bot/
 │   │   ├── 2026-03-06/
 │   │   ├── 2026-03-10/
-│   │   └── 2026-03-12/
+│   │   ├── 2026-03-12/
+│   │   └── 2026-03-20/        # newer local baseline receipts / working lane
 │   └── steamer-card-engine/
 │       ├── 2026-03-06/
 │       ├── 2026-03-10/
-│       └── 2026-03-12/
+│       ├── 2026-03-12/
+│       ├── 2026-03-17/        # newer local candidate receipts / working lane
+│       ├── 2026-03-18/        # newer local candidate receipts / working lane
+│       └── 2026-03-20/        # newer local candidate receipts / working lane
 ├── comparisons/
 │   ├── replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_.../
 │   ├── replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_.../
 │   ├── replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_...__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_.../
 │   ├── phase3_mismatch_2026-03-06_vs_2026-03-12/
-│   └── phase3_recheck_2026-03-10/
+│   ├── phase3_recheck_2026-03-10/
+│   └── manual-live-paired-20260320-.../   # workspace-local paired compare lane
 └── tests/
     ├── test_cli.py
     ├── test_manifests.py
@@ -102,7 +107,7 @@ steamer-card-engine/
 - `src/steamer_card_engine/sim_compare.py`
   - M1 foundation tooling:
     - baseline artifact normalizer (`sim normalize-baseline`)
-    - comparator skeleton (`sim compare`) with hard gates + scaffold report outputs
+    - comparator (`sim compare`) with hard gates + decision-grade report outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
@@ -110,7 +115,9 @@ steamer-card-engine/
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
   - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for a 3-scenario pre-sprint evidence pack
+  - compare outputs are now decision-grade (`compare-manifest.json`, `diff.json`, `summary.md`), not just placeholder plumbing
   - include both passing comparable pairs and explicit phase-3 mismatch replayability checks for hard-gate verification
+  - working tree may also contain newer local run/comparison lanes (for example 2026-03-17/18/20 candidate receipts or `manual-live-paired-*` comparisons); treat those as workspace receipts until promoted into `docs/M1_EVIDENCE_PACK_INDEX.md`
   - Option B hygiene: duplicate `event-log.jsonl` payloads are symlink-deduped to canonical copies; content hashes remain unchanged
 
 ### Intentional placeholders (not yet “real runtime”)
@@ -165,3 +172,11 @@ steamer-card-engine/
 - M1 evidence-pack index: `docs/M1_EVIDENCE_PACK_INDEX.md`
 - M1 evidence packaging hygiene: `docs/EVIDENCE_PACKAGING_HYGIENE.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
+T_REVIEW_COPILOT.md`
+ntract: `docs/SIM_ARTIFACT_SPEC.md`
+- Scenario identity contract: `docs/SCENARIO_SPEC.md`
+- M1 evidence-pack acceptance contract: `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
+- M1 evidence-pack index: `docs/M1_EVIDENCE_PACK_INDEX.md`
+- M1 evidence packaging hygiene: `docs/EVIDENCE_PACKAGING_HYGIENE.md`
+- Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
+T_REVIEW_COPILOT.md`
