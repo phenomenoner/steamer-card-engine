@@ -868,7 +868,7 @@ def compare_bundles(
     candidate_pnl = _parse_json(candidate_result.bundle_dir / "pnl-summary.json", default={})
 
     diff_payload = {
-        "compare_version": "m1-compare/v0",
+        "compare_version": "m2-decision-grade/v0",
         "status": status,
         "counts": {
             "fills": {
@@ -902,15 +902,44 @@ def compare_bundles(
             "baseline": baseline_result.anomalies_by_severity,
             "candidate": candidate_result.anomalies_by_severity,
         },
-        "scaffold_placeholders": {
-            "per_symbol_totals": "pending",
-            "max_exposure": "pending",
-            "exit_reason_distribution": "pending",
+        "decision_grade_diff": {
+            "per_symbol_totals": {
+                "baseline": baseline_pnl.get("per_symbol_totals", {}),
+                "candidate": candidate_pnl.get("per_symbol_totals", {}),
+            },
+            "exposure": {
+                "baseline": {
+                    "max_exposure": baseline_pnl.get("max_exposure", baseline_pnl.get("max_position_qty")),
+                    "max_position_qty": baseline_pnl.get("max_position_qty"),
+                },
+                "candidate": {
+                    "max_exposure": candidate_pnl.get("max_exposure", candidate_pnl.get("max_position_qty")),
+                    "max_position_qty": candidate_pnl.get("max_position_qty"),
+                },
+            },
+            "exit_reason_distribution": {
+                "baseline": baseline_pnl.get("exit_reason_counts", {}),
+                "candidate": candidate_pnl.get("exit_reason_counts", {}),
+            },
+            "realized_totals": {
+                "baseline": {
+                    "realized_pnl_gross": baseline_pnl.get("realized_pnl_gross"),
+                    "fees_total": baseline_pnl.get("fees_total"),
+                    "taxes_total": baseline_pnl.get("taxes_total"),
+                    "realized_pnl_net": baseline_pnl.get("realized_pnl_net"),
+                },
+                "candidate": {
+                    "realized_pnl_gross": candidate_pnl.get("realized_pnl_gross"),
+                    "fees_total": candidate_pnl.get("fees_total"),
+                    "taxes_total": candidate_pnl.get("taxes_total"),
+                    "realized_pnl_net": candidate_pnl.get("realized_pnl_net"),
+                },
+            },
         },
     }
 
     compare_manifest = {
-        "compare_version": "m1-compare/v0",
+        "compare_version": "m2-decision-grade/v0",
         "status": status,
         "hard_fail_reasons": hard_fail_reasons,
         "baseline": {
@@ -949,7 +978,7 @@ def compare_bundles(
     _write_json(output_dir / "diff.json", diff_payload)
 
     summary_lines = [
-        "# M1 Comparator Summary",
+        "# Decision-Grade Comparator Summary",
         "",
         f"- status: **{status.upper()}**",
         f"- baseline run: `{baseline_manifest.get('run_id')}` ({baseline_manifest.get('lane')})",
@@ -973,7 +1002,7 @@ def compare_bundles(
             f"- risk decisions: baseline={baseline_result.counts['risk']} candidate={candidate_result.counts['risk']}",
             "",
             "## Notes",
-            "- This is a comparator skeleton; per-symbol exposure/exit diffs are scaffold placeholders.",
+            "- Decision-grade diff now includes per-symbol totals, exposure maxima, exit-reason distribution, and realized totals.",
             "- execution_model hash mismatch remains a hard stop.",
         ]
     )

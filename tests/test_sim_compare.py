@@ -284,7 +284,7 @@ def test_sim_compare_passes_when_hard_gates_match(tmp_path: Path, capsys) -> Non
     assert payload["status"] == "pass"
     diff = _load_json(compare_out / "diff.json")
     assert diff["counts"]["intents"]["baseline"] >= 1
-    assert diff["scaffold_placeholders"]["per_symbol_totals"] == "pending"
+    assert "decision_grade_diff" in diff
 
 
 def test_replay_run_emits_candidate_bundle(tmp_path: Path, capsys) -> None:
