@@ -1,0 +1,138 @@
+version: 1
+kind: doc_driven_sprint_controller
+
+name: steamer-card-engine-m1-sim-comparability
+slug: sce-m1-sim-compare
+owner: CK
+
+milestone:
+  short: M1 SIM comparability (replay proof + live-sim-attached + acceptance; sim-only)
+  long: |
+    Sim-only, contract-first milestone for steamer-card-engine.
+
+    Current truth:
+    - replay-sim comparability pre-sprint pack is complete
+    - truthful 3-scenario evidence pack exists
+    - acceptance contract / repeatability / operatorization are in place
+    - Stage 4 live-sim-attached is closed (first truthful `run_type=live-sim` v1 bundle exists)
+    - Stage 5 evidence-pack acceptance is closed (receipt in playbook tech note)
+    - follow-up remains: clarify `live-sim-attached` timing semantics vs current 13:40 progress + 14:15 watchdog schedule before treating it as canonical automation
+
+    Hard boundaries:
+    - steamer-card-engine is adjacent productization; daily Steamer ops remain the baseline lane
+    - no live trading authority expansion
+    - do not exercise broker order submission codepaths for M1
+    - execution_model mismatch is a hard stop for comparison
+
+executionContract:
+  default: forward-mandatory
+  milestoneClosure: concrete-artifact
+  activeGateOwner: bounded-worker
+  primitive:
+    kind: helper-script
+    path: /root/.openclaw/workspace/steamer-card-engine/tools/steamer_card_engine_stage4_live_sim_first_run.py
+    purpose: Emit (or re-emit) a truthful Stage 4 `run_type=live-sim` bundle from a captured feed dir while staying sim-only.
+  inputs:
+    - /root/.openclaw/workspace/openclaw-async-coding-playbook/projects/trading-research/artifacts/tw-paper-sim/<session_date>/
+    - /root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_intraday.toml
+  outputs:
+    - /root/.openclaw/workspace/steamer-card-engine/runs/steamer-card-engine/<session_date>/<run_id>/
+  successReceipt: First truthful `run_type=live-sim` bundle exists with explicit sim-only capability posture + `scenario-spec.json` + `scenario_fingerprint` + `anomalies.json` + `file-index.json`; ready-only does not close the gate.
+  reportImmediatelyOn:
+    - important decision or milestone-definition change
+    - safety hazard / broker-submission risk
+    - rollback ambiguity
+    - material scope / authority / resource boundary change
+
+coverage:
+  status: active-sprint
+  reportModel: report-immediately-on-important-decisions
+
+evidenceTargets:
+  - lane: replay-proof
+    target: truthful 3-scenario replay evidence pack remains the frozen baseline proof
+  - lane: live-sim-attached
+    target: first truthful v1 bundle exists under sim-only capability posture; preserve reproducibility + hard-stop gates
+  - lane: comparator
+    target: preserve hard-fail identity / execution-model gates through the live-sim-attached stage
+  - lane: operatorization
+    target: sprint doc + public docs + topology stay self-explanatory and receipted
+
+rolloutPolicy:
+  overallPosture: active-sprint (progress-pass live, handoff scaffolded)
+  mode: staged
+  executionPosture: forward-mandatory-inside-gates
+  orderedStages:
+    - foundation
+    - contract-freeze
+    - replay-sim-comparable
+    - live-sim-attached
+    - evidence-pack
+
+gates:
+  allowAutoEnableApprovedJobs: false
+  hardBoundaries:
+    - do not redefine the milestone without approval
+    - do not bypass stage order or gates
+    - do not widen scope beyond the declared milestone
+    - do not turn the controller into the main worker
+    - do not exercise broker order submission semantics (M1 is sim-only)
+    - do not enable additional live controller cron jobs without explicit approval
+    - do not stop for routine approval once the next move is already inside approved sprint scope and hard boundaries
+    - do not claim Stage 4 closed on CLI readiness alone; this gate closes on the first truthful emitted bundle
+  escalationConditions:
+    - milestone definition needs to change
+    - live-sim-attached gate is genuinely ambiguous
+    - safety hazard / broker-submission risk appears
+    - a rollback is needed and the clean path is unclear
+    - repeated failures suggest the sprint should pause or change shape
+    - the next move crosses into materially larger scope or new authority/resource class
+    - a real strategic tradeoff deserves CK's decision now rather than at the next report window
+
+actions:
+  allowed:
+    - update sprint doc
+    - sync minimal related docs when repo truth changed
+    - append concise durable notes to memory/YYYY-MM-DD.md
+    - prepare stage gates/checklists
+    - prepare rollout / rollback / observation checklists
+    - run docs cold-lane ingest after material operator-doc changes
+    - invoke the checked-in Stage 4 execution pack/helper when the active gate is green and stays sim-only
+    - launch or continue the next bounded in-scope worker/implementation move when it stays inside the active stage and sim-only boundary
+
+truthSurfaces:
+  sprintDoc: /root/.openclaw/workspace/steamer-card-engine/ops/sprints/steamer-card-engine-m1-sim-comparability-sprint.md
+  techNote: /root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-15_steamer_card_engine_m1_sprint-activation-pack.md
+  relatedDocs:
+    - ops/sprints/steamer-card-engine-m1-stage4-live-sim-first-run-pack.md
+    - docs/MILESTONE_M1_SIM_COMPARABILITY.md
+    - docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md
+    - docs/M1_EVIDENCE_PACK_INDEX.md
+    - docs/EVIDENCE_PACKAGING_HYGIENE.md
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/STATUS.md
+  topologyDocs:
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/topology-pack-l0.md
+
+cadence:
+  passes:
+    - name: progress
+      purpose: Keep the scorecard/blockers truthful and advance the next in-scope gate.
+      cron: 40 13 * * *
+      tz: Asia/Taipei
+      wakeMode: next-heartbeat
+    - name: handoff
+      purpose: Refresh the handoff block and next-review posture before the next day.
+      cron: 20 23 * * *
+      tz: Asia/Taipei
+      wakeMode: next-heartbeat
+
+receipts:
+  playbookRepo: /root/.openclaw/workspace/openclaw-async-coding-playbook
+  ledgerRepo: /root/.openclaw/workspace/lyria-working-ledger
+  memoryPath: /root/.openclaw/workspace/memory/YYYY-MM-DD.md
+
+notes:
+  - Progress pass is live; captain-prep remains scaffolded/disabled until explicitly approved.
+  - Keep public/private boundaries clean: do not copy operator-only runbooks into public docs.
+  - Ordinary green progress should keep moving; important decisions should report immediately.
+  - This sprint now has a named execution surface for Stage 4 so the milestone cannot stall in a ready-without-execution contradiction.

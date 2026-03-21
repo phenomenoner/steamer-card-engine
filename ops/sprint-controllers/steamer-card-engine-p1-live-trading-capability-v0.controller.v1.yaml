@@ -1,0 +1,147 @@
+version: 1
+kind: doc_driven_sprint_controller
+
+name: steamer-card-engine-p1-live-trading-capability-v0
+slug: steamer-card-engine-p1-live-cap-v0
+owner: CK
+
+launchContract:
+  launchingUser: CK
+  confirmationRequired: true
+  confirmationMeaning: Launching user confirms route connectivity + best-case timing are acceptable and accepts the no-fight rule relative to Sprint A.
+
+milestone:
+  short: steamer-card-engine Product Sprint P1 / Live Trading Capability v0
+  long: |
+    Productization sprint for guarded live-capability posture.
+
+    Current truth:
+    - M1 sim comparability is closed
+    - the product line now needs an explicit, operator-credible path toward live capability
+    - this sprint is adjacent to Sprint A and must not redefine Sprint A's pair-contract milestone
+
+executionContract:
+  default: forward-mandatory
+  milestoneClosure: ready-only
+  activeGateOwner: controller
+  primitive:
+    kind: provisioning-pack
+    path: /root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_live-trading-capability_v0_sprint-pack.md
+    purpose: Keep the product live-capability contract pack truthful and advance the next bounded stage.
+  inputs:
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/STATUS.md
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/topology-pack-l0.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/PRODUCT_SCOPE.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/AUTH_AND_SESSION_MODEL.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/DAYTRADING_GUARDRAILS.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/MIGRATION_PLAN.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/CLI_SPEC.md
+    - /root/.openclaw/workspace/steamer-card-engine/ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md
+  outputs:
+    - /root/.openclaw/workspace/steamer-card-engine/ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md
+    - /root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_live-trading-capability_v0_sprint-pack.md
+  successReceipt: Repo truth contains a coherent product live-capability pack (capability posture states, operator control contract, bounded live path contract, and reportable sprint truth).
+  reportImmediatelyOn:
+    - important decision or milestone-definition change
+    - rollback ambiguity
+    - material scope / authority / resource boundary change
+
+pathAudit:
+  connectivityVerdict: connected
+  notes:
+    - Product docs already define the key safety and operator boundaries.
+    - M1 already proved the sim-only product contract layer.
+    - The next honest edge is guarded live capability, not broad production-readiness theater.
+  fastestPath:
+    - stage: capability-posture-contract
+      ifGreenBy: within 0.5-1 active day after sprint start
+    - stage: operator-control-contract
+      ifGreenBy: within 1-2 active days after sprint start
+    - stage: bounded-live-path-contract
+      ifGreenBy: within 2-3 active days after sprint start
+    - stage: reportable-p1
+      ifGreenBy: within 2-4 active days after sprint start
+  fastestMilestoneFinish: ~2-4 calendar days
+
+coverage:
+  status: active-sprint
+  reportModel: report-immediately-on-important-decisions
+
+evidenceTargets:
+  - lane: capability-posture
+    target: one explicit product posture ladder exists between sim-only and live-capable
+  - lane: operator-controls
+    target: one bounded operator control contract exists
+  - lane: operatorization
+    target: sprint doc + tech note + status/topology truth read coherently without chat archaeology
+
+rolloutPolicy:
+  overallPosture: active-sprint (scaffold-first)
+  mode: staged
+  executionPosture: forward-mandatory-inside-gates
+  orderedStages:
+    - capability-posture-contract
+    - operator-control-contract
+    - bounded-live-path-contract
+    - reportable-p1
+
+gates:
+  allowAutoEnableApprovedJobs: false
+  hardBoundaries:
+    - do not redefine the milestone without approval
+    - do not bypass stage order or gates
+    - do not widen scope beyond the declared sprint
+    - do not turn the controller into the main worker
+    - do not blur Product Sprint P1 with Sprint A ownership
+    - do not claim broad production readiness
+    - do not hide live-authority posture behind ambiguous auth/session state
+  escalationConditions:
+    - milestone definition needs to change
+    - the live-capability cut is genuinely ambiguous
+    - rollback is needed and the clean path is unclear
+    - repeated failures suggest the sprint should pause or change shape
+    - the next move crosses into materially larger scope
+
+actions:
+  allowed:
+    - update sprint doc
+    - sync minimal related docs when repo truth changed
+    - append concise durable notes to memory/YYYY-MM-DD.md
+    - prepare rollout / rollback / observation checklists
+    - scaffold the next bounded execution-pack/helper spec when it becomes truthful
+
+truthSurfaces:
+  sprintDoc: /root/.openclaw/workspace/steamer-card-engine/ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md
+  techNote: /root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_live-trading-capability_v0_sprint-pack.md
+  relatedDocs:
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/TECH_NOTES/2026-03-19_steamer_dual-sprint_governance_pair-contract_plus_product-live-capability.md
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/STATUS.md
+    - docs/PRODUCT_SCOPE.md
+    - docs/AUTH_AND_SESSION_MODEL.md
+    - docs/DAYTRADING_GUARDRAILS.md
+    - docs/MIGRATION_PLAN.md
+    - docs/CLI_SPEC.md
+  topologyDocs:
+    - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/topology-pack-l0.md
+
+cadence:
+  passes:
+    - name: progress
+      purpose: Keep the product live-capability scorecard truthful and advance the next bounded contract stage.
+      cron: 25 13 * * *
+      tz: Asia/Taipei
+      wakeMode: next-heartbeat
+    - name: handoff
+      purpose: Refresh the handoff block and next-check posture before Captain's Log windows.
+      cron: 25 23 * * *
+      tz: Asia/Taipei
+      wakeMode: next-heartbeat
+
+receipts:
+  playbookRepo: /root/.openclaw/workspace/openclaw-async-coding-playbook
+  ledgerRepo: /root/.openclaw/workspace/lyria-working-ledger
+  memoryPath: /root/.openclaw/workspace/memory/YYYY-MM-DD.md
+
+notes:
+  - Scaffold-first only in this pass; no live controller jobs enabled here.
+  - This sprint is product-adjacent and must not fight Sprint A.

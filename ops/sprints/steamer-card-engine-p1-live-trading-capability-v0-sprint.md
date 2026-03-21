@@ -1,0 +1,142 @@
+# Steamer Card Engine — Product Sprint P1 / Live Trading Capability v0
+
+## Sprint goal / milestone
+
+Make **Live Trading Capability v0** operator-credible and reportable for `steamer-card-engine`.
+
+This sprint exists because `steamer-card-engine` is not only a Steamer-internal adjacent track.
+It is also a product line we intend to push outward.
+
+The question for this sprint is:
+
+> can the product earn a guarded live-capability posture without lying about safety, permissions, or operator control?
+
+## Current rollout policy
+
+- Overall posture: **active sprint, scaffold-first**
+- Controller posture: **doc-driven sprint controller pack scaffolded**
+- Live controller jobs: **progress pass enabled; handoff pass scaffolded/disabled**
+- Rollout mode: **staged / docs-first**
+- Execution posture: **forward-mandatory inside approved gates**
+- Report posture: ordinary progress stays in sprint truth; important decisions report immediately
+- Ordered stages:
+  1. `capability-posture-contract`
+  2. `operator-control-contract`
+  3. `bounded-live-path-contract`
+  4. `reportable-p1`
+
+Boundary note:
+- current M1 remains closed under its written contract
+- Sprint A owns pair-contract coupling for Steamer strategy work
+- this sprint owns guarded product live-capability posture only
+- no unrestricted live-authority expansion is implied
+
+## Execution contract / forcing move
+
+This sprint is a **ready-only contract sprint**.
+
+The milestone closes when repo truth contains a coherent, operator-usable P1 pack:
+- explicit capability posture states
+- explicit operator control contract
+- explicit bounded live path contract
+- reportable docs/receipts tying the above into product/runtime topology
+
+Current forcing move:
+- close `stage-4 reportable-p1`
+
+## Path audit + best-case timing
+
+Connectivity verdict: **connected**.
+
+Why it connects:
+- product docs already define the main safety boundaries
+- M1 already proved the sim-only artifact/product contract layer
+- the next bounded product edge is guarded live capability rather than a broad rewrite
+
+Best-case timing map:
+- `capability-posture-contract` -> **0.5-1 good active day**
+- `operator-control-contract` -> **0.5-1 good active day**
+- `bounded-live-path-contract` -> **0.5-1 good active day**
+- `reportable-p1` -> **0.5-1 good active day**
+- fastest plausible finish -> **~2-4 calendar days**
+
+Launching user:
+- **CK**
+
+Launch confirmation meaning:
+- CK accepted that product live-trading capability should advance as an adjacent line without fighting Sprint A.
+
+## Lane / stage scorecard
+
+| Stage | Status | Hard gate | Evidence pointer |
+|---|---|---|---|
+| stage-0-bootstrap | done | sprint pack exists in repo truth | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_live-trading-capability_v0_sprint-pack.md` |
+| stage-1-capability-posture-contract | done | product states between sim-only and live-capable are explicit and operator-inspectable | this sprint doc + `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage1_capability-posture-contract.md` |
+| stage-2-operator-control-contract | done | status / arm / disarm / flatten surfaces are explicitly bounded | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage2_operator-control-contract.md` |
+| stage-3-bounded-live-path-contract | done | one guarded path from current product state to bounded live capability is explicit | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md` |
+| stage-4-reportable-p1 | active | the slice reads as one coherent product live-capability line | this sprint doc + supporting tech notes |
+
+## Current blockers / risks
+
+- The main risk is **fake readiness**: product docs can sound live-ready before capability, operator control, and guardrails are explicitly connected.
+- The second risk is **milestone collision**: if Sprint A and Product Sprint P1 are allowed to own the same gate, both lines will drift and fake progress.
+- The third risk is **authority ambiguity**: if auth/session posture does not visibly state `trade_enabled`, live-capability claims become unsafe theater.
+
+## Allowed auto-actions
+
+The controller may:
+- update this sprint doc
+- sync related `STATUS.md`, `topology-pack-l0.md`, and tech notes when repo truth changed
+- append concise durable notes to `memory/YYYY-MM-DD.md`
+- run docs cold-lane ingest after material operator-doc changes
+- prepare rollout / rollback / observation checklists
+- scaffold the next bounded execution-pack or helper spec once the contract stages make that truthful
+- launch or continue the next bounded in-scope doc/contract move inside the declared stage order
+
+It may **not**:
+- redefine the milestone without approval
+- bypass stage order
+- widen P1 into broad production-readiness claims
+- pretend operator-governed live control is already implemented if the contract is not explicit
+- claim ownership of Sprint A's pair-contract problem
+- turn the controller into the main coding worker
+
+## Escalate-to-human conditions
+
+Report immediately only if:
+1. milestone definition needs to change
+2. the live-capability cut is genuinely ambiguous
+3. rollback is needed and the clean path is unclear
+4. a safety hazard or forbidden execution path appears
+5. repeated failures suggest the sprint should pause or be re-cut
+6. the next useful move widens scope materially beyond Product Sprint P1
+
+## Docs / topology / memory sync checklist
+
+When durable truth changes, update in the same pass:
+- this sprint doc
+- relevant `STATUS.md` / `topology-pack-l0.md` / tech notes
+- push receipts for changed repos
+- docs cold-lane ingest if operator-facing docs changed materially
+- `memory/YYYY-MM-DD.md`
+
+If topology does **not** change, say so explicitly in the receipt.
+
+## Captain / handoff block
+
+Current sprint read:
+- M1 is closed under its written contract
+- Product Sprint P1 is now the next bounded productization edge for `steamer-card-engine`
+- this line is intentionally separate from Sprint A and must not fight it
+- immediate forcing move: close `stage-4 reportable-p1`
+
+## Run journal
+
+- 2026-03-19 — sprint pack scaffolded after CK approved running A+B in parallel without collision.
+- 2026-03-19 — one live progress manager was provisioned for Product Sprint P1 (`ac9002f2-f086-4ee1-8fb3-de222b4e7d67`); handoff remains scaffolded.
+- 2026-03-19 — stage-1 capability posture ladder contract note added (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage1_capability-posture-contract.md`.
+- 2026-03-19 — stage-1 `capability-posture-contract` marked **done**; stage-2 `operator-control-contract` activated.
+- 2026-03-19 — stage-2 operator control contract note added (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage2_operator-control-contract.md`.
+- 2026-03-20 — stage-2 `operator-control-contract` clarified (explicit mapping to auth/session + CLI spec); stage-2 marked **done** (no topology change).
+- 2026-03-20 — stage-3 bounded live path contract note added (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md`; stage-3 activated.
+- 2026-03-21 — stage-3 marked **done**; stage-4 `reportable-p1` activated (no topology change).
