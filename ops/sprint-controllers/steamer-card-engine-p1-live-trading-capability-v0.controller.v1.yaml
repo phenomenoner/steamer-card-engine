@@ -122,6 +122,7 @@ truthSurfaces:
     - docs/MIGRATION_PLAN.md
     - docs/CLI_SPEC.md
   topologyDocs:
+    - /root/.openclaw/workspace/steamer-card-engine/docs/TOPOLOGY.md
     - /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/topology-pack-l0.md
 
 cadence:

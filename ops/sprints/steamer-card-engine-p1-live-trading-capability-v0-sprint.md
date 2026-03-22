@@ -140,3 +140,4 @@ Current sprint read:
 - 2026-03-20 — stage-2 `operator-control-contract` clarified (explicit mapping to auth/session + CLI spec); stage-2 marked **done** (no topology change).
 - 2026-03-20 — stage-3 bounded live path contract note added (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md`; stage-3 activated.
 - 2026-03-21 — stage-3 marked **done**; stage-4 `reportable-p1` activated (no topology change).
+- 2026-03-22 — stage-4 coherence pass: refreshed sprint-pack forcing-move truth + cleaned `docs/TOPOLOGY.md` cross-links + updated scaffold cron spec docs to point at canonical sprint surfaces (no topology change).

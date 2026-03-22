@@ -30,6 +30,7 @@ steamer-card-engine/
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
+│   ├── tech-notes/
 │   ├── receipts/
 │   │   ├── 2026-03-14_m1-stage3-first-replay-sim-comparable.md
 │   │   ├── 2026-03-14_m1-stage4-candidate-engine-emitted-blocker.md
@@ -42,6 +43,9 @@ steamer-card-engine/
 │   │   └── 2026-03-15_m1-pre-sprint-serial-closure.md
 │   └── articles/
 │       └── 2026-03-12-steamer-card-engine-overview/
+├── ops/
+│   ├── sprints/
+│   └── sprint-controllers/
 ├── examples/
 │   ├── cards/     # example card manifests (TOML)
 │   ├── decks/     # example deck manifests (TOML)
@@ -165,18 +169,13 @@ steamer-card-engine/
 - Setup guide: `docs/SETUP.md`
 - Agent/contributor protocol: `AGENTS.md`
 - Architecture overview: `docs/ARCHITECTURE.md`
+- Product scope: `docs/PRODUCT_SCOPE.md`
+- Auth/session model: `docs/AUTH_AND_SESSION_MODEL.md`
+- Day-trading guardrails: `docs/DAYTRADING_GUARDRAILS.md`
+- CLI spec: `docs/CLI_SPEC.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
-- M1 evidence-pack acceptance contract: `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
-- M1 evidence-pack index: `docs/M1_EVIDENCE_PACK_INDEX.md`
-- M1 evidence packaging hygiene: `docs/EVIDENCE_PACKAGING_HYGIENE.md`
+- M1 pointers: `docs/MILESTONE_M1_SIM_COMPARABILITY.md`, `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md`, `docs/M1_EVIDENCE_PACK_INDEX.md`
+- P1 sprint truth: `ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
-T_REVIEW_COPILOT.md`
-ntract: `docs/SIM_ARTIFACT_SPEC.md`
-- Scenario identity contract: `docs/SCENARIO_SPEC.md`
-- M1 evidence-pack acceptance contract: `docs/M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md`
-- M1 evidence-pack index: `docs/M1_EVIDENCE_PACK_INDEX.md`
-- M1 evidence packaging hygiene: `docs/EVIDENCE_PACKAGING_HYGIENE.md`
-- Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
-T_REVIEW_COPILOT.md`

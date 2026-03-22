@@ -50,9 +50,11 @@ Launching user confirmation:
   - `/root/.openclaw/workspace/steamer-card-engine/ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md`
 - controller config:
   - `/root/.openclaw/workspace/steamer-card-engine/ops/sprint-controllers/steamer-card-engine-p1-live-trading-capability-v0.controller.v1.yaml`
-- scaffold cron specs:
-  - `cron/jobs/6fc06cb3-caba-4567-a058-b568a6c94c67.md`
-  - `cron/jobs/f2defcce-1a85-4d44-91a5-20def71a488c.md`
+- live scheduler jobId (OpenClaw cron):
+  - `ac9002f2-f086-4ee1-8fb3-de222b4e7d67` (`13:25` Asia/Taipei)
+- scaffold cron spec templates (disabled by default; repo truth):
+  - `/root/.openclaw/workspace/openclaw-async-coding-playbook/cron/jobs/6fc06cb3-caba-4567-a058-b568a6c94c67.md`
+  - `/root/.openclaw/workspace/openclaw-async-coding-playbook/cron/jobs/f2defcce-1a85-4d44-91a5-20def71a488c.md`
 
 ## Recommended stage order
 
@@ -71,10 +73,14 @@ Launching user confirmation:
 
 ## Immediate forcing move
 
-Update (2026-03-20):
+Update (2026-03-22):
 - stage-1 `capability-posture-contract` is closed.
 - stage-2 `operator-control-contract` is closed.
-- current forcing move: close **stage-3 bounded-live-path-contract** (one coherent bounded path from live-capable/disarmed into armed-live, with TTL + disarm/flatten exits and explicit capability/posture visibility).
+- stage-3 `bounded-live-path-contract` is closed.
+- active gate: **stage-4 reportable-p1**
+
+Current forcing move:
+- close **stage-4 reportable-p1** by making the sprint slice read coherently end-to-end (sprint doc + stage notes + controller config + topology pointers + cron spec pointers), without implying broad production readiness or hiding live authority behind ambiguous session state.
 
 ## Topology statement
 
