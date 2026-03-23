@@ -42,7 +42,7 @@ The milestone closes when repo truth contains a coherent, operator-usable P1 pac
 - reportable docs/receipts tying the above into product/runtime topology
 
 Current forcing move:
-- close `stage-4 reportable-p1`
+- `stage-4 reportable-p1` is closed; maintain pack coherence and prep for operator handoff.
 
 ## Path audit + best-case timing
 
@@ -74,7 +74,7 @@ Launch confirmation meaning:
 | stage-1-capability-posture-contract | done | product states between sim-only and live-capable are explicit and operator-inspectable | this sprint doc + `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage1_capability-posture-contract.md` |
 | stage-2-operator-control-contract | done | status / arm / disarm / flatten surfaces are explicitly bounded | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage2_operator-control-contract.md` |
 | stage-3-bounded-live-path-contract | done | one guarded path from current product state to bounded live capability is explicit | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md` |
-| stage-4-reportable-p1 | active | the slice reads as one coherent product live-capability line | this sprint doc + supporting tech notes |
+| stage-4-reportable-p1 | done | the slice reads as one coherent product live-capability line | this sprint doc + supporting tech notes |
 
 ## Current blockers / risks
 
@@ -128,7 +128,7 @@ Current sprint read:
 - M1 is closed under its written contract
 - Product Sprint P1 is now the next bounded productization edge for `steamer-card-engine`
 - this line is intentionally separate from Sprint A and must not fight it
-- immediate forcing move: close `stage-4 reportable-p1`
+- immediate forcing move: `stage-4 reportable-p1` is closed; maintain pack coherence and prep handoff
 
 ## Run journal
 
@@ -141,3 +141,4 @@ Current sprint read:
 - 2026-03-20 — stage-3 bounded live path contract note added (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md`; stage-3 activated.
 - 2026-03-21 — stage-3 marked **done**; stage-4 `reportable-p1` activated (no topology change).
 - 2026-03-22 — stage-4 coherence pass: refreshed sprint-pack forcing-move truth + cleaned `docs/TOPOLOGY.md` cross-links + updated scaffold cron spec docs to point at canonical sprint surfaces (no topology change).
+- 2026-03-23 — stage-4 `reportable-p1` marked **done** (pack is reportable end-to-end; no topology change).

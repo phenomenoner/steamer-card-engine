@@ -73,14 +73,14 @@ Launching user confirmation:
 
 ## Immediate forcing move
 
-Update (2026-03-22):
+Update (2026-03-23):
 - stage-1 `capability-posture-contract` is closed.
 - stage-2 `operator-control-contract` is closed.
 - stage-3 `bounded-live-path-contract` is closed.
-- active gate: **stage-4 reportable-p1**
+- stage-4 `reportable-p1` is closed (pack is reportable end-to-end).
 
 Current forcing move:
-- close **stage-4 reportable-p1** by making the sprint slice read coherently end-to-end (sprint doc + stage notes + controller config + topology pointers + cron spec pointers), without implying broad production readiness or hiding live authority behind ambiguous session state.
+- maintain pack coherence; do not imply broad production readiness or hide live authority behind ambiguous session state.
 
 ## Topology statement
 
