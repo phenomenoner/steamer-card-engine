@@ -142,3 +142,4 @@ Current sprint read:
 - 2026-03-21 — stage-3 marked **done**; stage-4 `reportable-p1` activated (no topology change).
 - 2026-03-22 — stage-4 coherence pass: refreshed sprint-pack forcing-move truth + cleaned `docs/TOPOLOGY.md` cross-links + updated scaffold cron spec docs to point at canonical sprint surfaces (no topology change).
 - 2026-03-23 — stage-4 `reportable-p1` marked **done** (pack is reportable end-to-end; no topology change).
+- 2026-03-25 — repo hygiene: ignore `runs/` + `comparisons/` artifacts via `.gitignore` (no topology change).

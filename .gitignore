@@ -7,3 +7,7 @@ dist/
 build/
 *.egg-info/
 .env
+
+# runtime artifacts (keep repo status clean)
+runs/
+comparisons/
