@@ -23,6 +23,12 @@ from steamer_card_engine.sim_compare import (
     compare_bundles,
     normalize_baseline_bundle,
 )
+from steamer_card_engine.strategy_catalog import (
+    StrategyCatalogValidationError,
+    load_strategy_catalog,
+    query_strategies_by_regime,
+    summarize_strategy_catalog,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,6 +83,34 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_global = author_sub.add_parser("inspect-global", help="Inspect a global config manifest")
     inspect_global.add_argument("path")
     inspect_global.add_argument("--json", action="store_true", dest="as_json")
+
+    catalog = subparsers.add_parser(
+        "catalog",
+        help="Discovery-only strategy catalog metadata commands (read-only)",
+    )
+    catalog_sub = catalog.add_subparsers(dest="catalog_command", required=True)
+
+    catalog_validate = catalog_sub.add_parser("validate", help="Validate a strategy catalog metadata file")
+    catalog_validate.add_argument("path")
+
+    catalog_inspect = catalog_sub.add_parser("inspect", help="Inspect a strategy catalog metadata file")
+    catalog_inspect.add_argument("path")
+    catalog_inspect.add_argument("--json", action="store_true", dest="as_json")
+
+    catalog_query = catalog_sub.add_parser(
+        "query",
+        help="Query which cards are relevant under one or more market regimes",
+    )
+    catalog_query.add_argument("path")
+    catalog_query.add_argument(
+        "--regime",
+        action="append",
+        required=True,
+        dest="regimes",
+        help="Market regime tag to match (repeatable)",
+    )
+    catalog_query.add_argument("--limit", type=int)
+    catalog_query.add_argument("--json", action="store_true", dest="as_json")
 
     replay = subparsers.add_parser("replay", help="Replay and analysis commands")
     replay_sub = replay.add_subparsers(dest="replay_command", required=True)
@@ -232,6 +266,26 @@ def _print_global_summary(summary: dict) -> None:
             "  emergency_stop: "
             f"mode={emergency_stop['mode']} value={emergency_stop['value']}"
         )
+
+
+def _print_catalog_summary(summary: dict) -> None:
+    print("Strategy Catalog Metadata")
+    print(f"  schema_version: {summary['schema_version']}")
+    if summary.get("catalog_id"):
+        print(f"  catalog_id: {summary['catalog_id']}")
+    if summary.get("updated_at"):
+        print(f"  updated_at: {summary['updated_at']}")
+    print(f"  strategies_total: {summary['strategies_total']}")
+    regimes = summary.get("market_regimes") or []
+    if regimes:
+        print(f"  market_regimes ({len(regimes)}): {', '.join(regimes)}")
+
+
+def _handle_catalog_error(error: StrategyCatalogValidationError) -> int:
+    print(f"Validation failed for strategy catalog metadata: {error.path}", flush=True)
+    for issue in error.errors:
+        print(f"- {issue}", flush=True)
+    return 2
 
 
 def _handle_manifest_error(error: ManifestValidationError) -> int:
@@ -441,6 +495,50 @@ def main(argv: list[str] | None = None) -> int:
                 _print_global_summary(summary)
             return 0
 
+        if args.command == "catalog" and args.catalog_command == "validate":
+            load_strategy_catalog(args.path)
+            _print_validation_success("strategy catalog metadata", args.path)
+            return 0
+
+        if args.command == "catalog" and args.catalog_command == "inspect":
+            catalog = load_strategy_catalog(args.path)
+            summary = summarize_strategy_catalog(catalog)
+            if args.as_json:
+                _print_json(summary)
+            else:
+                _print_catalog_summary(summary)
+            return 0
+
+        if args.command == "catalog" and args.catalog_command == "query":
+            catalog = load_strategy_catalog(args.path)
+            matches = query_strategies_by_regime(catalog, args.regimes)
+            if args.limit is not None:
+                matches = matches[: max(0, args.limit)]
+
+            if args.as_json:
+                payload = {
+                    "regimes": args.regimes,
+                    "matches_total": len(matches),
+                    "matches": [
+                        {
+                            "card_id": entry.card_id,
+                            "display_name": entry.display_name,
+                            "default_priority": entry.default_priority,
+                            "market_regimes": entry.market_regimes,
+                        }
+                        for entry in matches
+                    ],
+                }
+                _print_json(payload)
+            else:
+                for entry in matches:
+                    label = entry.display_name or ""
+                    if label:
+                        print(f"{entry.card_id}\t{label}")
+                    else:
+                        print(entry.card_id)
+            return 0
+
         if args.command == "replay" and args.replay_command == "run":
             summary = _emit_replay_candidate_bundle(args)
             if args.as_json:
@@ -519,6 +617,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return 0 if summary["status"] == "pass" else 3
 
+    except StrategyCatalogValidationError as error:
+        return _handle_catalog_error(error)
     except ManifestValidationError as error:
         return _handle_manifest_error(error)
     except SimCompareError as error:

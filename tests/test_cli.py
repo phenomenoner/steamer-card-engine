@@ -40,3 +40,33 @@ def test_cli_validate_auth_failure(capsys) -> None:
     captured = capsys.readouterr()
     assert code == 2
     assert "Validation failed for auth_profile manifest" in captured.out
+
+
+def test_cli_validate_strategy_catalog_success(capsys) -> None:
+    code = main(
+        [
+            "catalog",
+            "validate",
+            "examples/catalog/strategy_catalog_metadata.v0.toml",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "OK: strategy catalog metadata manifest is valid" in captured.out
+
+
+def test_cli_query_strategy_catalog_by_regime(capsys) -> None:
+    code = main(
+        [
+            "catalog",
+            "query",
+            "examples/catalog/strategy_catalog_metadata.v0.toml",
+            "--regime",
+            "open-drive",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "gap-reclaim-v1" in captured.out
