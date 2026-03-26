@@ -29,6 +29,7 @@ Boundary note:
 - current M1 remains closed under its written contract
 - Sprint A owns pair-contract coupling for Steamer strategy work
 - this sprint owns guarded product live-capability posture only
+- backtest engine/product ownership belongs to this line; strategy interpretation and campaign cadence do not
 - no unrestricted live-authority expansion is implied
 
 ## Execution contract / forcing move
@@ -128,6 +129,7 @@ Current sprint read:
 - M1 is closed under its written contract
 - Product Sprint P1 is now the next bounded productization edge for `steamer-card-engine`
 - this line is intentionally separate from Sprint A and must not fight it
+- ownership split contract note: `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-26_backtest-loop-ownership-contract_with_strategy-powerhouse_and_mandate-framework.md`
 - immediate forcing move: `stage-4 reportable-p1` is closed; maintain pack coherence and prep handoff
 
 ## Run journal

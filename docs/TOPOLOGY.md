@@ -155,6 +155,23 @@ steamer-card-engine/
    - The actual state machine (disarmed / replay-only / live-sim / armed-live / degraded-session) is not implemented yet.
    - Until then, any sim attachment must remain explicitly `trade_enabled=false` with simulated execution disclosed in artifacts.
 
+
+## Cross-line ownership contract (2026-03-26)
+
+This repo now owns the **backtest engine/product surface** for the Steamer line.
+
+Authority split:
+- `steamer-card-engine` (this repo): engine capability + productization contracts
+- `StrategyExecuter .../powerhouse`: strategy experiment loop + interpretation of validation results
+- `mandate-campaign-framework`: governor cadence + artifact-governance discipline
+
+Guardrails for this repo:
+- allowed: engine contracts, lineage tooling, validation-pack productization
+- must not: strategy semantic promotion authority, Steamer nightly governor writes, campaign-governor cadence ownership
+
+Canonical note:
+- `docs/tech-notes/2026-03-26_backtest-loop-ownership-contract_with_strategy-powerhouse_and_mandate-framework.md`
+
 ## Where to put new work (when v0.2 starts)
 
 - **Contract models** → `src/steamer_card_engine/models.py`
