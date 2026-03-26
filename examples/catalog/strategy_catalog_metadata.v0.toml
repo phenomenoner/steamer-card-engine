@@ -1,0 +1,13 @@
+schema_version = "strategy_catalog_metadata.v0"
+catalog_id = "steamer-card-engine.sample"
+updated_at = "2026-03-27T00:00:00Z"
+notes = "Sample strategy catalog metadata. Discovery-only; not used for execution."
+
+[[strategies]]
+card_id = "gap-reclaim-v1"
+display_name = "Gap Reclaim"
+aliases = ["gap reclaim", "gap-reclaim", "reclaim"]
+default_priority = 50
+market_regimes = ["open-drive", "mean-revert", "high-vol"]
+required_evidence = ["replay_bundle>=20_sessions", "slippage_check"]
+required_tools = ["steamer-card-engine replay run", "steamer-card-engine sim compare"]
