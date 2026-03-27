@@ -146,3 +146,4 @@ Current sprint read:
 - 2026-03-23 — stage-4 `reportable-p1` marked **done** (pack is reportable end-to-end; no topology change).
 - 2026-03-25 — repo hygiene: ignore `runs/` + `comparisons/` artifacts via `.gitignore` (no topology change).
 - 2026-03-26 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-03-27 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
