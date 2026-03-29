@@ -203,6 +203,120 @@ def test_operator_auto_disarm_after_ttl_expiry(capsys, tmp_path: Path) -> None:
     assert "auto_disarm_receipt" in payload
 
 
+def test_operator_auto_disarm_when_scope_missing_expiry(capsys, tmp_path: Path) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    arm_code = main(
+        [
+            "operator",
+            "arm-live",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--ttl-seconds",
+            "300",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--confirm-live",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+    assert arm_code == 0
+    capsys.readouterr()
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    state["armed_live"] = True
+    state["armed_scope"].pop("expires_at", None)
+    state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+    status_code = main(
+        [
+            "operator",
+            "status",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert status_code == 0
+    assert payload["armed_live"] is False
+    assert "auto_disarm_receipt" in payload
+
+    receipt_payload = json.loads(Path(payload["auto_disarm_receipt"]).read_text(encoding="utf-8"))
+    assert receipt_payload["action"] == "auto-disarm"
+    assert receipt_payload["status"] == "scope-invalid"
+    assert receipt_payload["details"]["reason"] == "missing-expires-at"
+
+
+def test_operator_submit_order_reports_auto_disarm_receipt_when_ttl_expired(capsys, tmp_path: Path) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    arm_code = main(
+        [
+            "operator",
+            "arm-live",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--ttl-seconds",
+            "300",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--confirm-live",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+    assert arm_code == 0
+    capsys.readouterr()
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    state["armed_live"] = True
+    state["armed_scope"]["expires_at"] = (
+        datetime.now(UTC) - timedelta(minutes=1)
+    ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+    code = main(
+        [
+            "operator",
+            "submit-order-smoke",
+            "--symbol",
+            "2330",
+            "--side",
+            "buy",
+            "--quantity",
+            "1",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert payload["ok"] is False
+    assert payload["gate_reason"] == "disarmed-posture"
+    assert "auto_disarm_receipt" in payload
+
+    receipt_payload = json.loads(Path(payload["auto_disarm_receipt"]).read_text(encoding="utf-8"))
+    assert receipt_payload["action"] == "auto-disarm"
+    assert receipt_payload["status"] == "ttl-expired"
+
+
 def test_operator_flatten_implicitly_disarms(capsys, tmp_path: Path) -> None:
     state_file = tmp_path / "operator_state.json"
     receipt_dir = tmp_path / "receipts"

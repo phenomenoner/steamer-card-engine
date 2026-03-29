@@ -117,8 +117,8 @@ Responsibilities:
 
 - inspect runtime health, capability, and posture in one view
 - arm/disarm live mode with bounded TTL policy
-- auto-disarm on TTL expiry when operator state is inspected/used
-- produce explicit disarmed refusal for seed order-submission smoke checks
+- auto-disarm on TTL expiry (and invalid arm scope) when operator state is inspected/used
+- enforce submission gate against non-active arm windows with explicit disarmed refusal for seed order-smoke checks
 - write action receipts for arm/disarm/flatten/refusals
 
 ## Governance rules
@@ -202,6 +202,7 @@ Current implementation status:
 - ✅ `replay run` emits candidate v1 bundles (legacy-bridge emitter for M1, with explicit provenance)
 - ✅ seed operator posture controls: `operator status|arm-live|disarm-live|flatten` + TTL policy + action receipts
 - ✅ `operator submit-order-smoke` explicit refusal while disarmed (seed smoke surface; no broker submission)
+- ✅ operator auto-disarm now closes invalid arm-scope TTL metadata (missing/malformed `expires_at`) in addition to normal TTL expiry
 
 Next evolution order remains:
 

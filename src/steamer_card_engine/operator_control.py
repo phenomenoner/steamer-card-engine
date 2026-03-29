@@ -121,10 +121,75 @@ def _resolve_operator_id(operator_id: str | None) -> str:
     return os.environ.get("USER", "unknown-operator")
 
 
+def _evaluate_arm_window(state: dict[str, Any]) -> dict[str, Any]:
+    if not state["armed_live"]:
+        return {
+            "status": "disarmed",
+            "allowed": False,
+            "reason": "disarmed-posture",
+            "details": {"reason": "armed_live=false"},
+        }
+
+    armed_scope = state.get("armed_scope")
+    if not isinstance(armed_scope, dict):
+        return {
+            "status": "invalid",
+            "allowed": False,
+            "reason": "invalid-armed-scope",
+            "details": {"reason": "armed_scope_missing_or_non_object"},
+        }
+
+    expires_at_raw = armed_scope.get("expires_at")
+    if not isinstance(expires_at_raw, str):
+        return {
+            "status": "invalid",
+            "allowed": False,
+            "reason": "invalid-armed-scope",
+            "details": {"reason": "missing-expires-at"},
+        }
+
+    try:
+        expires_at = _parse_utc(expires_at_raw)
+    except ValueError:
+        return {
+            "status": "invalid",
+            "allowed": False,
+            "reason": "invalid-armed-scope",
+            "details": {
+                "reason": "invalid-expires-at",
+                "expires_at": expires_at_raw,
+            },
+        }
+
+    now = _utc_now()
+    if now >= expires_at:
+        return {
+            "status": "expired",
+            "allowed": False,
+            "reason": "ttl-expired",
+            "details": {
+                "reason": "ttl-expired",
+                "expired_at": expires_at_raw,
+            },
+        }
+
+    return {
+        "status": "active",
+        "allowed": True,
+        "reason": "armed-live",
+        "details": {
+            "expires_at": expires_at_raw,
+            "remaining_seconds": int((expires_at - now).total_seconds()),
+        },
+    }
+
+
 def _submission_gate(state: dict[str, Any]) -> dict[str, Any]:
-    if state["armed_live"]:
-        return {"allowed": True, "reason": "armed-live"}
-    return {"allowed": False, "reason": "disarmed-posture"}
+    window = _evaluate_arm_window(state)
+    return {
+        "allowed": bool(window["allowed"]),
+        "reason": str(window["reason"]),
+    }
 
 
 def _write_receipt(
@@ -210,39 +275,38 @@ def _maybe_auto_disarm(
     state_file: Path,
     receipt_dir: Path,
 ) -> dict[str, Any] | None:
-    if not state["armed_live"]:
+    window = _evaluate_arm_window(state)
+    if window["status"] in {"disarmed", "active"}:
         return None
 
-    armed_scope = state.get("armed_scope")
-    if not isinstance(armed_scope, dict):
-        state["armed_live"] = False
-        state["armed_scope"] = None
-        return None
-
-    expires_at_raw = armed_scope.get("expires_at")
-    if not isinstance(expires_at_raw, str):
-        return None
-
-    expires_at = _parse_utc(expires_at_raw)
-    now = _utc_now()
-    if now < expires_at:
-        return None
-
-    previous_scope = state["armed_scope"]
+    previous_scope = state.get("armed_scope")
     state["armed_live"] = False
     state["armed_scope"] = None
+
+    if window["status"] == "expired":
+        status = "ttl-expired"
+        operator_note = "arm TTL expired"
+    else:
+        status = "scope-invalid"
+        operator_note = "arm scope invalid; auto-disarmed"
+
+    details = {
+        "reason": window["details"]["reason"],
+        "previous_scope": previous_scope,
+    }
+    for key, value in window["details"].items():
+        if key == "reason":
+            continue
+        details[key] = value
+
     receipt = _write_receipt(
         receipt_dir=receipt_dir,
         action="auto-disarm",
-        status="ttl-expired",
+        status=status,
         operator_id="system",
-        operator_note="arm TTL expired",
+        operator_note=operator_note,
         state_file=state_file,
-        details={
-            "reason": "ttl-expired",
-            "previous_scope": previous_scope,
-            "expired_at": expires_at_raw,
-        },
+        details=details,
         state=state,
     )
     _append_recent_action(state, receipt)
@@ -558,7 +622,11 @@ def operator_submit_order_smoke(
 ) -> OperatorResult:
     state = load_operator_state(state_file)
     _apply_auth_profile(state, auth_profile_path=auth_profile_path, session_id=session_id)
-    _maybe_auto_disarm(state=state, state_file=state_file, receipt_dir=receipt_dir)
+    auto_disarm_receipt = _maybe_auto_disarm(
+        state=state,
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+    )
 
     resolved_operator = _resolve_operator_id(operator_id)
     request = {
@@ -566,8 +634,17 @@ def operator_submit_order_smoke(
         "side": side,
         "quantity": quantity,
     }
+    submission_gate = _submission_gate(state)
 
-    if not state["armed_live"]:
+    if not submission_gate["allowed"]:
+        details: dict[str, Any] = {
+            "reason": "submission gate denied",
+            "gate_reason": submission_gate["reason"],
+            "request": request,
+        }
+        if auto_disarm_receipt:
+            details["auto_disarm_receipt"] = auto_disarm_receipt["receipt_path"]
+
         receipt = _write_receipt(
             receipt_dir=receipt_dir,
             action="submit-order-smoke",
@@ -575,21 +652,24 @@ def operator_submit_order_smoke(
             operator_id=resolved_operator,
             operator_note=operator_note,
             state_file=state_file,
-            details={
-                "reason": "disarmed posture",
-                "request": request,
-            },
+            details=details,
             state=state,
         )
         _append_recent_action(state, receipt)
         save_operator_state(state_file, state)
+
+        payload = {
+            "ok": False,
+            "error": "order submission refused: runtime is disarmed",
+            "gate_reason": submission_gate["reason"],
+            "request": request,
+            "receipt_path": receipt["receipt_path"],
+        }
+        if auto_disarm_receipt:
+            payload["auto_disarm_receipt"] = auto_disarm_receipt["receipt_path"]
+
         return OperatorResult(
-            payload={
-                "ok": False,
-                "error": "order submission refused: runtime is disarmed",
-                "request": request,
-                "receipt_path": receipt["receipt_path"],
-            },
+            payload=payload,
             exit_code=OPERATOR_REFUSED_EXIT,
         )
 
