@@ -103,7 +103,7 @@ Minimum operator-inspectable surfaces:
 ## What this does NOT claim
 
 - It does not claim the broker adapter is production-ready.
-- It does not claim the operator commands are already implemented.
+- At contract-writing time it did not assume operator commands were implemented; seed implementation later landed at `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-30_steamer_card_engine_p1_bounded-live-smoke_operator-control_seed-implementation.md`.
 - It does not widen scope into strategy selection, universe research, or Sprint A's pair-contract milestones.
 
 ## Stage-3 closure criteria (P1)

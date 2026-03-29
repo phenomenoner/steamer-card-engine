@@ -106,19 +106,20 @@ Used for controlled runtime and live-adjacent governance.
 Examples:
 
 ```bash
-steamer-card-engine operator status
-steamer-card-engine operator arm-live --deck approved_tw_cash_main
+steamer-card-engine operator status --json
+steamer-card-engine operator arm-live --deck examples/decks/tw_cash_intraday.toml --ttl-seconds 300 --auth-profile examples/profiles/tw_cash_password_auth.toml --confirm-live
 steamer-card-engine operator disarm-live
 steamer-card-engine operator flatten --mode final-auction
+steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quantity 1
 ```
 
 Responsibilities:
 
-- inspect runtime health
-- view active deck, auth/session state, and adapter state
-- arm/disarm live mode
-- inspect recent intents, blocks, and execution receipts
-- trigger guarded flatten workflows when policy allows
+- inspect runtime health, capability, and posture in one view
+- arm/disarm live mode with bounded TTL policy
+- auto-disarm on TTL expiry when operator state is inspected/used
+- produce explicit disarmed refusal for seed order-submission smoke checks
+- write action receipts for arm/disarm/flatten/refusals
 
 ## Governance rules
 
@@ -141,6 +142,8 @@ The CLI should support:
 - `1`: CLI usage error / unhandled command / general failure
 - `2`: validation/normalization failure (manifest or sim command input/schema errors)
 - `3`: comparison completed but failed hard gates (`sim compare` status=`fail`)
+- `4`: operator action refused due to posture/capability mismatch
+- `5`: operator action refused due to missing explicit confirmation
 
 (Tests already assert `2` for validation errors; keep this stable.)
 
@@ -197,7 +200,8 @@ Current implementation status:
 - ✅ `sim normalize-baseline` (legacy baseline → v1-shaped M1 bundle)
 - ✅ `sim compare` (hard-fail gates + decision-grade compare report)
 - ✅ `replay run` emits candidate v1 bundles (legacy-bridge emitter for M1, with explicit provenance)
-- ⏳ operator execution remains placeholder
+- ✅ seed operator posture controls: `operator status|arm-live|disarm-live|flatten` + TTL policy + action receipts
+- ✅ `operator submit-order-smoke` explicit refusal while disarmed (seed smoke surface; no broker submission)
 
 Next evolution order remains:
 

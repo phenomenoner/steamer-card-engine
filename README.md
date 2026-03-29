@@ -215,7 +215,8 @@ uv run steamer-card-engine sim compare \
 目前 CLI 已有第一版 **manifest contract commands**（validate / inspect for auth/card/deck/global），
 以及 M1 基礎實作：`sim normalize-baseline` / `sim compare` / `replay run`（候選 bundle 發射路徑）。
 其中 `sim compare` 會落地 `compare-manifest.json`、`diff.json`、`summary.md` 這組 decision-grade 比對輸出。
-`operator` 仍是 placeholder，尚未接上實際 runtime。
+`operator` 現在有 seed 級控制面：`status` / `arm-live` / `disarm-live` / `flatten`，含 TTL policy、auto-disarm、action receipts，
+另外提供 `submit-order-smoke` 來驗證 disarmed posture 的顯式拒單。這仍不是 broker-connected runtime。
 
 ## 文件導覽
 
@@ -251,9 +252,10 @@ uv run steamer-card-engine sim compare \
 - ✅ M1 evidence pack expanded to 3 scenarios with per-scenario baseline/candidate/compare receipts
 - ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
 - ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy
+- ✅ Seed operator control slice landed (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with TTL/auto-disarm + receipt trails
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
-- ⏳ Controlled live-sim / operator workflow
+- ⏳ Broker-connected controlled live-sim / operator workflow
 
 ## Roadmap
 

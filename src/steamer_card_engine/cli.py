@@ -18,6 +18,13 @@ from steamer_card_engine.manifest import (
     summarize_deck_manifest,
     summarize_global_config,
 )
+from steamer_card_engine.operator_control import (
+    operator_arm_live,
+    operator_disarm_live,
+    operator_flatten,
+    operator_status,
+    operator_submit_order_smoke,
+)
 from steamer_card_engine.sim_compare import (
     SimCompareError,
     compare_bundles,
@@ -183,7 +190,64 @@ def build_parser() -> argparse.ArgumentParser:
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
-    operator_sub.add_parser("status", help="Inspect runtime posture")
+
+    status = operator_sub.add_parser("status", help="Inspect runtime posture")
+    status.add_argument("--auth-profile")
+    status.add_argument("--session-id")
+    status.add_argument("--state-file", default=".state/operator_posture.json")
+    status.add_argument("--receipt-dir", default=".state/operator_receipts")
+    status.add_argument("--json", action="store_true", dest="as_json")
+
+    arm_live = operator_sub.add_parser("arm-live", help="Arm bounded live posture with explicit TTL")
+    arm_live.add_argument("--deck", required=True)
+    arm_live.add_argument("--ttl-seconds", required=True, type=int)
+    arm_live.add_argument("--auth-profile", required=True)
+    arm_live.add_argument("--session-id")
+    arm_live.add_argument("--operator-id")
+    arm_live.add_argument("--operator-note")
+    arm_live.add_argument("--confirm-live", action="store_true")
+    arm_live.add_argument("--state-file", default=".state/operator_posture.json")
+    arm_live.add_argument("--receipt-dir", default=".state/operator_receipts")
+    arm_live.add_argument("--json", action="store_true", dest="as_json")
+
+    disarm_live = operator_sub.add_parser("disarm-live", help="Immediately disarm live posture")
+    disarm_live.add_argument("--auth-profile")
+    disarm_live.add_argument("--session-id")
+    disarm_live.add_argument("--operator-id")
+    disarm_live.add_argument("--operator-note")
+    disarm_live.add_argument("--state-file", default=".state/operator_posture.json")
+    disarm_live.add_argument("--receipt-dir", default=".state/operator_receipts")
+    disarm_live.add_argument("--json", action="store_true", dest="as_json")
+
+    flatten = operator_sub.add_parser("flatten", help="Issue bounded flatten action")
+    flatten.add_argument(
+        "--mode",
+        required=True,
+        choices=("emergency", "forced-exit", "final-auction"),
+    )
+    flatten.add_argument("--auth-profile")
+    flatten.add_argument("--session-id")
+    flatten.add_argument("--operator-id")
+    flatten.add_argument("--operator-note")
+    flatten.add_argument("--state-file", default=".state/operator_posture.json")
+    flatten.add_argument("--receipt-dir", default=".state/operator_receipts")
+    flatten.add_argument("--json", action="store_true", dest="as_json")
+
+    submit_order_smoke = operator_sub.add_parser(
+        "submit-order-smoke",
+        help="Seed smoke command for order-gate refusal/acceptance receipts",
+    )
+    submit_order_smoke.add_argument("--symbol", required=True)
+    submit_order_smoke.add_argument("--side", required=True, choices=("buy", "sell"))
+    submit_order_smoke.add_argument("--quantity", required=True, type=int)
+    submit_order_smoke.add_argument("--auth-profile")
+    submit_order_smoke.add_argument("--session-id")
+    submit_order_smoke.add_argument("--operator-id")
+    submit_order_smoke.add_argument("--operator-note")
+    submit_order_smoke.add_argument("--state-file", default=".state/operator_posture.json")
+    submit_order_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
+    submit_order_smoke.add_argument("--json", action="store_true", dest="as_json")
+
     inspect = operator_sub.add_parser("inspect", help="Inspect a runtime target")
     inspect.add_argument("target", nargs="?", default="default")
 
@@ -279,6 +343,53 @@ def _print_catalog_summary(summary: dict) -> None:
     regimes = summary.get("market_regimes") or []
     if regimes:
         print(f"  market_regimes ({len(regimes)}): {', '.join(regimes)}")
+
+
+def _print_operator_status_summary(payload: dict) -> None:
+    print("Operator Status")
+    session = payload["session"]
+    capabilities = payload["capabilities"]
+    gate = payload["order_submission_gate"]
+
+    print(f"  mode: {payload['mode']}")
+    print(
+        "  session: "
+        f"id={session['session_id']} account={session['account_no']} auth_mode={session['auth_mode']}"
+    )
+    print(
+        "  capabilities: "
+        f"marketdata={capabilities['marketdata_enabled']} "
+        f"account_query={capabilities['account_query_enabled']} trade={capabilities['trade_enabled']}"
+    )
+    print(f"  armed_live: {payload['armed_live']}")
+    if payload.get("armed_scope"):
+        scope = payload["armed_scope"]
+        print(
+            "  armed_scope: "
+            f"deck_id={scope['deck_id']} expires_at={scope['expires_at']} ttl={scope['ttl_seconds']}"
+        )
+    else:
+        print("  armed_scope: (none)")
+    print(f"  order_submission_gate: allowed={gate['allowed']} reason={gate['reason']}")
+
+
+def _print_operator_action_summary(payload: dict) -> None:
+    if payload.get("ok"):
+        print("OK")
+    else:
+        print("REFUSED")
+
+    for key in (
+        "error",
+        "armed_live",
+        "was_armed",
+        "flatten_mode",
+        "implicit_disarm",
+        "dispatch",
+        "receipt_path",
+    ):
+        if key in payload:
+            print(f"  {key}: {payload[key]}")
 
 
 def _handle_catalog_error(error: StrategyCatalogValidationError) -> int:
@@ -617,6 +728,86 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return 0 if summary["status"] == "pass" else 3
 
+        if args.command == "operator" and args.operator_command == "status":
+            result = operator_status(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_status_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "arm-live":
+            result = operator_arm_live(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                deck_ref=args.deck,
+                ttl_seconds=args.ttl_seconds,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+                confirm_live=args.confirm_live,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "disarm-live":
+            result = operator_disarm_live(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "flatten":
+            result = operator_flatten(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                mode=args.mode,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "submit-order-smoke":
+            result = operator_submit_order_smoke(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                symbol=args.symbol,
+                side=args.side,
+                quantity=args.quantity,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
     except StrategyCatalogValidationError as error:
         return _handle_catalog_error(error)
     except ManifestValidationError as error:
@@ -624,10 +815,6 @@ def main(argv: list[str] | None = None) -> int:
     except SimCompareError as error:
         print(f"SIM comparability command failed: {error}", flush=True)
         return 2
-
-    if args.command == "operator" and args.operator_command == "status":
-        print("Status placeholder: no runtime attached yet; seed repo is docs/scaffold first.")
-        return 0
 
     if args.command == "operator" and args.operator_command == "inspect":
         print(f"Inspect placeholder for target={args.target}")

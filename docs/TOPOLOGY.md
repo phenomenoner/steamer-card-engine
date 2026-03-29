@@ -115,6 +115,7 @@ steamer-card-engine/
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
+  - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
@@ -128,8 +129,8 @@ steamer-card-engine/
 
 - `src/steamer_card_engine/runtime/components.py`
   - **names** the future components, but does not implement conflict resolution / risk / execution
-- `steamer-card-engine operator ...`
-  - placeholder output only (no runtime attached yet)
+- operator commands now maintain a seed local posture/receipt state machine (`.state/operator_posture.json` + `.state/operator_receipts/`)
+  - this is a bounded smoke/control surface, not a broker-connected production control plane
 
 ## Sharp edges / known deltas
 
@@ -150,10 +151,10 @@ steamer-card-engine/
    - M1 SIM-comparability evidence runs require `scenario-spec.json` + `scenario_fingerprint`, but enforcement is not implemented yet.
    - Current CLI/runtime paths may still accept loosely specified replay inputs; strict ScenarioSpec validation is a next-step implementation item.
 
-5. **Authority states need executable posture**
+5. **Authority states are only seed-grade executable posture today**
    - Docs strongly assert operator-governed live authority.
-   - The actual state machine (disarmed / replay-only / live-sim / armed-live / degraded-session) is not implemented yet.
-   - Until then, any sim attachment must remain explicitly `trade_enabled=false` with simulated execution disclosed in artifacts.
+   - A bounded local state machine now exists for `disarmed` ↔ `armed-live` with TTL/auto-disarm and receipt trails.
+   - It is still not broker-connected runtime authority; sim attachments remain explicitly simulated and disclosure-first.
 
 
 ## Cross-line ownership contract (2026-03-26)
