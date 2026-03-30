@@ -73,7 +73,7 @@ Launch confirmation meaning:
 |---|---|---|---|
 | stage-0-bootstrap | done | sprint pack exists in repo truth | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_live-trading-capability_v0_sprint-pack.md` |
 | stage-1-capability-posture-contract | done | product states between sim-only and live-capable are explicit and operator-inspectable | this sprint doc + `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage1_capability-posture-contract.md` |
-| stage-2-operator-control-contract | done | status / arm / disarm / flatten surfaces are explicitly bounded | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage2_operator-control-contract.md` |
+| stage-2-operator-control-contract | done | status / arm / disarm / flatten surfaces are explicitly bounded | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-19_steamer_card_engine_p1_stage2_operator-control-contract.md` + `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-30_steamer_card_engine_p1_bounded-live-smoke_operator-control_seed-implementation.md` |
 | stage-3-bounded-live-path-contract | done | one guarded path from current product state to bounded live capability is explicit | `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-20_steamer_card_engine_p1_stage3_bounded-live-path-contract.md` |
 | stage-4-reportable-p1 | done | the slice reads as one coherent product live-capability line | this sprint doc + supporting tech notes |
 
@@ -148,3 +148,4 @@ Current sprint read:
 - 2026-03-26 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-03-27 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-03-30 — bounded live smoke gate landed as a seed executable control slice (`operator status|arm-live|disarm-live|flatten` + TTL auto-disarm + explicit disarmed refusal smoke command + receipts), with explicit non-broker boundary (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-30_steamer_card_engine_p1_bounded-live-smoke_operator-control_seed-implementation.md`.
+- 2026-03-30 — progress pass: wired the bounded-live smoke seed note into the stage-2 evidence pointer for reportability (no topology change).
