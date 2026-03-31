@@ -22,6 +22,17 @@
 
 它比較像一個**產品骨架**：先把 Card / Deck / Adapter / Session / Replay / Risk 這些邊界定清楚，讓後續實作能夠低延遲、可回放、可審核、可逐步接近 live，而不是把既有單體腳本越疊越重。
 
+## 權責定位（2026-03-30 portfolio cutover）
+
+這個 repo 的角色要講白：
+
+- `steamer-card-engine` = **next-gen architecture / product surface**
+- `StrategyExecuter_Steamer-Antigravity` = **current proving truth / 現役驗證現實**
+- `mandate-campaign-framework` = **campaign/kernel contract**（只有真的在做 mandate/campaign runtime 時才往那邊走）
+
+所以這裡應該吸收的是**新平台 abstraction、card/deck/runtime productization、guarded live-capability contracts**，
+不是假裝自己已經是現在 Steamer 的日常 proving truth，也不是來接管 campaign cadence。
+
 ## 這個 repo 想解的問題
 
 目前很多台股日內執行系統，會長成這樣：
