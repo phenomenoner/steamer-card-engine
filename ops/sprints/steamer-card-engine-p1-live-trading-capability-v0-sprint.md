@@ -150,3 +150,4 @@ Current sprint read:
 - 2026-03-30 — bounded live smoke gate landed as a seed executable control slice (`operator status|arm-live|disarm-live|flatten` + TTL auto-disarm + explicit disarmed refusal smoke command + receipts), with explicit non-broker boundary (no topology change): `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-03-30_steamer_card_engine_p1_bounded-live-smoke_operator-control_seed-implementation.md`.
 - 2026-03-30 — progress pass: wired the bounded-live smoke seed note into the stage-2 evidence pointer for reportability (no topology change).
 - 2026-03-31 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
