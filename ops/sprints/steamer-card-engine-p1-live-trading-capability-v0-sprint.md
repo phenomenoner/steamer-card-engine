@@ -151,3 +151,4 @@ Current sprint read:
 - 2026-03-30 — progress pass: wired the bounded-live smoke seed note into the stage-2 evidence pointer for reportability (no topology change).
 - 2026-03-31 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-02 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
