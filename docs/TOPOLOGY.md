@@ -166,6 +166,11 @@ Authority split:
 - `StrategyExecuter .../powerhouse`: strategy experiment loop + interpretation of validation results
 - `mandate-campaign-framework`: governor cadence + artifact-governance discipline
 
+Current bounded operating cut (2026-04-05):
+- during the Steamer `autonomous-entry-bearing-pivot-v0` sprint, this repo is the **primary live-sim execution surface** for family × variation sweeps
+- that does **not** transfer final strategy-promotion authority into this repo
+- it also does **not** make this repo the Steamer daily control plane; native runtime truth stays in Steamer
+
 Guardrails for this repo:
 - allowed: engine contracts, lineage tooling, validation-pack productization
 - must not: strategy semantic promotion authority, Steamer nightly governor writes, campaign-governor cadence ownership

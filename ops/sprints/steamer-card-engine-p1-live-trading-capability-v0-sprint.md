@@ -153,3 +153,4 @@ Current sprint read:
 - 2026-04-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-02 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-03 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-05 — upstream Steamer workflow recut accepted: for the bounded `autonomous-entry-bearing-pivot-v0` sprint, `steamer-card-engine` is now the primary live-sim execution surface for family × variation sweeps while final strategy authority remains upstream in Steamer. Product Sprint P1 ownership is unchanged. (Topology unchanged.)
