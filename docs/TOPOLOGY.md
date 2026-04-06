@@ -201,4 +201,6 @@ Canonical note:
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
 - M1 pointers: `docs/MILESTONE_M1_SIM_COMPARABILITY.md`, `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md`, `docs/M1_EVIDENCE_PACK_INDEX.md`
 - P1 sprint truth: `ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md`
+- Mission Control dashboard sprint truth: `ops/sprints/steamer-card-engine-mission-control-dashboard-v0-sprint.md`
+- Mission Control dashboard build packet: `docs/tech-notes/2026-04-06_steamer_card_engine_mission-control_dashboard_v0_build-packet.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`

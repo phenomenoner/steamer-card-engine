@@ -39,6 +39,7 @@ Helps draft cards, validate configs, prepare replay jobs, and assist configurati
 - Separate feature/synthesizer pipeline for time-series and indicators
 - CLI-managed card/deck/global config and auth profiles
 - Replay runner and live-sim path as first-class features
+- Read-only browser Mission Control observability over replay/live-sim artifacts
 - Audit-friendly event, intent, risk, and execution receipts
 - Replaceable `MarketDataAdapter` and `BrokerAdapter` interfaces
 - Day-trading guardrails: emergency stop-loss, forced exit, final-auction flatten controls
@@ -66,7 +67,7 @@ Helps draft cards, validate configs, prepare replay jobs, and assist configurati
 
 ### Deliberately deferred
 - Deep strategy library
-- GUI/dashboard
+- Broker-connected or operator-authoritative GUI/control plane
 - Hosted multi-tenant service
 - Real credential storage implementation in this repo
 - Multi-market abstraction beyond Taiwan cash
