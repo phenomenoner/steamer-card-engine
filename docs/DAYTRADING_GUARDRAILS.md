@@ -83,6 +83,19 @@ Without that, one card can misread another card's lifecycle activity, or one acc
 
 This is not optional.
 
+### 6. Market-day gating (non-trading days / holidays)
+
+The runtime must be able to refuse to run **live** or **live sim** when the exchange is closed.
+
+Minimum contract:
+- treat `is_trading_day=false` as a hard gate: do not arm live authority and do not start live-data capture chains
+- use an **official** market calendar source (for TW, TWSE holiday calendar) rather than ad hoc manual skip lists
+- make the reason operator-inspectable (status surface: closed-day verdict + source)
+- safe default is **skip**, not “run anyway”
+
+Related upstream hardening note:
+- `/root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/TECH_NOTES/2026-04-06_steamer_market-day-gating_twse-official-holiday-json.md`
+
 ## Live sim and replay sim expectations
 
 The engine should support at least two bounded non-live execution modes:
