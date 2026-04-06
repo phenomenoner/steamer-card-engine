@@ -116,23 +116,38 @@ uv run uvicorn steamer_card_engine.dashboard.api:create_app --factory --host 0.0
 ### If you want to open it from the parent system browser
 
 Binding `127.0.0.1` **inside the container** is not enough for the parent/host browser.
-Use the same topology idea as `pm-dashboard`:
+Use the same topology idea as `pm-dashboard`: run this dashboard as an **outer compose sibling service**.
 
-1. bind the app to `0.0.0.0` inside the container
-2. publish a host port from the **outer** Docker/compose layer, for example:
+Authoritative outer compose contract for this environment:
 
-```yaml
-ports:
-  - "127.0.0.1:8000:8000"
-```
+- compose file: `/workspace/docker-compose.yml`
+- service name: `steamer-dashboard`
+- image build file: `/workspace/steamer-dashboard.Dockerfile`
+- host publish: `127.0.0.1:${STEAMER_DASHBOARD_PORT:-8780}:8780`
+- runtime mount: `openclaw-config:/root/.openclaw:ro`
+- repo root inside container: `/root/.openclaw/workspace/steamer-card-engine`
+- import path inside container comes from `steamer-dashboard.Dockerfile` via `PYTHONPATH=/root/.openclaw/workspace/steamer-card-engine/src`
 
 Then open from the parent system:
 
-- `http://127.0.0.1:8000/` for the browser dashboard
-- `http://127.0.0.1:8000/api/dates` for the discovered March fixture index
-- `http://127.0.0.1:8000/api/docs` for the read-only API docs
+- `http://127.0.0.1:8780/` for the browser dashboard
+- `http://127.0.0.1:8780/api/dates` for the discovered March fixture index
+- `http://127.0.0.1:8780/api/docs` for the read-only API docs
 
-If the outer compose publishes a different host port, replace the left-hand `8000` accordingly.
+### Outer compose launch
+
+```bash
+cd /workspace
+docker compose build steamer-dashboard
+docker compose up -d steamer-dashboard
+docker compose ps steamer-dashboard
+```
+
+Health check:
+
+```bash
+curl -sS http://127.0.0.1:8780/api/health
+```
 
 ## M1 evidence-pack operator workflow (sim-only)
 
