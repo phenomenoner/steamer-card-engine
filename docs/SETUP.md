@@ -107,17 +107,32 @@ npm run build
 cd ..
 ```
 
-Launch the local Mission Control demo:
+Launch the local Mission Control demo inside the container/runtime:
 
 ```bash
-uv run uvicorn steamer_card_engine.dashboard.api:create_app --factory --host 127.0.0.1 --port 8000
+uv run uvicorn steamer_card_engine.dashboard.api:create_app --factory --host 0.0.0.0 --port 8000
 ```
 
-Open:
+### If you want to open it from the parent system browser
+
+Binding `127.0.0.1` **inside the container** is not enough for the parent/host browser.
+Use the same topology idea as `pm-dashboard`:
+
+1. bind the app to `0.0.0.0` inside the container
+2. publish a host port from the **outer** Docker/compose layer, for example:
+
+```yaml
+ports:
+  - "127.0.0.1:8000:8000"
+```
+
+Then open from the parent system:
 
 - `http://127.0.0.1:8000/` for the browser dashboard
 - `http://127.0.0.1:8000/api/dates` for the discovered March fixture index
 - `http://127.0.0.1:8000/api/docs` for the read-only API docs
+
+If the outer compose publishes a different host port, replace the left-hand `8000` accordingly.
 
 ## M1 evidence-pack operator workflow (sim-only)
 
