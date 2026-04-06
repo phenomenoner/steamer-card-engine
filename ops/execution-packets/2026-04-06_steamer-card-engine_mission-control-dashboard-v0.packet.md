@@ -7,28 +7,33 @@ Build a **production-grade, read-only browser dashboard** for `steamer-card-engi
 The opening proof is not “perfect analytics.”
 The opening proof is:
 
-> a recent AWS paired-live capture day can be opened in browser and read clearly from real artifacts.
+> a recent local March replay/compare day can be opened in browser and read clearly from real artifacts.
 
 ## Authoritative inputs
 
 - `docs/tech-notes/2026-04-06_steamer_card_engine_mission-control_dashboard_v0_build-packet.md`
-- `docs/tech-notes/2026-03-20_steamer_card_engine_manual_paired_live_compare_smoke.md`
-- `comparisons/manual-live-paired-20260402-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260402T010536Z/compare-manifest.json`
-- `comparisons/manual-live-paired-20260402-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260402T010536Z/diff.json`
-- `comparisons/manual-live-paired-20260402-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260402T010536Z/summary.md`
-- equivalent `20260402` slope-2 compare files
-- `runs/baseline-bot/2026-04-02/...`
-- `runs/steamer-card-engine/2026-04-02/...`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T082717Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z/compare-manifest.json`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z__replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z/compare-manifest.json`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/compare-manifest.json`
+- `runs/baseline-bot/2026-03-06/...`
+- `runs/baseline-bot/2026-03-10/...`
+- `runs/baseline-bot/2026-03-12/...`
+- `runs/steamer-card-engine/2026-03-06/...`
+- `runs/steamer-card-engine/2026-03-10/...`
+- `runs/steamer-card-engine/2026-03-12/...`
 
 ## Demo fixture set
 
 Opening fixture set:
-- `20260331`
-- `20260401`
-- `20260402`
+- `20260306`
+- `20260310`
+- `20260312`
 
 Opening hero day:
-- `20260402`
+- `20260312`
+
+Topology note:
+- unchanged; this packet is a truthful recut of the opening demo contract to the local March fixture set already present in the worktree
 
 ## Scope
 
@@ -74,7 +79,7 @@ The aggregator owns normalization.
 2. backend app skeleton
 3. aggregator module for day-bundle generation
 4. read-only API routes
-5. demoable daily command page for `20260402`
+5. demoable daily command page for `20260312`
 6. screenshot receipts
 7. smoke tests
 8. short runbook for local launch in browser
@@ -90,8 +95,8 @@ The aggregator owns normalization.
 
 ### Must-pass
 - app loads locally in browser
-- `20260402` renders without manual file editing
-- date switch among `20260331`, `20260401`, `20260402` works
+- `20260312` renders without manual file editing
+- date switch among `20260306`, `20260310`, `20260312` works
 - strategy-card panel opens
 - replay/event detail opens
 - transaction/PnL empty-state renders truthfully where data is absent

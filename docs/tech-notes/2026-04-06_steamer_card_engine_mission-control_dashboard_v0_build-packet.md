@@ -4,14 +4,14 @@
 
 The right product cut is a **read-only browser Mission Control dashboard** for `steamer-card-engine`, not a broker-facing GUI and not a generic SaaS analytics page.
 
-Its job is to turn existing live-sim / compare artifacts into a **daily battle report + strategy-card observability surface + replay drilldown surface** that an operator can open from the parent system browser and understand in about 10 seconds.
+Its job is to turn existing replay/compare artifacts into a **daily battle report + strategy-card observability surface + replay drilldown surface** that an operator can open from the parent system browser and understand in about 10 seconds.
 
 ## Why now
 
 The real gate is no longer “can card-engine emit comparable bundles?”
 That gate is already closed enough to support a new product edge:
 
-- same-day AWS live-sim capture -> local sync -> baseline/candidate bundle emission -> compare receipt already exists at the manual smoke level
+- committed replay-sim baseline/candidate bundle emission -> compare receipt already exists at the repo level
 - the repo already contains multi-day local `runs/` and `comparisons/` bundles
 - CK now wants a human-first browser surface similar to `pm-dashboard`, but aimed at Steamer live-sim snapshots, strategy cards, transaction surfaces, and date-based historical review
 
@@ -48,27 +48,19 @@ Why this repo, not Steamer core:
 
 ## Demo-first truth surfaces available today
 
-### A. Manual same-day AWS paired-live smoke receipt
-- tech note:
-  - `docs/tech-notes/2026-03-20_steamer_card_engine_manual_paired_live_compare_smoke.md`
-- proves:
-  - same-day AWS sim capture
-  - local sync
-  - paired baseline/candidate bundle emission
-  - passing compare receipts
-
-### B. Demoable recent local compare bundles
-Recent comparison directories already exist, including:
-- `comparisons/manual-live-paired-20260331-...`
-- `comparisons/manual-live-paired-20260401-...`
-- `comparisons/manual-live-paired-20260402-...`
+### A. Demoable committed compare bundles
+Committed comparison directories already exist for:
+- `2026-03-06`
+- `2026-03-10`
+- `2026-03-12`
 
 Representative pass receipts:
-- `comparisons/manual-live-paired-20260402-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260402T010536Z/summary.md`
-- `comparisons/manual-live-paired-20260402-entry-mode-long-one-vcp-vcp-min-trend-slope-2-tick-volume-mode-auto-feed-neoapitest-20260402T010536Z/summary.md`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T082717Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z/summary.md`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z__replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z/summary.md`
+- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/summary.md`
 
-### C. Demoable bundle inputs already on disk
-For the recent days above, the repo already has:
+### B. Demoable bundle inputs already on disk
+For the three March days above, the repo already has:
 - `runs/.../event-log.jsonl`
 - `runs/.../intent-log.jsonl`
 - `runs/.../feature-provenance.jsonl`
@@ -95,6 +87,9 @@ Current bundles are **not yet rich** for a deep trading blotter because:
 Therefore the opening browser demo should be framed as:
 - **battle report + strategy-card observability + replay/snapshot explorer first**
 - transaction / PnL panels included, but rendered truthfully with zero-state / placeholder-state contracts where data is not yet present
+
+Topology note:
+- unchanged; this build packet is a truthful recut of the opening demo contract from the previously claimed April set to the committed March fixture set
 
 ## Product cut
 
@@ -179,17 +174,16 @@ Main body:
 
 ## Demo pages that are truthful right now
 
-Using the recent AWS paired-live capture lineage, the first demo should explicitly ship these pages:
+Using the committed March replay/compare lineage, the first demo should explicitly ship these pages:
 
-1. **History index** over `20260331`, `20260401`, `20260402`
-2. **Daily command view** for `20260402`
-3. **Strategy-card detail** for slope `10` and slope `2` lanes
+1. **History index** over `20260306`, `20260310`, `20260312`
+2. **Daily command view** for `20260312`
+3. **Strategy-card detail** for the baseline and candidate lanes
 4. **Replay / event timeline** backed by local bundle event logs
 5. **Transaction/PnL panel** with a truthful zero-state contract where compare-lane trade surfaces remain empty
 
 If we want one explicit “receipt wall” demo panel, use:
-- the 2026-03-20 manual paired-live smoke note
-- the 2026-04-02 compare-manifest / diff / summary triple
+- the 2026-03-12 compare-manifest / diff / summary triple
 
 ## UI/UX posture
 
@@ -248,7 +242,7 @@ It explicitly excludes:
 ## Verifier plan
 
 ### Backend / aggregator
-- fixture selection for `20260331`, `20260401`, `20260402`
+- fixture selection for `20260306`, `20260310`, `20260312`
 - parse tests for bundle discovery
 - summary generation tests
 - empty-state correctness tests for transactions/PnL
@@ -275,7 +269,7 @@ It explicitly excludes:
 
 ## Next recommended move
 
-Use the paired-live AWS capture lineage as the first truthful demo fixture set and execute the dashboard as a **櫻花刀舞 serial queue**:
+Use the committed March replay/compare lineage as the first truthful demo fixture set and execute the dashboard as a **櫻花刀舞 serial queue**:
 
 1. fixture contract
 2. day-bundle aggregator

@@ -2,7 +2,7 @@
 
 ## Sprint goal / milestone
 
-Ship the first **browser-openable, read-only Mission Control dashboard** for `steamer-card-engine` using real paired-live AWS capture lineage.
+Ship the first **browser-openable, read-only Mission Control dashboard** for `steamer-card-engine` using real local replay/compare lineage.
 
 The milestone closes when a user can open one recent day in browser and understand:
 - what happened
@@ -18,8 +18,9 @@ without chat archaeology.
 - authority: read-only only
 - execution posture: forward-mandatory inside declared boundaries
 - report posture: batch ordinary progress; surface only real blockers/decisions
-- opening fixture day: `20260402`
-- opening fixture set: `20260331`, `20260401`, `20260402`
+- opening fixture day: `20260312`
+- opening fixture set: `20260306`, `20260310`, `20260312`
+- topology note: unchanged; this sprint is a truthful recut of the demo contract to the March fixture set present in the repo
 
 ## Boundary note
 
@@ -56,7 +57,7 @@ If the day-bundle is not readable, nothing else counts as progress.
   - `transaction_surface`
   - `empty_state_metadata`
 - verifier:
-  - `20260402` bundle can be generated from repo truth only
+  - `20260312` bundle can be generated from repo truth only
 
 ### Blade 2 — read-only API
 - goal: expose dates + per-day bundle through FastAPI
@@ -88,7 +89,7 @@ If the day-bundle is not readable, nothing else counts as progress.
   - card content / config summary
   - reason distribution / anomaly links
 - verifier:
-  - slope `10` vs `2` identity is obvious on `20260402`
+  - card and lane identity are obvious on `20260312`
 
 ### Blade 5 — replay timeline + snapshot drilldown
 - goal: make event flow explorable without leaving global context
@@ -149,4 +150,4 @@ If topology does not change, say so explicitly.
 
 - 2026-04-06 — sprint opened after CK approved a browser mission-control line for `steamer-card-engine` and explicitly requested a formal build packet with `櫻花刀舞` planning.
 - 2026-04-06 — remote repo selection locked to `phenomenoner/steamer-card-engine`; topology unchanged.
-- 2026-04-06 — demo-fixture truth locked to paired-live AWS capture lineage already present in local `runs/` and `comparisons/` bundles, with `20260402` as the opening hero day.
+- 2026-04-06 — April fixture claims were removed after repo verification; the opening demo contract was truthfully recut to the committed March bundles in `runs/` and `comparisons/`, with `20260312` as the opening hero day. Topology unchanged.

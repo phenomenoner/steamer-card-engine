@@ -19,7 +19,10 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.34.0",
+]
 
 [project.scripts]
 steamer-card-engine = "steamer_card_engine.cli:main"
@@ -29,6 +32,7 @@ packages = ["src/steamer_card_engine"]
 
 [tool.uv]
 dev-dependencies = [
+  "httpx>=0.28.0",
   "pytest>=8.3.5",
   "ruff>=0.11.0",
 ]

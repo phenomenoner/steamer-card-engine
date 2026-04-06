@@ -203,4 +203,5 @@ Canonical note:
 - P1 sprint truth: `ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md`
 - Mission Control dashboard sprint truth: `ops/sprints/steamer-card-engine-mission-control-dashboard-v0-sprint.md`
 - Mission Control dashboard build packet: `docs/tech-notes/2026-04-06_steamer_card_engine_mission-control_dashboard_v0_build-packet.md`
+- Mission Control dashboard demo fixture contract was truthfully recut on 2026-04-06 to the committed March set (`2026-03-06`, `2026-03-10`, `2026-03-12`); topology unchanged
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`

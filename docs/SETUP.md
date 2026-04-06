@@ -77,6 +77,48 @@ uv run pytest
 uv run ruff check .
 ```
 
+## Mission Control dashboard demo (read-only, March fixtures only)
+
+Truth contract for the local browser demo:
+
+- fixture set: `2026-03-06`, `2026-03-10`, `2026-03-12`
+- hero day: `2026-03-12`
+- topology: unchanged
+- transaction/PnL surfaces: intentionally truthful empty/incomplete panels when fills/orders/positions are empty in the committed artifacts
+
+Frontend prerequisites:
+
+- Node.js `>=22`
+- npm
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install --include=dev
+cd ..
+```
+
+Build the browser bundle:
+
+```bash
+cd frontend
+npm run build
+cd ..
+```
+
+Launch the local Mission Control demo:
+
+```bash
+uv run uvicorn steamer_card_engine.dashboard.api:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Open:
+
+- `http://127.0.0.1:8000/` for the browser dashboard
+- `http://127.0.0.1:8000/api/dates` for the discovered March fixture index
+- `http://127.0.0.1:8000/api/docs` for the read-only API docs
+
 ## M1 evidence-pack operator workflow (sim-only)
 
 Current pre-sprint evidence index:
