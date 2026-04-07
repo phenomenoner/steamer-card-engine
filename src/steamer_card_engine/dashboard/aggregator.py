@@ -324,6 +324,8 @@ def _lane_payload(
                 "title": f"Risk allow {risk['reason_code']}",
                 "subtitle": risk["policy_name"],
                 "symbol": intent["symbol"] if intent else None,
+                "card_id": intent.get("card_id") if intent else None,
+                "intent_id": risk.get("intent_id"),
                 "status": "positive",
                 "details": risk,
             }
@@ -343,6 +345,8 @@ def _lane_payload(
                 "title": f"Risk block {risk['reason_code']}",
                 "subtitle": risk["policy_name"],
                 "symbol": intent["symbol"] if intent else None,
+                "card_id": intent.get("card_id") if intent else None,
+                "intent_id": risk.get("intent_id"),
                 "status": "warn",
                 "details": risk,
             }
@@ -350,6 +354,8 @@ def _lane_payload(
         blocked_added += 1
 
     for execution in executions:
+        risk = risk_by_id.get(execution.get("risk_decision_id"))
+        intent = intent_by_id.get(risk.get("intent_id")) if risk else None
         timeline.append(
             {
                 "event_key": f"{lane}:{execution['exec_request_id']}",
@@ -359,6 +365,8 @@ def _lane_payload(
                 "title": f"{execution['side']} {execution['symbol']} execution request",
                 "subtitle": execution["order_type"],
                 "symbol": execution["symbol"],
+                "card_id": intent.get("card_id") if intent else None,
+                "intent_id": risk.get("intent_id") if risk else None,
                 "status": "neutral",
                 "details": execution,
             }

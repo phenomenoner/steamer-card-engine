@@ -56,6 +56,8 @@ type TimelineEvent = {
   title: string;
   subtitle: string;
   symbol: string | null;
+  card_id?: string | null;
+  intent_id?: string | null;
   status: string;
   details: Record<string, unknown>;
 };
@@ -193,6 +195,10 @@ type CardDetail = {
   truth_notes: string[];
 };
 
+type EvidenceRow = Record<string, unknown>;
+
+type KeyValueItem = { label: string; value: unknown };
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
   if (!response.ok) {
@@ -222,6 +228,111 @@ function formatTimestamp(value: string) {
   });
 }
 
+function stringifyValue(value: unknown): string {
+  if (value === null) {
+    return "null";
+  }
+  if (value === undefined) {
+    return "—";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.length ? value.map((item) => stringifyValue(item)).join(", ") : "[]";
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function getRowString(row: EvidenceRow, key: string): string | null {
+  const value = row[key];
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  return null;
+}
+
+function getRowNumber(row: EvidenceRow, key: string): number | null {
+  const value = row[key];
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function KeyValueGrid({ items }: { items: KeyValueItem[] }) {
+  if (!items.length) {
+    return null;
+  }
+
+  return (
+    <div className="kv-grid">
+      {items.map((item) => (
+        <div className="kv-row" key={item.label}>
+          <span className="kv-label">{item.label}</span>
+          <span className="kv-value">{stringifyValue(item.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EvidenceList({
+  title,
+  hint,
+  rows,
+  getKey,
+  renderPrimary,
+  renderSecondary,
+  renderMeta,
+}: {
+  title: string;
+  hint?: string;
+  rows: EvidenceRow[];
+  getKey: (row: EvidenceRow, index: number) => string;
+  renderPrimary: (row: EvidenceRow) => string;
+  renderSecondary?: (row: EvidenceRow) => string;
+  renderMeta?: (row: EvidenceRow) => string;
+}) {
+  return (
+    <div className="evidence-stack">
+      <div className="evidence-stack-header">
+        <h4>{title}</h4>
+        {hint ? <p className="muted">{hint}</p> : null}
+      </div>
+      {rows.length ? (
+        <div className="evidence-list">
+          {rows.slice(0, 8).map((row, index) => (
+            <div className="evidence-row" key={getKey(row, index)}>
+              <div className="evidence-row-main">
+                <strong>{renderPrimary(row)}</strong>
+                {renderSecondary ? <p>{renderSecondary(row)}</p> : null}
+              </div>
+              {renderMeta ? <div className="evidence-row-meta">{renderMeta(row)}</div> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="state-block">No sampled rows in this fixture slice.</div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [dates, setDates] = useState<DateItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -231,6 +342,7 @@ function App() {
   const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
   const [deckLoading, setDeckLoading] = useState(true);
   const [cardLoading, setCardLoading] = useState(false);
+  const [timelineLaneFilter, setTimelineLaneFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -273,6 +385,7 @@ function App() {
           return;
         }
         setDeck(payload);
+        setTimelineLaneFilter(null);
         setActiveCardId(payload.strategy.cards[0]?.id ?? null);
         setActiveEventKey(payload.evidence.timeline[0]?.event_key ?? null);
       })
@@ -330,6 +443,76 @@ function App() {
   const activeEvent = useMemo(() => {
     return deck?.evidence.timeline.find((event) => event.event_key === activeEventKey) ?? null;
   }, [deck, activeEventKey]);
+
+  const visibleTimeline = useMemo(() => {
+    const events = deck?.evidence.timeline ?? [];
+    if (!timelineLaneFilter) {
+      return events;
+    }
+    return events.filter((event) => event.lane === timelineLaneFilter);
+  }, [deck, timelineLaneFilter]);
+
+  const laneAnomalies = useMemo(() => {
+    if (!deck || !cardDetail) {
+      return [];
+    }
+    return deck.evidence.anomalies.filter((anom) => anom.lane === cardDetail.lane);
+  }, [deck, cardDetail]);
+
+  const evidenceSummaryItems = useMemo<KeyValueItem[]>(() => {
+    if (!activeEvent) {
+      return [];
+    }
+
+    const details = activeEvent.details ?? {};
+    if (activeEvent.kind === "anomaly") {
+      return [
+        { label: "anomaly_id", value: details.anomaly_id },
+        { label: "category", value: details.category },
+        { label: "severity", value: details.severity },
+        { label: "message", value: details.message },
+      ];
+    }
+
+    if (activeEvent.kind.startsWith("risk-")) {
+      return [
+        { label: "decision", value: details.decision },
+        { label: "reason_code", value: details.reason_code },
+        { label: "policy_name", value: details.policy_name },
+        { label: "adjusted_qty", value: details.adjusted_qty },
+        { label: "intent_id", value: (activeEvent.intent_id ?? details.intent_id) as unknown },
+        { label: "risk_decision_id", value: details.risk_decision_id },
+      ];
+    }
+
+    if (activeEvent.kind === "execution-request") {
+      return [
+        { label: "symbol", value: details.symbol },
+        { label: "side", value: details.side },
+        { label: "order_type", value: details.order_type },
+        { label: "qty", value: details.qty },
+        { label: "limit_price", value: details.limit_price },
+        { label: "risk_decision_id", value: details.risk_decision_id },
+        { label: "exec_request_id", value: details.exec_request_id },
+      ];
+    }
+
+    if (activeEvent.kind === "market-sample") {
+      const payload = details.payload as Record<string, unknown> | undefined;
+      return [
+        { label: "event_id", value: details.event_id },
+        { label: "symbol", value: details.symbol },
+        { label: "price", value: payload?.price },
+        { label: "size", value: payload?.size },
+      ];
+    }
+
+    if (activeEvent.kind === "run-start" || activeEvent.kind === "run-end") {
+      return [{ label: "run_id", value: details.run_id }];
+    }
+
+    return [];
+  }, [activeEvent]);
 
   return (
     <div className="page-shell">
@@ -399,7 +582,9 @@ function App() {
               <h2>{deck ? formatDate(deck.date) : selectedDate ? formatDate(selectedDate) : "Select a day"}</h2>
               {deck ? <p className="muted">{deck.cover.scenario_id}</p> : null}
             </div>
-            {deck ? <span className={`badge ${deck.cover.compare_status === "pass" ? "badge-hero" : ""}`}>{deck.cover.compare_status}</span> : null}
+            {deck ? (
+              <span className={`badge ${deck.cover.compare_status === "pass" ? "badge-hero" : ""}`}>{deck.cover.compare_status}</span>
+            ) : null}
           </div>
 
           {deckLoading ? <div className="state-block">Opening deck…</div> : null}
@@ -515,29 +700,60 @@ function App() {
 
                 <article className="subpanel deck-section">
                   <div className="subpanel-header">
-                    <h3>Evidence timeline</h3>
-                    <span className="muted">{deck.evidence.timeline.length} items</span>
+                    <div>
+                      <h3>Evidence timeline</h3>
+                      <p className="muted">{visibleTimeline.length} items {timelineLaneFilter ? `(lane=${timelineLaneFilter})` : ""}</p>
+                    </div>
+                    <div className="chip-row">
+                      <button
+                        type="button"
+                        className={`chip chip-button ${!timelineLaneFilter ? "chip-accent" : ""}`}
+                        onClick={() => setTimelineLaneFilter(null)}
+                      >
+                        All lanes
+                      </button>
+                      <button
+                        type="button"
+                        className={`chip chip-button ${timelineLaneFilter === "baseline-bot" ? "chip-accent" : ""}`}
+                        onClick={() => setTimelineLaneFilter("baseline-bot")}
+                      >
+                        baseline
+                      </button>
+                      <button
+                        type="button"
+                        className={`chip chip-button ${timelineLaneFilter === "steamer-card-engine" ? "chip-accent" : ""}`}
+                        onClick={() => setTimelineLaneFilter("steamer-card-engine")}
+                      >
+                        candidate
+                      </button>
+                    </div>
                   </div>
                   <div className="timeline">
-                    {deck.evidence.timeline.slice(0, 70).map((event) => (
-                      <button
-                        key={event.event_key}
-                        className={`timeline-row timeline-${event.status} ${
-                          activeEventKey === event.event_key ? "timeline-row-active" : ""
-                        }`}
-                        onClick={() => setActiveEventKey(event.event_key)}
-                        type="button"
-                      >
-                        <div className="timeline-time">{formatTimestamp(event.timestamp)}</div>
-                        <div>
-                          <strong>{event.title}</strong>
-                          <p>
-                            {event.lane} · {event.kind}
-                            {event.symbol ? ` · ${event.symbol}` : ""}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                    {visibleTimeline.slice(0, 70).map((event) => {
+                      const isActive = activeEventKey === event.event_key;
+                      const isRelatedToCard =
+                        !!activeCard && event.lane === activeCard.lane && event.card_id === activeCard.card_id;
+                      return (
+                        <button
+                          key={event.event_key}
+                          className={`timeline-row timeline-${event.status} ${isActive ? "timeline-row-active" : ""} ${
+                            isRelatedToCard ? "timeline-row-related" : ""
+                          }`}
+                          onClick={() => setActiveEventKey(event.event_key)}
+                          type="button"
+                        >
+                          <div className="timeline-time">{formatTimestamp(event.timestamp)}</div>
+                          <div>
+                            <strong>{event.title}</strong>
+                            <p>
+                              {event.lane} · {event.kind}
+                              {event.symbol ? ` · ${event.symbol}` : ""}
+                              {event.card_id ? ` · card=${event.card_id}` : ""}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <details className="compare-memo">
@@ -632,29 +848,156 @@ function App() {
                 </div>
               ) : null}
 
-              <div className="drawer-section">
-                <h3>Intent reasons</h3>
-                {cardDetail.distributions.intent_reasons.map((item) => (
-                  <div className="pill-row" key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.count}</strong>
+              {laneAnomalies.length > 0 ? (
+                <div className="drawer-section">
+                  <h3>Lane anomalies</h3>
+                  <p className="muted">These anomalies are lane-scoped (not card-specific) in the March fixtures.</p>
+                  <div className="anomaly-list">
+                    {laneAnomalies.map((anom) => (
+                      <button
+                        key={anom.anomaly_id}
+                        type="button"
+                        className="anomaly-row"
+                        onClick={() => setActiveEventKey(`${anom.lane}:${anom.anomaly_id}`)}
+                      >
+                        <div>
+                          <strong>{anom.category}</strong>
+                          <p>{anom.message}</p>
+                        </div>
+                        <span className={`badge badge-muted badge-${anom.severity}`}>{anom.severity}</span>
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : null}
 
               <div className="drawer-section">
-                <h3>Top symbols</h3>
-                {cardDetail.distributions.top_symbols.map((item) => (
-                  <div className="pill-row" key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.count}</strong>
-                  </div>
-                ))}
+                <h3>Evidence stack</h3>
+                <p className="muted">Sampled, card-native intent → risk → execution → feature rows (not raw dumps by default).</p>
+
+                <EvidenceList
+                  title="Intent"
+                  hint="Why we wanted to act."
+                  rows={cardDetail.samples.intents}
+                  getKey={(row, index) => getRowString(row, "intent_id") ?? `intent:${index}`}
+                  renderPrimary={(row) => {
+                    const side = getRowString(row, "side") ?? "?";
+                    const symbol = getRowString(row, "symbol") ?? "?";
+                    return `${side.toUpperCase()} ${symbol}`;
+                  }}
+                  renderSecondary={(row) => {
+                    const reason = getRowString(row, "reason_code") ?? "unknown";
+                    const qty = getRowNumber(row, "requested_qty");
+                    return `reason=${reason}${qty !== null ? ` · requested_qty=${qty}` : ""}`;
+                  }}
+                  renderMeta={(row) => {
+                    const when = getRowString(row, "intent_time_utc");
+                    return when ? formatTimestamp(when) : "";
+                  }}
+                />
+
+                <EvidenceList
+                  title="Risk"
+                  hint="Policy allow/block decisions."
+                  rows={cardDetail.samples.risk_decisions}
+                  getKey={(row, index) => getRowString(row, "risk_decision_id") ?? `risk:${index}`}
+                  renderPrimary={(row) => {
+                    const decision = getRowString(row, "decision") ?? "?";
+                    const reason = getRowString(row, "reason_code") ?? "unknown";
+                    return `${decision.toUpperCase()} ${reason}`;
+                  }}
+                  renderSecondary={(row) => {
+                    const policy = getRowString(row, "policy_name") ?? "?";
+                    const qty = getRowNumber(row, "adjusted_qty");
+                    return `${policy}${qty !== null ? ` · adjusted_qty=${qty}` : ""}`;
+                  }}
+                  renderMeta={(row) => {
+                    const when = getRowString(row, "decision_time_utc");
+                    return when ? formatTimestamp(when) : "";
+                  }}
+                />
+
+                <EvidenceList
+                  title="Execution"
+                  hint="Execution requests (shells; fills may be empty)."
+                  rows={cardDetail.samples.execution_requests}
+                  getKey={(row, index) => getRowString(row, "exec_request_id") ?? `exec:${index}`}
+                  renderPrimary={(row) => {
+                    const side = getRowString(row, "side") ?? "?";
+                    const symbol = getRowString(row, "symbol") ?? "?";
+                    const orderType = getRowString(row, "order_type") ?? "?";
+                    return `${side.toUpperCase()} ${symbol} (${orderType})`;
+                  }}
+                  renderSecondary={(row) => {
+                    const qty = getRowNumber(row, "qty");
+                    const limit = row["limit_price"];
+                    const limitLabel = limit === null || limit === undefined ? "" : ` · limit=${stringifyValue(limit)}`;
+                    return `${qty !== null ? `qty=${qty}` : "qty=?"}${limitLabel}`;
+                  }}
+                  renderMeta={(row) => {
+                    const when = getRowString(row, "request_time_utc");
+                    return when ? formatTimestamp(when) : "";
+                  }}
+                />
+
+                <EvidenceList
+                  title="Features"
+                  hint="Provenance snapshots used by the card."
+                  rows={cardDetail.samples.feature_provenance}
+                  getKey={(row, index) => getRowString(row, "feature_record_id") ?? `feature:${index}`}
+                  renderPrimary={(row) => {
+                    const name = getRowString(row, "feature_name") ?? "feature";
+                    const version = getRowString(row, "feature_version") ?? "?";
+                    return `${name} (${version})`;
+                  }}
+                  renderSecondary={(row) => {
+                    const symbol = getRowString(row, "symbol") ?? "?";
+                    const window = getRowString(row, "window_spec") ?? "?";
+                    return `${symbol} · ${window}`;
+                  }}
+                  renderMeta={(row) => {
+                    const when = getRowString(row, "computed_at_utc");
+                    return when ? formatTimestamp(when) : "";
+                  }}
+                />
+
+                <details className="drawer-section">
+                  <summary>Raw sampled payloads (JSON)</summary>
+                  <pre className="json-block">{JSON.stringify(cardDetail.samples, null, 2)}</pre>
+                </details>
               </div>
 
               <details className="drawer-section">
-                <summary>Sampled intent shells</summary>
-                <pre className="json-block">{JSON.stringify(cardDetail.samples.intents, null, 2)}</pre>
+                <summary>Distributions (reasons / symbols)</summary>
+                <div className="drawer-section">
+                  <h3>Intent reasons</h3>
+                  {cardDetail.distributions.intent_reasons.map((item) => (
+                    <div className="pill-row" key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="drawer-section">
+                  <h3>Risk reasons</h3>
+                  {cardDetail.distributions.risk_reasons.map((item) => (
+                    <div className="pill-row" key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="drawer-section">
+                  <h3>Top symbols</h3>
+                  {cardDetail.distributions.top_symbols.map((item) => (
+                    <div className="pill-row" key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
               </details>
             </>
           ) : null}
@@ -667,6 +1010,7 @@ function App() {
             <div>
               <p className="panel-kicker">Evidence</p>
               <h2>{activeEvent.title}</h2>
+              <p className="muted">{activeEvent.subtitle}</p>
             </div>
             <button className="ghost-button" onClick={() => setActiveEventKey(null)} type="button">
               Close
@@ -674,8 +1018,48 @@ function App() {
           </div>
           <p className="drawer-meta">
             {formatTimestamp(activeEvent.timestamp)} · {activeEvent.lane} · {activeEvent.kind}
+            {activeEvent.symbol ? ` · ${activeEvent.symbol}` : ""}
           </p>
-          <pre className="json-block">{JSON.stringify(activeEvent.details, null, 2)}</pre>
+
+          {activeEvent.card_id && deck?.strategy.cards.some((card) => card.id === `${activeEvent.lane}:${activeEvent.card_id}`) ? (
+            <div className="drawer-section">
+              <h3>Related card</h3>
+              <button
+                type="button"
+                className="link-row"
+                onClick={() => setActiveCardId(`${activeEvent.lane}:${activeEvent.card_id}`)}
+              >
+                Open {activeEvent.lane}:{activeEvent.card_id}
+              </button>
+            </div>
+          ) : null}
+
+          {!activeEvent.card_id && deck ? (
+            <div className="drawer-section">
+              <h3>Lane cards</h3>
+              <p className="muted">For lane-scoped evidence (like anomalies), jump to an implicated card surface.</p>
+              <div className="lane-card-links">
+                {deck.strategy.cards
+                  .filter((card) => card.lane === activeEvent.lane)
+                  .slice(0, 6)
+                  .map((card) => (
+                    <button key={card.id} type="button" className="link-row" onClick={() => setActiveCardId(card.id)}>
+                      {card.card_id} · exec={card.execution_request_count} · allow={card.allowed_risk_count}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="drawer-section">
+            <h3>Summary</h3>
+            <KeyValueGrid items={evidenceSummaryItems} />
+          </div>
+
+          <details className="drawer-section">
+            <summary>Raw event payload (JSON)</summary>
+            <pre className="json-block">{JSON.stringify(activeEvent.details, null, 2)}</pre>
+          </details>
         </aside>
       ) : null}
     </div>
