@@ -540,7 +540,7 @@ function App() {
           <div className="panel-header">
             <div>
               <p className="panel-kicker">Deck Wall</p>
-              <h2>March day covers</h2>
+              <h2>DAILY DECKS</h2>
             </div>
           </div>
           <div className="deck-wall-list">
@@ -557,18 +557,17 @@ function App() {
               >
                 <div className="deck-cover-top">
                   <strong>{formatDate(date.date)}</strong>
-                  {date.hero ? <span className="badge badge-hero">Hero</span> : null}
+                  {date.hero ? <span className="badge badge-hero">HERO</span> : null}
                 </div>
-                <p className="muted deck-cover-subtitle">{date.scenario_id}</p>
+                <p className="deck-cover-subtitle">{date.scenario_id}</p>
                 <div className="deck-cover-meta">
-                  <span className="badge badge-muted">{date.compare_status}</span>
-                  <span className="badge badge-muted">{date.anomaly_count} anomalies</span>
-                  <span className="badge badge-muted">{date.transaction_state}</span>
-                  {date.symbol_count ? <span className="badge badge-muted">{date.symbol_count} symbols</span> : null}
+                  <span className={`badge ${date.compare_status === "pass" ? "badge-hero" : "badge-muted"}`}>
+                    {date.compare_status.toUpperCase()}
+                  </span>
+                  <span className="badge badge-muted">{date.anomaly_count} ANOM</span>
                 </div>
                 <p className="deck-cover-bottom muted">
-                  Dominant: {date.dominant_lane}
-                  {date.candidate_deck_id ? ` · deck=${date.candidate_deck_id}` : ""}
+                  {date.dominant_lane} {date.candidate_deck_id ? ` · deck=${date.candidate_deck_id}` : ""}
                 </p>
               </button>
             ))}
@@ -578,102 +577,50 @@ function App() {
         <section className="panel daily-deck">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">Daily Deck</p>
-              <h2>{deck ? formatDate(deck.date) : selectedDate ? formatDate(selectedDate) : "Select a day"}</h2>
+              <p className="panel-kicker">Operational View</p>
+              <h2>{deck ? formatDate(deck.date).toUpperCase() : selectedDate ? formatDate(selectedDate).toUpperCase() : "Select a day"}</h2>
               {deck ? <p className="muted">{deck.cover.scenario_id}</p> : null}
             </div>
             {deck ? (
-              <span className={`badge ${deck.cover.compare_status === "pass" ? "badge-hero" : ""}`}>{deck.cover.compare_status}</span>
+              <span className={`badge ${deck.cover.compare_status === "pass" ? "badge-hero" : "badge-alert"}`}>
+                {deck.cover.compare_status.toUpperCase()}
+              </span>
             ) : null}
           </div>
 
-          {deckLoading ? <div className="state-block">Opening deck…</div> : null}
-          {error ? <div className="state-block state-error">{error}</div> : null}
+          {deckLoading ? <div className="state-block">Engaging deck link…</div> : null}
+          {error ? <div className="state-block state-error">ERROR: {error}</div> : null}
 
           {!deckLoading && deck ? (
             <>
               <div className="deck-cover-grid">
                 <article className="metric-card">
-                  <span className="metric-label">Dominant lane</span>
-                  <strong>{deck.cover.dominant_lane}</strong>
-                  <p>{deck.cover.dominant_card_label ?? "No dominant card resolved"}</p>
+                  <span className="metric-label">Dominant Lane</span>
+                  <strong>{deck.cover.dominant_lane === "steamer-card-engine" ? "CANDIDATE" : "BASELINE"}</strong>
+                  <p>{deck.cover.dominant_card_label ?? "No card resolved"}</p>
                 </article>
                 <article className="metric-card">
                   <span className="metric-label">Anomalies</span>
-                  <strong>{deck.cover.anomaly_total}</strong>
-                  <p>Both lanes (minor-only in March set).</p>
+                  <strong className={deck.cover.anomaly_total > 0 ? "text-alert" : ""}>{deck.cover.anomaly_total}</strong>
+                  <p>Detected in session logs.</p>
                 </article>
                 <article className="metric-card">
-                  <span className="metric-label">Intent / risk shells</span>
-                  <strong>
-                    {deck.cover.delta_counts.intents?.candidate ?? 0} / {deck.cover.delta_counts.risk_decisions?.candidate ?? 0}
-                  </strong>
-                  <p>Candidate totals (placeholders allowed).</p>
+                  <span className="metric-label">Decisions</span>
+                  <strong>{deck.cover.delta_counts.intents?.candidate ?? 0}</strong>
+                  <p>Strategy intents processed.</p>
                 </article>
                 <article className="metric-card">
-                  <span className="metric-label">Transaction truth</span>
-                  <strong>{deck.cover.transaction_state}</strong>
+                  <span className="metric-label">Truth State</span>
+                  <strong>{deck.cover.transaction_state.toUpperCase()}</strong>
                   <p>{deck.transactions.empty_state_metadata.empty_reason}</p>
                 </article>
               </div>
 
-              <div className="deck-what-changed">
-                <h3>What changed / notes</h3>
-                <ul>
-                  {deck.cover.compare_notes.length > 0 ? (
-                    deck.cover.compare_notes.map((note) => <li key={note}>{note}</li>)
-                  ) : (
-                    <li>No compare notes were captured in the summary.md fixture for this day.</li>
-                  )}
-                  {deck.cover.scaffold_placeholders.length > 0 ? (
-                    <li>Scaffold placeholders: {deck.cover.scaffold_placeholders.join(", ")}</li>
-                  ) : null}
-                </ul>
-              </div>
-
               <div className="deck-sections">
-                <article className="subpanel deck-section">
+                <article className="subpanel">
                   <div className="subpanel-header">
-                    <h3>World / Universe</h3>
-                    <span className="muted">{deck.universe.calendar ?? "?"}</span>
-                  </div>
-                  <div className="universe-grid">
-                    <div>
-                      <span className="mini-label">Timezone</span>
-                      <strong>{deck.universe.timezone ?? "unknown"}</strong>
-                    </div>
-                    <div>
-                      <span className="mini-label">Session</span>
-                      <strong>
-                        {deck.universe.session.slice_label ?? "?"} {deck.universe.session.start_local ?? "?"}-
-                        {deck.universe.session.end_local ?? "?"}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="mini-label">Symbols</span>
-                      <strong>{formatNumber(deck.universe.symbol_count)}</strong>
-                    </div>
-                    <div>
-                      <span className="mini-label">Event source</span>
-                      <strong>{deck.universe.event_source.source_kind ?? "?"}</strong>
-                    </div>
-                  </div>
-                  <div className="symbol-cloud">
-                    {deck.universe.symbol_samples.map((symbol) => (
-                      <span className="pill" key={symbol}>
-                        {symbol}
-                      </span>
-                    ))}
-                    {deck.universe.symbol_count > deck.universe.symbol_samples.length ? (
-                      <span className="pill pill-muted">+{deck.universe.symbol_count - deck.universe.symbol_samples.length} more</span>
-                    ) : null}
-                  </div>
-                </article>
-
-                <article className="subpanel deck-section">
-                  <div className="subpanel-header">
-                    <h3>Strategy cards</h3>
-                    <span className="muted">{deck.strategy.cards.length} cards</span>
+                    <h3>STRATEGY CARDS</h3>
+                    <span className="pill">{deck.strategy.cards.length} ACTIVE</span>
                   </div>
                   <div className="card-grid">
                     {deck.strategy.cards.map((card) => (
@@ -685,46 +632,35 @@ function App() {
                       >
                         <div className="card-tile-top">
                           <strong>{card.card_id}</strong>
-                          <span className="badge badge-muted">{card.lane}</span>
+                          <span className="badge badge-muted">{card.lane.split("-")[0]}</span>
                         </div>
-                        <p className="muted">deck={card.deck_id}</p>
                         <div className="card-tile-metrics">
-                          <span>{card.execution_request_count} exec</span>
-                          <span>{card.allowed_risk_count} allow</span>
-                          <span>{card.blocked_risk_count} block</span>
+                          <span>{card.execution_request_count} EXEC</span>
+                          <span>{card.allowed_risk_count} ALLOW</span>
+                          <span>{card.blocked_risk_count} BLOCK</span>
                         </div>
                       </button>
                     ))}
                   </div>
                 </article>
 
-                <article className="subpanel deck-section">
+                <article className="subpanel">
                   <div className="subpanel-header">
-                    <div>
-                      <h3>Evidence timeline</h3>
-                      <p className="muted">{visibleTimeline.length} items {timelineLaneFilter ? `(lane=${timelineLaneFilter})` : ""}</p>
-                    </div>
+                    <h3>EVIDENCE FEED</h3>
                     <div className="chip-row">
                       <button
                         type="button"
                         className={`chip chip-button ${!timelineLaneFilter ? "chip-accent" : ""}`}
                         onClick={() => setTimelineLaneFilter(null)}
                       >
-                        All lanes
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip chip-button ${timelineLaneFilter === "baseline-bot" ? "chip-accent" : ""}`}
-                        onClick={() => setTimelineLaneFilter("baseline-bot")}
-                      >
-                        baseline
+                        ALL
                       </button>
                       <button
                         type="button"
                         className={`chip chip-button ${timelineLaneFilter === "steamer-card-engine" ? "chip-accent" : ""}`}
                         onClick={() => setTimelineLaneFilter("steamer-card-engine")}
                       >
-                        candidate
+                        CANDIDATE
                       </button>
                     </div>
                   </div>
@@ -742,53 +678,59 @@ function App() {
                           onClick={() => setActiveEventKey(event.event_key)}
                           type="button"
                         >
-                          <div className="timeline-time">{formatTimestamp(event.timestamp)}</div>
+                          <div className="timeline-time">{new Date(event.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'})}</div>
                           <div>
-                            <strong>{event.title}</strong>
-                            <p>
-                              {event.lane} · {event.kind}
-                              {event.symbol ? ` · ${event.symbol}` : ""}
-                              {event.card_id ? ` · card=${event.card_id}` : ""}
-                            </p>
+                            <strong>{event.title.toUpperCase()}</strong>
+                            <p>{event.symbol ? `SYMBOL=${event.symbol}` : ""}</p>
                           </div>
                         </button>
                       );
                     })}
                   </div>
+                </article>
+              </div>
 
-                  <details className="compare-memo">
-                    <summary>Compare memo (fixture summary.md)</summary>
-                    <pre className="markdown-block">{deck.evidence.comparison_summary_markdown}</pre>
-                    <p className="muted">relpath: {deck.evidence.comparison_summary_relpath}</p>
-                  </details>
+              <div className="deck-sections" style={{ marginTop: '20px' }}>
+                <article className="subpanel">
+                  <div className="subpanel-header">
+                    <h3>UNIVERSE</h3>
+                    <span className="pill">{deck.universe.calendar}</span>
+                  </div>
+                  <div className="universe-grid">
+                    <div>
+                      <span className="mini-label">TZ</span>
+                      <strong>{deck.universe.timezone}</strong>
+                    </div>
+                    <div>
+                      <span className="mini-label">SESSION</span>
+                      <strong>{deck.universe.session.slice_label}</strong>
+                    </div>
+                  </div>
+                  <div className="symbol-cloud">
+                    {deck.universe.symbol_samples.map((symbol) => (
+                      <span className="pill" key={symbol}>{symbol}</span>
+                    ))}
+                  </div>
                 </article>
 
-                <article className="subpanel deck-section">
+                <article className="subpanel">
                   <div className="subpanel-header">
-                    <h3>Transactions / PnL</h3>
-                    <span className="muted">Read-only</span>
+                    <h3>PNL PERFORMANCE</h3>
+                    <span className="pill">REALTIME</span>
                   </div>
-                  <div className="compare-grid">
+                  <div className="drawer-grid" style={{ marginBottom: 0 }}>
                     <div>
-                      <span className="mini-label">Orders</span>
-                      <strong>{deck.transactions.counts.orders.baseline + deck.transactions.counts.orders.candidate}</strong>
+                      <span className="mini-label">GROSS</span>
+                      <strong style={{ color: deck.transactions.pnl_reported.candidate.realized_pnl_gross >= 0 ? 'var(--accent)' : 'var(--alert)' }}>
+                        {deck.transactions.pnl_reported.candidate.realized_pnl_gross.toFixed(2)}
+                      </strong>
                     </div>
                     <div>
-                      <span className="mini-label">Fills</span>
-                      <strong>{deck.transactions.counts.fills.baseline + deck.transactions.counts.fills.candidate}</strong>
+                      <span className="mini-label">NET</span>
+                      <strong style={{ color: deck.transactions.pnl_reported.candidate.realized_pnl_net >= 0 ? 'var(--accent)' : 'var(--alert)' }}>
+                        {deck.transactions.pnl_reported.candidate.realized_pnl_net.toFixed(2)}
+                      </strong>
                     </div>
-                    <div>
-                      <span className="mini-label">Gross PnL</span>
-                      <strong>{deck.transactions.pnl_reported.baseline.realized_pnl_gross.toFixed(2)}</strong>
-                    </div>
-                    <div>
-                      <span className="mini-label">Net PnL</span>
-                      <strong>{deck.transactions.pnl_reported.candidate.realized_pnl_net.toFixed(2)}</strong>
-                    </div>
-                  </div>
-                  <div className="truth-banner">
-                    <strong>{deck.transactions.empty_state_metadata.state}</strong>
-                    <p>{deck.transactions.empty_state_metadata.truth_note}</p>
                   </div>
                 </article>
               </div>
@@ -801,45 +743,37 @@ function App() {
         <aside className="drawer">
           <div className="drawer-header">
             <div>
-              <p className="panel-kicker">Strategy card</p>
+              <p className="panel-kicker">STRATEGY CARD</p>
               <h2>{activeCard.card_id}</h2>
-              <p className="muted">
-                {activeCard.lane} · deck={activeCard.deck_id} · v={activeCard.card_version}
+              <p className="muted" style={{ fontFamily: 'IBM Plex Mono' }}>
+                {activeCard.lane.toUpperCase()} · v{activeCard.card_version}
               </p>
             </div>
             <button className="ghost-button" onClick={() => setActiveCardId(null)} type="button">
-              Close
+              [CLOSE]
             </button>
           </div>
 
-          {cardLoading && !cardDetail ? <div className="state-block">Loading card evidence…</div> : null}
+          {cardLoading && !cardDetail ? <div className="state-block">SCANNING ARCHIVES…</div> : null}
 
           {cardDetail ? (
             <>
               <div className="drawer-grid">
                 <div>
-                  <span className="mini-label">Intents</span>
+                  <span className="mini-label">INTENTS</span>
                   <strong>{cardDetail.counts.intents}</strong>
                 </div>
                 <div>
-                  <span className="mini-label">Risk allow / block</span>
+                  <span className="mini-label">RISK DECISIONS</span>
                   <strong>
-                    {cardDetail.counts.risk_allow} / {cardDetail.counts.risk_block}
+                    {cardDetail.counts.risk_allow}A / {cardDetail.counts.risk_block}B
                   </strong>
-                </div>
-                <div>
-                  <span className="mini-label">Exec shells</span>
-                  <strong>{cardDetail.counts.execution_requests}</strong>
-                </div>
-                <div>
-                  <span className="mini-label">Feature provenance</span>
-                  <strong>{cardDetail.counts.feature_records}</strong>
                 </div>
               </div>
 
               {cardDetail.truth_notes.length > 0 ? (
                 <div className="drawer-section">
-                  <h3>Truth notes</h3>
+                  <h3 className="mini-label">TRUTH NOTES</h3>
                   <ul className="truth-list">
                     {cardDetail.truth_notes.map((note) => (
                       <li key={note}>{note}</li>
@@ -848,36 +782,12 @@ function App() {
                 </div>
               ) : null}
 
-              {laneAnomalies.length > 0 ? (
-                <div className="drawer-section">
-                  <h3>Lane anomalies</h3>
-                  <p className="muted">These anomalies are lane-scoped (not card-specific) in the March fixtures.</p>
-                  <div className="anomaly-list">
-                    {laneAnomalies.map((anom) => (
-                      <button
-                        key={anom.anomaly_id}
-                        type="button"
-                        className="anomaly-row"
-                        onClick={() => setActiveEventKey(`${anom.lane}:${anom.anomaly_id}`)}
-                      >
-                        <div>
-                          <strong>{anom.category}</strong>
-                          <p>{anom.message}</p>
-                        </div>
-                        <span className={`badge badge-muted badge-${anom.severity}`}>{anom.severity}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
               <div className="drawer-section">
-                <h3>Evidence stack</h3>
-                <p className="muted">Sampled, card-native intent → risk → execution → feature rows (not raw dumps by default).</p>
+                <h3 className="mini-label">EVIDENCE STACK</h3>
+                <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>SAMPLED OPERATIONAL DATA</p>
 
                 <EvidenceList
-                  title="Intent"
-                  hint="Why we wanted to act."
+                  title="INTENT"
                   rows={cardDetail.samples.intents}
                   getKey={(row, index) => getRowString(row, "intent_id") ?? `intent:${index}`}
                   renderPrimary={(row) => {
@@ -887,18 +797,16 @@ function App() {
                   }}
                   renderSecondary={(row) => {
                     const reason = getRowString(row, "reason_code") ?? "unknown";
-                    const qty = getRowNumber(row, "requested_qty");
-                    return `reason=${reason}${qty !== null ? ` · requested_qty=${qty}` : ""}`;
+                    return `REASON=${reason}`;
                   }}
                   renderMeta={(row) => {
                     const when = getRowString(row, "intent_time_utc");
-                    return when ? formatTimestamp(when) : "";
+                    return when ? new Date(when).toLocaleTimeString([], { hour12: false }) : "";
                   }}
                 />
 
                 <EvidenceList
-                  title="Risk"
-                  hint="Policy allow/block decisions."
+                  title="RISK"
                   rows={cardDetail.samples.risk_decisions}
                   getKey={(row, index) => getRowString(row, "risk_decision_id") ?? `risk:${index}`}
                   renderPrimary={(row) => {
@@ -908,96 +816,18 @@ function App() {
                   }}
                   renderSecondary={(row) => {
                     const policy = getRowString(row, "policy_name") ?? "?";
-                    const qty = getRowNumber(row, "adjusted_qty");
-                    return `${policy}${qty !== null ? ` · adjusted_qty=${qty}` : ""}`;
+                    return `POLICY=${policy}`;
                   }}
                   renderMeta={(row) => {
                     const when = getRowString(row, "decision_time_utc");
-                    return when ? formatTimestamp(when) : "";
+                    return when ? new Date(when).toLocaleTimeString([], { hour12: false }) : "";
                   }}
                 />
-
-                <EvidenceList
-                  title="Execution"
-                  hint="Execution requests (shells; fills may be empty)."
-                  rows={cardDetail.samples.execution_requests}
-                  getKey={(row, index) => getRowString(row, "exec_request_id") ?? `exec:${index}`}
-                  renderPrimary={(row) => {
-                    const side = getRowString(row, "side") ?? "?";
-                    const symbol = getRowString(row, "symbol") ?? "?";
-                    const orderType = getRowString(row, "order_type") ?? "?";
-                    return `${side.toUpperCase()} ${symbol} (${orderType})`;
-                  }}
-                  renderSecondary={(row) => {
-                    const qty = getRowNumber(row, "qty");
-                    const limit = row["limit_price"];
-                    const limitLabel = limit === null || limit === undefined ? "" : ` · limit=${stringifyValue(limit)}`;
-                    return `${qty !== null ? `qty=${qty}` : "qty=?"}${limitLabel}`;
-                  }}
-                  renderMeta={(row) => {
-                    const when = getRowString(row, "request_time_utc");
-                    return when ? formatTimestamp(when) : "";
-                  }}
-                />
-
-                <EvidenceList
-                  title="Features"
-                  hint="Provenance snapshots used by the card."
-                  rows={cardDetail.samples.feature_provenance}
-                  getKey={(row, index) => getRowString(row, "feature_record_id") ?? `feature:${index}`}
-                  renderPrimary={(row) => {
-                    const name = getRowString(row, "feature_name") ?? "feature";
-                    const version = getRowString(row, "feature_version") ?? "?";
-                    return `${name} (${version})`;
-                  }}
-                  renderSecondary={(row) => {
-                    const symbol = getRowString(row, "symbol") ?? "?";
-                    const window = getRowString(row, "window_spec") ?? "?";
-                    return `${symbol} · ${window}`;
-                  }}
-                  renderMeta={(row) => {
-                    const when = getRowString(row, "computed_at_utc");
-                    return when ? formatTimestamp(when) : "";
-                  }}
-                />
-
-                <details className="drawer-section">
-                  <summary>Raw sampled payloads (JSON)</summary>
-                  <pre className="json-block">{JSON.stringify(cardDetail.samples, null, 2)}</pre>
-                </details>
               </div>
 
               <details className="drawer-section">
-                <summary>Distributions (reasons / symbols)</summary>
-                <div className="drawer-section">
-                  <h3>Intent reasons</h3>
-                  {cardDetail.distributions.intent_reasons.map((item) => (
-                    <div className="pill-row" key={item.label}>
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="drawer-section">
-                  <h3>Risk reasons</h3>
-                  {cardDetail.distributions.risk_reasons.map((item) => (
-                    <div className="pill-row" key={item.label}>
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="drawer-section">
-                  <h3>Top symbols</h3>
-                  {cardDetail.distributions.top_symbols.map((item) => (
-                    <div className="pill-row" key={item.label}>
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </div>
-                  ))}
-                </div>
+                <summary className="mini-label" style={{ cursor: 'pointer' }}>[RAW PAYLOADS]</summary>
+                <pre className="json-block">{JSON.stringify(cardDetail.samples, null, 2)}</pre>
               </details>
             </>
           ) : null}
@@ -1008,43 +838,44 @@ function App() {
         <aside className="drawer drawer-right">
           <div className="drawer-header">
             <div>
-              <p className="panel-kicker">Evidence</p>
-              <h2>{activeEvent.title}</h2>
-              <p className="muted">{activeEvent.subtitle}</p>
+              <p className="panel-kicker">EVIDENCE ARCHIVE</p>
+              <h2>{activeEvent.title.toUpperCase()}</h2>
+              <p className="muted" style={{ fontFamily: 'IBM Plex Mono' }}>{activeEvent.subtitle}</p>
             </div>
             <button className="ghost-button" onClick={() => setActiveEventKey(null)} type="button">
-              Close
+              [CLOSE]
             </button>
           </div>
-          <p className="drawer-meta">
-            {formatTimestamp(activeEvent.timestamp)} · {activeEvent.lane} · {activeEvent.kind}
+          <p className="drawer-meta" style={{ fontFamily: 'IBM Plex Mono', fontSize: '0.8rem' }}>
+            {formatTimestamp(activeEvent.timestamp)} · {activeEvent.lane.toUpperCase()} · {activeEvent.kind.toUpperCase()}
             {activeEvent.symbol ? ` · ${activeEvent.symbol}` : ""}
           </p>
 
           {activeEvent.card_id && deck?.strategy.cards.some((card) => card.id === `${activeEvent.lane}:${activeEvent.card_id}`) ? (
             <div className="drawer-section">
-              <h3>Related card</h3>
+              <h3 className="mini-label">RELATED CARD</h3>
               <button
                 type="button"
                 className="link-row"
+                style={{ fontFamily: 'IBM Plex Mono' }}
                 onClick={() => setActiveCardId(`${activeEvent.lane}:${activeEvent.card_id}`)}
               >
-                Open {activeEvent.lane}:{activeEvent.card_id}
+                {"> OPEN "}{activeEvent.lane.toUpperCase()}:{activeEvent.card_id}
               </button>
             </div>
           ) : null}
 
           {!activeEvent.card_id && deck ? (
             <div className="drawer-section">
-              <h3>Lane cards</h3>
-              <p className="muted">For lane-scoped evidence (like anomalies), jump to an implicated card surface.</p>
+              <h3 className="mini-label">LANE IMPLICATIONS</h3>
+              <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '12px' }}>Operational cards in this lane segment:</p>
               <div className="lane-card-links">
                 {deck.strategy.cards
                   .filter((card) => card.lane === activeEvent.lane)
                   .slice(0, 6)
                   .map((card) => (
-                    <button key={card.id} type="button" className="link-row" onClick={() => setActiveCardId(card.id)}>
-                      {card.card_id} · exec={card.execution_request_count} · allow={card.allowed_risk_count}
+                    <button key={card.id} type="button" className="link-row" style={{ fontFamily: 'IBM Plex Mono' }} onClick={() => setActiveCardId(card.id)}>
+                      {card.card_id} [E:{card.execution_request_count} A:{card.allowed_risk_count}]
                     </button>
                   ))}
               </div>
@@ -1052,12 +883,12 @@ function App() {
           ) : null}
 
           <div className="drawer-section">
-            <h3>Summary</h3>
+            <h3 className="mini-label">PAYLOAD SUMMARY</h3>
             <KeyValueGrid items={evidenceSummaryItems} />
           </div>
 
           <details className="drawer-section">
-            <summary>Raw event payload (JSON)</summary>
+            <summary className="mini-label" style={{ cursor: 'pointer' }}>[RAW EVENT DATA]</summary>
             <pre className="json-block">{JSON.stringify(activeEvent.details, null, 2)}</pre>
           </details>
         </aside>
