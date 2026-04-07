@@ -28,6 +28,13 @@ def test_dashboard_api_routes() -> None:
     assert dates_response.status_code == 200
     assert dates_response.json()[0]["date"] == "2026-03-12"
 
+    deck_response = client.get("/api/days/2026-03-10/deck")
+    assert deck_response.status_code == 200
+    deck_payload = deck_response.json()
+    assert deck_payload["cover"]["scenario_id"] == "tw-paper-sim.twse.2026-03-10.full-session"
+    assert deck_payload["universe"]["calendar"] == "TWSE"
+    assert deck_payload["strategy"]["cards"]
+
     summary_response = client.get("/api/days/2026-03-10/summary")
     assert summary_response.status_code == 200
     assert summary_response.json()["scenario_id"] == "tw-paper-sim.twse.2026-03-10.full-session"
@@ -35,6 +42,12 @@ def test_dashboard_api_routes() -> None:
     cards_response = client.get("/api/days/2026-03-10/cards")
     assert cards_response.status_code == 200
     assert cards_response.json()[0]["card_id"] == "legacy-baseline-card"
+
+    card_detail_response = client.get(
+        "/api/days/2026-03-10/lanes/steamer-card-engine/cards/legacy-baseline-card"
+    )
+    assert card_detail_response.status_code == 200
+    assert card_detail_response.json()["counts"]["intents"] > 0
 
     compare_response = client.get("/api/days/2026-03-10/compare")
     assert compare_response.status_code == 200

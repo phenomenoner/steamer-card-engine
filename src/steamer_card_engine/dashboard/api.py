@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .aggregator import DashboardDataError, build_day_bundle, list_fixture_dates
+from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
 
 
@@ -27,6 +27,10 @@ def create_app() -> FastAPI:
     def dates() -> list[dict]:
         return list_fixture_dates(root)
 
+    @app.get("/api/days/{date}/deck")
+    def deck(date: str) -> dict:
+        return build_day_bundle(date, root)["deck_view"]
+
     @app.get("/api/days/{date}/summary")
     def summary(date: str) -> dict:
         return build_day_bundle(date, root)["daily_summary"]
@@ -34,6 +38,10 @@ def create_app() -> FastAPI:
     @app.get("/api/days/{date}/cards")
     def cards(date: str) -> list[dict]:
         return build_day_bundle(date, root)["strategy_card_summaries"]
+
+    @app.get("/api/days/{date}/lanes/{lane}/cards/{card_id}")
+    def card_detail(date: str, lane: str, card_id: str) -> dict:
+        return build_card_detail(date, lane, card_id, root)
 
     @app.get("/api/days/{date}/compare")
     def compare(date: str) -> dict:

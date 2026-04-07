@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 
 type DateItem = {
   date: string;
@@ -10,35 +10,11 @@ type DateItem = {
   dominant_card: string | null;
   anomaly_count: number;
   transaction_state: string;
-};
-
-type Summary = {
-  date: string;
-  hero_day: boolean;
-  scenario_id: string;
-  scenario_fingerprint: string;
-  compare_status: string;
-  compare_version: string;
-  dominant_lane: string;
-  dominant_card: string | null;
-  dominant_card_label: string | null;
-  anomaly_total: number;
-  event_total: number;
-  execution_request_total: number;
-  intent_total: number;
-  transaction_state: string;
-  lanes: Array<{
-    lane: string;
-    run_id: string;
-    status: string;
-    started_at_utc: string;
-    ended_at_utc: string;
-    counts: Record<string, number>;
-    entry_count: number;
-    realized_pnl_net: number;
-    anomaly_count: number;
-    bundle_relpath: string;
-  }>;
+  symbol_count?: number | null;
+  calendar?: string | null;
+  timezone?: string | null;
+  candidate_deck_id?: string | null;
+  baseline_deck_id?: string | null;
 };
 
 type CardSummary = {
@@ -84,22 +60,6 @@ type TimelineEvent = {
   details: Record<string, unknown>;
 };
 
-type EventsData = {
-  date: string;
-  fixture: {
-    comparison_relpath: string;
-  };
-  event_timeline: TimelineEvent[];
-  anomalies: Array<{
-    anomaly_id: string;
-    category: string;
-    detected_at_utc: string;
-    message: string;
-    severity: string;
-    lane: string;
-  }>;
-};
-
 type TransactionsData = {
   counts: Record<string, Record<string, number>>;
   pnl_reported: Record<string, Record<string, number>>;
@@ -122,10 +82,115 @@ type TransactionsData = {
   };
 };
 
-type SnapshotResponse = {
+type DeckView = {
   date: string;
-  snapshot_id: string;
-  payload: Record<string, unknown>;
+  fixture: {
+    comparison_relpath: string;
+    baseline_bundle_relpath: string;
+    candidate_bundle_relpath: string;
+  };
+  cover: {
+    date: string;
+    scenario_id: string;
+    compare_status: string;
+    dominant_lane: string;
+    dominant_card: string | null;
+    dominant_card_label: string | null;
+    anomaly_total: number;
+    transaction_state: string;
+    delta_counts: Record<string, { baseline: number; candidate: number; delta: number }>;
+    scaffold_placeholders: string[];
+    compare_notes: string[];
+  };
+  universe: {
+    scenario_id: string | null;
+    calendar: string | null;
+    timezone: string | null;
+    session: {
+      session_date: string | null;
+      slice_label: string | null;
+      start_local: string | null;
+      end_local: string | null;
+    };
+    event_source: {
+      source_kind: string | null;
+      source_id: string | null;
+      time_range_utc: { start: string; end: string } | null;
+    };
+    determinism: Record<string, unknown>;
+    symbol_set: {
+      symbol_set_id: string | null;
+      mode: string | null;
+    };
+    symbol_count: number;
+    symbol_samples: string[];
+  };
+  strategy: {
+    dominant_lane: string;
+    dominant_card: string | null;
+    lanes: Record<
+      string,
+      {
+        deck_id: string | null;
+        deck_version: string | null;
+        config_hash: string | null;
+        cards: Array<{ card_id: string; card_version: string }>;
+        card_count: number;
+      }
+    >;
+    cards: CardSummary[];
+  };
+  compare: CompareData;
+  evidence: {
+    anomalies: Array<{
+      anomaly_id: string;
+      category: string;
+      detected_at_utc: string;
+      message: string;
+      severity: string;
+      lane: string;
+    }>;
+    timeline: TimelineEvent[];
+    comparison_summary_markdown: string;
+    comparison_summary_relpath: string;
+  };
+  transactions: TransactionsData;
+  snapshots_available: string[];
+};
+
+type CardDetail = {
+  date: string;
+  lane: string;
+  card_id: string;
+  card_version: string;
+  deck_id: string | null;
+  deck_version: string | null;
+  config_hash: string | null;
+  scenario_id: string | null;
+  run_id: string | null;
+  bundle_relpath: string;
+  anomaly_refs: Array<string | null>;
+  counts: {
+    intents: number;
+    risk_decisions: number;
+    risk_allow: number;
+    risk_block: number;
+    execution_requests: number;
+    feature_records: number;
+  };
+  distributions: {
+    top_symbols: Array<{ label: string; count: number }>;
+    sides: Array<{ label: string; count: number }>;
+    intent_reasons: Array<{ label: string; count: number }>;
+    risk_reasons: Array<{ label: string; count: number }>;
+  };
+  samples: {
+    intents: Array<Record<string, unknown>>;
+    risk_decisions: Array<Record<string, unknown>>;
+    execution_requests: Array<Record<string, unknown>>;
+    feature_provenance: Array<Record<string, unknown>>;
+  };
+  truth_notes: string[];
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -160,20 +225,16 @@ function formatTimestamp(value: string) {
 function App() {
   const [dates, setDates] = useState<DateItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [cards, setCards] = useState<CardSummary[]>([]);
-  const [compare, setCompare] = useState<CompareData | null>(null);
-  const [events, setEvents] = useState<EventsData | null>(null);
-  const [transactions, setTransactions] = useState<TransactionsData | null>(null);
-  const [scenarioSnapshot, setScenarioSnapshot] = useState<SnapshotResponse | null>(null);
+  const [deck, setDeck] = useState<DeckView | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [activeEventKey, setActiveEventKey] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
+  const [deckLoading, setDeckLoading] = useState(true);
+  const [cardLoading, setCardLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     setError(null);
 
     getJson<DateItem[]>("/api/dates")
@@ -190,11 +251,6 @@ function App() {
         if (!cancelled) {
           setError(String(reason));
         }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
       });
 
     return () => {
@@ -208,29 +264,17 @@ function App() {
     }
 
     let cancelled = false;
-    setLoading(true);
+    setDeckLoading(true);
     setError(null);
 
-    Promise.all([
-      getJson<Summary>(`/api/days/${selectedDate}/summary`),
-      getJson<CardSummary[]>(`/api/days/${selectedDate}/cards`),
-      getJson<CompareData>(`/api/days/${selectedDate}/compare`),
-      getJson<EventsData>(`/api/days/${selectedDate}/events`),
-      getJson<TransactionsData>(`/api/days/${selectedDate}/transactions`),
-      getJson<SnapshotResponse>(`/api/days/${selectedDate}/snapshots/scenario`),
-    ])
-      .then(([summaryPayload, cardsPayload, comparePayload, eventsPayload, transactionsPayload, scenarioPayload]) => {
+    getJson<DeckView>(`/api/days/${selectedDate}/deck`)
+      .then((payload) => {
         if (cancelled) {
           return;
         }
-        setSummary(summaryPayload);
-        setCards(cardsPayload);
-        setCompare(comparePayload);
-        setEvents(eventsPayload);
-        setTransactions(transactionsPayload);
-        setScenarioSnapshot(scenarioPayload);
-        setActiveCardId(cardsPayload[0]?.id ?? null);
-        setActiveEventKey(eventsPayload.event_timeline[0]?.event_key ?? null);
+        setDeck(payload);
+        setActiveCardId(payload.strategy.cards[0]?.id ?? null);
+        setActiveEventKey(payload.evidence.timeline[0]?.event_key ?? null);
       })
       .catch((reason) => {
         if (!cancelled) {
@@ -239,7 +283,7 @@ function App() {
       })
       .finally(() => {
         if (!cancelled) {
-          setLoading(false);
+          setDeckLoading(false);
         }
       });
 
@@ -248,40 +292,79 @@ function App() {
     };
   }, [selectedDate]);
 
-  const activeCard = cards.find((card) => card.id === activeCardId) ?? null;
-  const activeEvent = events?.event_timeline.find((event) => event.event_key === activeEventKey) ?? null;
+  const activeCard = useMemo(() => {
+    return deck?.strategy.cards.find((card) => card.id === activeCardId) ?? null;
+  }, [deck, activeCardId]);
+
+  useEffect(() => {
+    if (!selectedDate || !activeCard) {
+      setCardDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCardLoading(true);
+
+    getJson<CardDetail>(`/api/days/${selectedDate}/lanes/${activeCard.lane}/cards/${activeCard.card_id}`)
+      .then((payload) => {
+        if (!cancelled) {
+          setCardDetail(payload);
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setError(String(reason));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCardLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, activeCard?.lane, activeCard?.card_id]);
+
+  const activeEvent = useMemo(() => {
+    return deck?.evidence.timeline.find((event) => event.event_key === activeEventKey) ?? null;
+  }, [deck, activeEventKey]);
 
   return (
     <div className="page-shell">
       <div className="ambient ambient-left" />
       <div className="ambient ambient-right" />
+
       <header className="hero">
         <div>
           <p className="eyebrow">Steamer Card Engine</p>
-          <h1>Mission Control Dashboard</h1>
+          <h1>Mission Control</h1>
           <p className="hero-copy">
-            Read-only battle report over the committed March replay fixtures. No broker control plane, no fabricated trade data.
+            Mission Control → Daily Deck → Strategy Card → Evidence. Read-only battle surfaces over the committed March
+            replay fixtures.
           </p>
         </div>
         <div className="hero-chip-cluster">
           <span className="chip">Fixture Set 20260306 / 20260310 / 20260312</span>
           <span className="chip chip-accent">Topology Unchanged</span>
+          {deck ? <span className="chip">{deck.universe.calendar ?? "?"}</span> : null}
         </div>
       </header>
 
-      <main className="dashboard-grid">
-        <section className="panel panel-history">
+      <main className="mission-layout">
+        <section className="panel deck-wall">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">History</p>
-              <h2>March demo fixtures</h2>
+              <p className="panel-kicker">Deck Wall</p>
+              <h2>March day covers</h2>
             </div>
           </div>
-          <div className="date-list">
+          <div className="deck-wall-list">
             {dates.map((date) => (
               <button
                 key={date.date}
-                className={`date-tile ${selectedDate === date.date ? "date-tile-active" : ""}`}
+                className={`deck-cover-tile ${selectedDate === date.date ? "deck-cover-tile-active" : ""}`}
                 onClick={() =>
                   startTransition(() => {
                     setSelectedDate(date.date);
@@ -289,223 +372,209 @@ function App() {
                 }
                 type="button"
               >
-                <div className="date-tile-head">
+                <div className="deck-cover-top">
                   <strong>{formatDate(date.date)}</strong>
                   {date.hero ? <span className="badge badge-hero">Hero</span> : null}
                 </div>
-                <div className="date-meta">
-                  <span>{date.compare_status}</span>
-                  <span>{date.dominant_lane}</span>
-                  <span>{date.anomaly_count} anomaly</span>
+                <p className="muted deck-cover-subtitle">{date.scenario_id}</p>
+                <div className="deck-cover-meta">
+                  <span className="badge badge-muted">{date.compare_status}</span>
+                  <span className="badge badge-muted">{date.anomaly_count} anomalies</span>
+                  <span className="badge badge-muted">{date.transaction_state}</span>
+                  {date.symbol_count ? <span className="badge badge-muted">{date.symbol_count} symbols</span> : null}
                 </div>
+                <p className="deck-cover-bottom muted">
+                  Dominant: {date.dominant_lane}
+                  {date.candidate_deck_id ? ` · deck=${date.candidate_deck_id}` : ""}
+                </p>
               </button>
             ))}
           </div>
         </section>
 
-        <section className="panel panel-command">
+        <section className="panel daily-deck">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">Daily Command View</p>
-              <h2>{summary ? formatDate(summary.date) : "Loading day"}</h2>
+              <p className="panel-kicker">Daily Deck</p>
+              <h2>{deck ? formatDate(deck.date) : selectedDate ? formatDate(selectedDate) : "Select a day"}</h2>
+              {deck ? <p className="muted">{deck.cover.scenario_id}</p> : null}
             </div>
-            {summary ? <span className="badge">{summary.compare_status}</span> : null}
+            {deck ? <span className={`badge ${deck.cover.compare_status === "pass" ? "badge-hero" : ""}`}>{deck.cover.compare_status}</span> : null}
           </div>
 
-          {loading && !summary ? <div className="state-block">Loading March mission-control bundle…</div> : null}
+          {deckLoading ? <div className="state-block">Opening deck…</div> : null}
           {error ? <div className="state-block state-error">{error}</div> : null}
 
-          {summary && compare && transactions ? (
+          {!deckLoading && deck ? (
             <>
-              <div className="command-strip">
+              <div className="deck-cover-grid">
                 <article className="metric-card">
                   <span className="metric-label">Dominant lane</span>
-                  <strong>{summary.dominant_lane}</strong>
-                  <p>{summary.dominant_card_label ?? "No dominant card resolved"}</p>
+                  <strong>{deck.cover.dominant_lane}</strong>
+                  <p>{deck.cover.dominant_card_label ?? "No dominant card resolved"}</p>
                 </article>
                 <article className="metric-card">
                   <span className="metric-label">Anomalies</span>
-                  <strong>{summary.anomaly_total}</strong>
-                  <p>Minor-only across both lanes in the committed March set.</p>
+                  <strong>{deck.cover.anomaly_total}</strong>
+                  <p>Both lanes (minor-only in March set).</p>
                 </article>
                 <article className="metric-card">
-                  <span className="metric-label">Event pressure</span>
-                  <strong>{formatNumber(summary.event_total)}</strong>
-                  <p>{formatNumber(summary.execution_request_total)} execution shells</p>
+                  <span className="metric-label">Intent / risk shells</span>
+                  <strong>
+                    {deck.cover.delta_counts.intents?.candidate ?? 0} / {deck.cover.delta_counts.risk_decisions?.candidate ?? 0}
+                  </strong>
+                  <p>Candidate totals (placeholders allowed).</p>
                 </article>
                 <article className="metric-card">
                   <span className="metric-label">Transaction truth</span>
-                  <strong>{transactions.empty_state_metadata.state}</strong>
-                  <p>{transactions.empty_state_metadata.empty_reason}</p>
+                  <strong>{deck.cover.transaction_state}</strong>
+                  <p>{deck.transactions.empty_state_metadata.empty_reason}</p>
                 </article>
               </div>
 
-              <div className="two-up">
-                <article className="subpanel">
+              <div className="deck-what-changed">
+                <h3>What changed / notes</h3>
+                <ul>
+                  {deck.cover.compare_notes.length > 0 ? (
+                    deck.cover.compare_notes.map((note) => <li key={note}>{note}</li>)
+                  ) : (
+                    <li>No compare notes were captured in the summary.md fixture for this day.</li>
+                  )}
+                  {deck.cover.scaffold_placeholders.length > 0 ? (
+                    <li>Scaffold placeholders: {deck.cover.scaffold_placeholders.join(", ")}</li>
+                  ) : null}
+                </ul>
+              </div>
+
+              <div className="deck-sections">
+                <article className="subpanel deck-section">
                   <div className="subpanel-header">
-                    <h3>Compare posture</h3>
-                    <span className="muted">{compare.compare_version}</span>
+                    <h3>World / Universe</h3>
+                    <span className="muted">{deck.universe.calendar ?? "?"}</span>
                   </div>
-                  <div className="compare-grid">
+                  <div className="universe-grid">
                     <div>
-                      <span className="mini-label">Intents</span>
+                      <span className="mini-label">Timezone</span>
+                      <strong>{deck.universe.timezone ?? "unknown"}</strong>
+                    </div>
+                    <div>
+                      <span className="mini-label">Session</span>
                       <strong>
-                        {compare.counts.intents.baseline} / {compare.counts.intents.candidate}
+                        {deck.universe.session.slice_label ?? "?"} {deck.universe.session.start_local ?? "?"}-
+                        {deck.universe.session.end_local ?? "?"}
                       </strong>
                     </div>
                     <div>
-                      <span className="mini-label">Risk decisions</span>
-                      <strong>
-                        {compare.counts.risk_decisions.baseline} / {compare.counts.risk_decisions.candidate}
-                      </strong>
+                      <span className="mini-label">Symbols</span>
+                      <strong>{formatNumber(deck.universe.symbol_count)}</strong>
                     </div>
                     <div>
-                      <span className="mini-label">Orders</span>
-                      <strong>
-                        {compare.counts.orders.baseline} / {compare.counts.orders.candidate}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="mini-label">Fills</span>
-                      <strong>
-                        {compare.counts.fills.baseline} / {compare.counts.fills.candidate}
-                      </strong>
+                      <span className="mini-label">Event source</span>
+                      <strong>{deck.universe.event_source.source_kind ?? "?"}</strong>
                     </div>
                   </div>
-                  <p className="subpanel-note">
-                    Compare artifacts pass, but scaffold placeholders remain for exit reasons, exposure, and per-symbol totals.
-                  </p>
+                  <div className="symbol-cloud">
+                    {deck.universe.symbol_samples.map((symbol) => (
+                      <span className="pill" key={symbol}>
+                        {symbol}
+                      </span>
+                    ))}
+                    {deck.universe.symbol_count > deck.universe.symbol_samples.length ? (
+                      <span className="pill pill-muted">+{deck.universe.symbol_count - deck.universe.symbol_samples.length} more</span>
+                    ) : null}
+                  </div>
                 </article>
 
-                <article className="subpanel">
+                <article className="subpanel deck-section">
                   <div className="subpanel-header">
-                    <h3>Scenario receipt</h3>
+                    <h3>Strategy cards</h3>
+                    <span className="muted">{deck.strategy.cards.length} cards</span>
+                  </div>
+                  <div className="card-grid">
+                    {deck.strategy.cards.map((card) => (
+                      <button
+                        className={`card-tile ${activeCardId === card.id ? "card-tile-active" : ""}`}
+                        key={card.id}
+                        onClick={() => setActiveCardId(card.id)}
+                        type="button"
+                      >
+                        <div className="card-tile-top">
+                          <strong>{card.card_id}</strong>
+                          <span className="badge badge-muted">{card.lane}</span>
+                        </div>
+                        <p className="muted">deck={card.deck_id}</p>
+                        <div className="card-tile-metrics">
+                          <span>{card.execution_request_count} exec</span>
+                          <span>{card.allowed_risk_count} allow</span>
+                          <span>{card.blocked_risk_count} block</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="subpanel deck-section">
+                  <div className="subpanel-header">
+                    <h3>Evidence timeline</h3>
+                    <span className="muted">{deck.evidence.timeline.length} items</span>
+                  </div>
+                  <div className="timeline">
+                    {deck.evidence.timeline.slice(0, 70).map((event) => (
+                      <button
+                        key={event.event_key}
+                        className={`timeline-row timeline-${event.status} ${
+                          activeEventKey === event.event_key ? "timeline-row-active" : ""
+                        }`}
+                        onClick={() => setActiveEventKey(event.event_key)}
+                        type="button"
+                      >
+                        <div className="timeline-time">{formatTimestamp(event.timestamp)}</div>
+                        <div>
+                          <strong>{event.title}</strong>
+                          <p>
+                            {event.lane} · {event.kind}
+                            {event.symbol ? ` · ${event.symbol}` : ""}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <details className="compare-memo">
+                    <summary>Compare memo (fixture summary.md)</summary>
+                    <pre className="markdown-block">{deck.evidence.comparison_summary_markdown}</pre>
+                    <p className="muted">relpath: {deck.evidence.comparison_summary_relpath}</p>
+                  </details>
+                </article>
+
+                <article className="subpanel deck-section">
+                  <div className="subpanel-header">
+                    <h3>Transactions / PnL</h3>
                     <span className="muted">Read-only</span>
                   </div>
-                  <p className="scenario-id">{summary.scenario_id}</p>
-                  <p className="fingerprint">{summary.scenario_fingerprint}</p>
-                  <p className="subpanel-note">
-                    {scenarioSnapshot ? JSON.stringify(scenarioSnapshot.payload.session_slice) : "Loading scenario slice…"}
-                  </p>
-                </article>
-              </div>
-            </>
-          ) : null}
-        </section>
-
-        <section className="panel panel-cards">
-          <div className="panel-header">
-            <div>
-              <p className="panel-kicker">Blade 4</p>
-              <h2>Strategy-card leaderboard</h2>
-            </div>
-          </div>
-          <div className="leaderboard">
-            {cards.map((card) => (
-              <button
-                key={card.id}
-                className={`leaderboard-row ${activeCardId === card.id ? "leaderboard-row-active" : ""}`}
-                onClick={() => setActiveCardId(card.id)}
-                type="button"
-              >
-                <div>
-                  <strong>{card.lane}</strong>
-                  <p>{card.card_id}</p>
-                </div>
-                <div className="leaderboard-metrics">
-                  <span>{card.execution_request_count} exec</span>
-                  <span>{card.allowed_risk_count} allow</span>
-                  <span>{card.blocked_risk_count} block</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel panel-events">
-          <div className="panel-header">
-            <div>
-              <p className="panel-kicker">Blade 5</p>
-              <h2>Replay and anomaly drilldown</h2>
-            </div>
-            {events ? <span className="muted">{events.event_timeline.length} timeline items</span> : null}
-          </div>
-          <div className="timeline">
-            {events?.event_timeline.slice(0, 80).map((event) => (
-              <button
-                key={event.event_key}
-                className={`timeline-row timeline-${event.status} ${
-                  activeEventKey === event.event_key ? "timeline-row-active" : ""
-                }`}
-                onClick={() => setActiveEventKey(event.event_key)}
-                type="button"
-              >
-                <div className="timeline-time">{formatTimestamp(event.timestamp)}</div>
-                <div>
-                  <strong>{event.title}</strong>
-                  <p>
-                    {event.lane} · {event.kind}
-                    {event.symbol ? ` · ${event.symbol}` : ""}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel panel-transactions">
-          <div className="panel-header">
-            <div>
-              <p className="panel-kicker">Blade 6</p>
-              <h2>Transaction and PnL truth surface</h2>
-            </div>
-          </div>
-          {transactions ? (
-            <>
-              <div className="transaction-grid">
-                <article className="subpanel">
-                  <h3>Compare counts</h3>
                   <div className="compare-grid">
                     <div>
                       <span className="mini-label">Orders</span>
-                      <strong>{transactions.counts.orders.baseline + transactions.counts.orders.candidate}</strong>
+                      <strong>{deck.transactions.counts.orders.baseline + deck.transactions.counts.orders.candidate}</strong>
                     </div>
                     <div>
                       <span className="mini-label">Fills</span>
-                      <strong>{transactions.counts.fills.baseline + transactions.counts.fills.candidate}</strong>
+                      <strong>{deck.transactions.counts.fills.baseline + deck.transactions.counts.fills.candidate}</strong>
                     </div>
                     <div>
                       <span className="mini-label">Gross PnL</span>
-                      <strong>{transactions.pnl_reported.baseline.realized_pnl_gross.toFixed(2)}</strong>
+                      <strong>{deck.transactions.pnl_reported.baseline.realized_pnl_gross.toFixed(2)}</strong>
                     </div>
                     <div>
                       <span className="mini-label">Net PnL</span>
-                      <strong>{transactions.pnl_reported.candidate.realized_pnl_net.toFixed(2)}</strong>
+                      <strong>{deck.transactions.pnl_reported.candidate.realized_pnl_net.toFixed(2)}</strong>
                     </div>
                   </div>
+                  <div className="truth-banner">
+                    <strong>{deck.transactions.empty_state_metadata.state}</strong>
+                    <p>{deck.transactions.empty_state_metadata.truth_note}</p>
+                  </div>
                 </article>
-                <article className="subpanel subpanel-warning">
-                  <h3>Truthful empty state</h3>
-                  <p>{transactions.empty_state_metadata.empty_reason}</p>
-                  <p className="subpanel-note">{transactions.empty_state_metadata.truth_note}</p>
-                </article>
-              </div>
-
-              <div className="lane-table">
-                {Object.entries(transactions.lanes).map(([lane, payload]) => (
-                  <article className="lane-card" key={lane}>
-                    <div className="subpanel-header">
-                      <h3>{lane}</h3>
-                      <span className="badge badge-muted">{payload.empty_state.is_empty ? "empty" : "partial"}</span>
-                    </div>
-                    <p>{payload.empty_state.truth_note}</p>
-                    <div className="lane-stats">
-                      <span>{payload.counts.execution_requests} execution shells</span>
-                      <span>{String(payload.pnl_summary.entry_count)} entry shells</span>
-                      <span>{String(payload.pnl_summary.realized_pnl_net)} net PnL</span>
-                    </div>
-                  </article>
-                ))}
               </div>
             </>
           ) : null}
@@ -516,49 +585,79 @@ function App() {
         <aside className="drawer">
           <div className="drawer-header">
             <div>
-              <p className="panel-kicker">Card detail</p>
+              <p className="panel-kicker">Strategy card</p>
               <h2>{activeCard.card_id}</h2>
+              <p className="muted">
+                {activeCard.lane} · deck={activeCard.deck_id} · v={activeCard.card_version}
+              </p>
             </div>
             <button className="ghost-button" onClick={() => setActiveCardId(null)} type="button">
               Close
             </button>
           </div>
-          <div className="drawer-grid">
-            <div>
-              <span className="mini-label">Lane</span>
-              <strong>{activeCard.lane}</strong>
-            </div>
-            <div>
-              <span className="mini-label">Deck</span>
-              <strong>{activeCard.deck_id}</strong>
-            </div>
-            <div>
-              <span className="mini-label">Intent count</span>
-              <strong>{activeCard.intent_count}</strong>
-            </div>
-            <div>
-              <span className="mini-label">Exec shells</span>
-              <strong>{activeCard.execution_request_count}</strong>
-            </div>
-          </div>
-          <div className="drawer-section">
-            <h3>Reason distribution</h3>
-            {activeCard.reason_distribution.map((item) => (
-              <div className="pill-row" key={item.label}>
-                <span>{item.label}</span>
-                <strong>{item.count}</strong>
+
+          {cardLoading && !cardDetail ? <div className="state-block">Loading card evidence…</div> : null}
+
+          {cardDetail ? (
+            <>
+              <div className="drawer-grid">
+                <div>
+                  <span className="mini-label">Intents</span>
+                  <strong>{cardDetail.counts.intents}</strong>
+                </div>
+                <div>
+                  <span className="mini-label">Risk allow / block</span>
+                  <strong>
+                    {cardDetail.counts.risk_allow} / {cardDetail.counts.risk_block}
+                  </strong>
+                </div>
+                <div>
+                  <span className="mini-label">Exec shells</span>
+                  <strong>{cardDetail.counts.execution_requests}</strong>
+                </div>
+                <div>
+                  <span className="mini-label">Feature provenance</span>
+                  <strong>{cardDetail.counts.feature_records}</strong>
+                </div>
               </div>
-            ))}
-          </div>
-          <div className="drawer-section">
-            <h3>Top symbols</h3>
-            {activeCard.top_symbols.map((item) => (
-              <div className="pill-row" key={item.label}>
-                <span>{item.label}</span>
-                <strong>{item.count}</strong>
+
+              {cardDetail.truth_notes.length > 0 ? (
+                <div className="drawer-section">
+                  <h3>Truth notes</h3>
+                  <ul className="truth-list">
+                    {cardDetail.truth_notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className="drawer-section">
+                <h3>Intent reasons</h3>
+                {cardDetail.distributions.intent_reasons.map((item) => (
+                  <div className="pill-row" key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+
+              <div className="drawer-section">
+                <h3>Top symbols</h3>
+                {cardDetail.distributions.top_symbols.map((item) => (
+                  <div className="pill-row" key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <details className="drawer-section">
+                <summary>Sampled intent shells</summary>
+                <pre className="json-block">{JSON.stringify(cardDetail.samples.intents, null, 2)}</pre>
+              </details>
+            </>
+          ) : null}
         </aside>
       ) : null}
 
@@ -566,7 +665,7 @@ function App() {
         <aside className="drawer drawer-right">
           <div className="drawer-header">
             <div>
-              <p className="panel-kicker">Event detail</p>
+              <p className="panel-kicker">Evidence</p>
               <h2>{activeEvent.title}</h2>
             </div>
             <button className="ghost-button" onClick={() => setActiveEventKey(null)} type="button">

@@ -435,3 +435,238 @@ h1 {
     width: auto;
   }
 }
+
+/* --- Deck-native Mission Control layout (v0 refresh) --- */
+
+.mission-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  max-width: 1540px;
+  margin: 0 auto;
+}
+
+.deck-wall {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 52px);
+  overflow: auto;
+}
+
+.deck-wall-list {
+  display: grid;
+  gap: 12px;
+}
+
+.deck-cover-tile {
+  text-align: left;
+  width: 100%;
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(9, 20, 31, 0.56);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.deck-cover-tile:hover {
+  border-color: var(--line-strong);
+}
+
+.deck-cover-tile-active {
+  border-color: rgba(87, 213, 157, 0.4);
+  box-shadow: 0 0 0 1px rgba(87, 213, 157, 0.24);
+}
+
+.deck-cover-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.deck-cover-subtitle {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.deck-cover-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.deck-cover-bottom {
+  margin-top: 12px;
+  line-height: 1.45;
+}
+
+.daily-deck {
+  min-height: 640px;
+}
+
+.deck-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.deck-what-changed {
+  border: 1px dashed rgba(141, 170, 186, 0.26);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: rgba(7, 17, 24, 0.38);
+}
+
+.deck-what-changed h3 {
+  margin-bottom: 10px;
+}
+
+.deck-what-changed ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+}
+
+.deck-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.universe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.symbol-cloud {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  border: 1px solid rgba(141, 170, 186, 0.22);
+  background: rgba(9, 20, 31, 0.52);
+  font-size: 0.9rem;
+}
+
+.pill-muted {
+  color: var(--muted);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.card-tile {
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid rgba(141, 170, 186, 0.22);
+  background: rgba(9, 20, 31, 0.46);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.card-tile:hover {
+  border-color: rgba(141, 170, 186, 0.4);
+}
+
+.card-tile-active {
+  border-color: rgba(87, 213, 157, 0.46);
+  box-shadow: 0 0 0 1px rgba(87, 213, 157, 0.22);
+}
+
+.card-tile-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.card-tile-metrics {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.truth-banner {
+  margin-top: 14px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(233, 184, 114, 0.3);
+  background: rgba(233, 184, 114, 0.08);
+}
+
+.truth-banner strong {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--accent-warm);
+}
+
+.truth-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+}
+
+.compare-memo {
+  margin-top: 14px;
+}
+
+.markdown-block {
+  white-space: pre-wrap;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  border-radius: 18px;
+  padding: 12px;
+  border: 1px solid rgba(141, 170, 186, 0.2);
+  background: rgba(5, 12, 17, 0.65);
+  color: var(--text);
+  margin: 12px 0 0;
+}
+
+@media (max-width: 1080px) {
+  .mission-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-wall {
+    position: static;
+    max-height: none;
+  }
+
+  .deck-cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .deck-cover-grid,
+  .deck-sections,
+  .universe-grid,
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}

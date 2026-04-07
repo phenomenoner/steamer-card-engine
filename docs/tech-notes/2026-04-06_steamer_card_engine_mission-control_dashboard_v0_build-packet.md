@@ -203,9 +203,14 @@ Recommended tone:
 - steel neutrals for background structure
 - one restrained accent for active focus
 
-## API surface v0
+## API surface v0 (extended, backwards-compatible)
 
-- `GET /api/dates`
+Primary deck-native surfaces:
+- `GET /api/dates` (deck wall / day covers)
+- `GET /api/days/{date}/deck` (Mission Control -> Daily Deck projection)
+- `GET /api/days/{date}/lanes/{lane}/cards/{card_id}` (strategy-card detail surface)
+
+Legacy v0 surfaces (still supported):
 - `GET /api/days/{date}/summary`
 - `GET /api/days/{date}/cards`
 - `GET /api/days/{date}/compare`
