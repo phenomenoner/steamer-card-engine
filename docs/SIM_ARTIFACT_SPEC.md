@@ -294,6 +294,13 @@ Minimum fields:
 - `loss_count`
 - `max_position_qty`
 
+Semantics note:
+
+- `entry_count` / `exit_count` are counts of **filled trades** (i.e., backed by `fills.jsonl` / `positions.jsonl`).
+- For early M1 bridge bundles where `order-lifecycle.jsonl` / `fills.jsonl` / `positions.jsonl` are placeholders,
+  keep `entry_count=0` and carry any decision-layer counts in extra diagnostic fields (for example:
+  `entry_request_count`, `entry_signal_count`).
+
 ### 11) `anomalies.json` (required)
 
 Structured anomalies for diagnostics.

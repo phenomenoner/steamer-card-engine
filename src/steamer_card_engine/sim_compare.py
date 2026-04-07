@@ -552,12 +552,16 @@ def normalize_baseline_bundle(
         "fees_total": 0.0,
         "taxes_total": 0.0,
         "realized_pnl_net": 0.0,
-        "entry_count": execution_total,
+        # NOTE: This normalizer does not currently emit fills/positions/PnL; keep
+        # pnl-summary aligned with that truth. Any legacy "entry" metrics are
+        # carried as diagnostic fields instead of being reported as executed entries.
+        "entry_count": 0,
         "exit_count": 0,
         "exit_reason_counts": {},
         "win_count": 0,
         "loss_count": 0,
         "max_position_qty": 0.0,
+        "entry_request_count": execution_total,
     }
 
     gate_reasons = _parse_json(baseline_dir / "gate_reasons.json", default={})
@@ -566,7 +570,7 @@ def normalize_baseline_bundle(
         if isinstance(counts, dict):
             maybe_entries = counts.get("entries_total")
             if isinstance(maybe_entries, (int, float)):
-                pnl_summary["entry_count"] = int(maybe_entries)
+                pnl_summary["entry_signal_count"] = int(maybe_entries)
 
     _write_json(output_dir / "pnl-summary.json", pnl_summary)
 

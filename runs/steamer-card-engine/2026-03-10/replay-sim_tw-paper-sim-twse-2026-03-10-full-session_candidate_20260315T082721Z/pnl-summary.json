@@ -1,6 +1,8 @@
 {
   "currency": "TWD",
-  "entry_count": 30,
+  "entry_count": 0,
+  "entry_request_count": 30,
+  "entry_signal_count": 30,
   "exit_count": 0,
   "exit_reason_counts": {},
   "fees_total": 0.0,

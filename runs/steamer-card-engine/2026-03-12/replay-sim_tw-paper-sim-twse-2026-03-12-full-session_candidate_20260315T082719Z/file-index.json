@@ -51,9 +51,9 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "bytes": 255,
+      "bytes": 311,
       "path": "pnl-summary.json",
-      "sha256": "2179088456d131792cf1df9fed6a3309942c971301cc028beffb19238e1e5fab"
+      "sha256": "2bd1641d11b9595a26e96777e9f3eb1892a00bd7abbc82f1b0921db139f48a7d"
     },
     {
       "bytes": 320,
