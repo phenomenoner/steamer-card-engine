@@ -105,6 +105,19 @@ Add a bounded P1 follow-up slice:
 Goal:
 - make TW cash market-phase semantics explicit and testable before any stronger live-capability claim
 
+Issue split:
+
+#### Issue 1 — runtime / artifact market-phase gating
+
+Problem:
+- current replay/live-sim artifact emission can record pre-09:00 `execution-request` rows as if they were normal intraday attempts
+
+Primary files for the eventual cut:
+- `src/steamer_card_engine/sim_compare.py`
+- `tests/test_sim_compare.py`
+- likely new shared phase/session helper module under `src/steamer_card_engine/` (name to be decided during implementation packet)
+- possibly `docs/SCENARIO_SPEC.md` / `docs/SIM_ARTIFACT_SPEC.md` if the emitted truth surface changes
+
 Acceptance target:
 1. a market-phase classifier exists for at least:
    - `pre_open_trial_match`
@@ -116,12 +129,30 @@ Acceptance target:
 3. default policy blocks normal intraday entry before official open
 4. pre-open participation requires explicit strategy/deck opt-in
 5. when pre-open participation is enabled, allowed order styles are explicitly constrained (starting default: `ROD` only)
-6. dashboard / receipts can distinguish:
-   - quote/trial-match evidence
+6. a `full-session` scenario whose source coverage does not actually span the declared session window can be flagged truthfully in emitted artifacts / validation
+
+#### Issue 2 — dashboard truth surface for pre-open attempts
+
+Problem:
+- current Mission Control surfaces pre-open execution attempts as ordinary execution evidence instead of phase-aware or contract-violation-aware evidence
+
+Primary files for the eventual cut:
+- `src/steamer_card_engine/dashboard/aggregator.py`
+- `frontend/src/App.tsx`
+- `tests/test_dashboard.py`
+- possibly dashboard-oriented docs / packet notes if the evidence contract changes
+
+Acceptance target:
+1. dashboard / receipts can distinguish:
+   - quote / trial-match evidence
    - official-open / session event evidence
    - execution request attempts
    - actual order lifecycle / fill evidence
-7. fixture validation can flag a `full-session` scenario whose source coverage does not actually span the declared session window
+2. pre-open attempts from legacy / already-emitted artifacts are not rendered as normal regular-session execution evidence
+3. the dashboard truth surface makes the phase state or contract violation explicit rather than silently hiding the ambiguity
+
+Implementation-planning packet:
+- `/root/.openclaw/workspace/steamer-card-engine/ops/execution-packets/2026-04-08_steamer-card-engine_market-phase-gating-and-dashboard-truth.packet.md`
 
 ## Topology statement
 
