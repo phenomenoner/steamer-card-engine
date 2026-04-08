@@ -72,13 +72,19 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
     assert surface["proposal"]["proposal_state"] == "proposed-not-active"
     assert surface["metrics"]["card_count"] == 3
     assert surface["metrics"]["hold_count"] == 1
+    assert surface["metrics"]["history_event_count"] >= 13
+    assert surface["metrics"]["verifier_receipt_count"] == 3
 
     cards = {card["candidate_id"]: card for card in surface["cards"]}
     assert cards["tw_orb_reclaim_long_5m"]["status"] == "ready"
     assert cards["tw_gap_reclaim_long_3m"]["status"] == "synthetic-proven"
     assert cards["tw_vcp_dryup_reclaim_bounded"]["status"] == "hold"
-    assert cards["tw_vcp_dryup_reclaim_bounded"]["next_gate"] == "needs-real-trigger"
+    assert cards["tw_vcp_dryup_reclaim_bounded"]["current_gate"] == "needs-real-trigger"
+    assert cards["tw_vcp_dryup_reclaim_bounded"]["latest_packet"]["kind"] == "gate-analysis"
     assert cards["tw_gap_reclaim_long_3m"]["validation_status"] == "synthetic-proven"
+    assert cards["tw_gap_reclaim_long_3m"]["latest_packet"]["kind"] == "parameter-estimate"
+    assert cards["tw_orb_reclaim_long_5m"]["verifier_history"][0]["status"] == "contract-only"
+    assert any(event["kind"] == "plan" for event in cards["tw_gap_reclaim_long_3m"]["family_timeline"])
     assert any(link["kind"] == "verifier" for link in cards["tw_gap_reclaim_long_3m"]["related_links"])
 
 
@@ -129,7 +135,10 @@ def test_dashboard_api_routes() -> None:
 
     strategy_powerhouse_response = client.get("/api/strategy-powerhouse")
     assert strategy_powerhouse_response.status_code == 200
-    assert strategy_powerhouse_response.json()["metrics"]["card_count"] == 3
+    strategy_payload = strategy_powerhouse_response.json()
+    assert strategy_payload["metrics"]["card_count"] == 3
+    assert strategy_payload["metrics"]["history_event_count"] >= 13
+    assert strategy_payload["cards"][0]["family_timeline"]
 
 
 def test_dashboard_api_404_for_unknown_day() -> None:

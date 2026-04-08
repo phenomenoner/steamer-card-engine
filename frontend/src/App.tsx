@@ -227,6 +227,17 @@ type StrategyLink = {
   path: string;
 };
 
+type StrategyHistoryEntry = {
+  event_id: string;
+  timestamp: string | null;
+  kind: string;
+  title: string;
+  summary: string;
+  status: string | null;
+  path: string;
+  source_kind: string;
+};
+
 type StrategyPowerhouseCard = {
   candidate_id: string;
   family_id: string;
@@ -235,7 +246,9 @@ type StrategyPowerhouseCard = {
   deck_id: string;
   status: string;
   validation_status: string;
+  current_gate: string | null;
   next_gate: string | null;
+  handoff_state: string;
   handoff_readiness: string;
   proposal_state: string;
   proposal_priority: string;
@@ -244,6 +257,9 @@ type StrategyPowerhouseCard = {
   selected_parameter_summary: Array<{ label: string; value: unknown }>;
   symbol_pool: string[];
   feature_requirements: string[];
+  latest_packet: StrategyHistoryEntry | null;
+  verifier_history: StrategyHistoryEntry[];
+  family_timeline: StrategyHistoryEntry[];
   related_links: StrategyLink[];
 };
 
@@ -271,6 +287,8 @@ type StrategyPowerhouseView = {
     ready_count: number;
     hold_count: number;
     synthetic_proven_count: number;
+    history_event_count: number;
+    verifier_receipt_count: number;
   };
   sources: StrategyLink[];
   cards: StrategyPowerhouseCard[];
@@ -385,6 +403,41 @@ function StatusChip({ value }: { value: string | null | undefined }) {
   return <span className={`status-chip status-chip-${statusTone(value)}`}>{value.replace(/-/g, " ").toUpperCase()}</span>;
 }
 
+function HistoryList({
+  title,
+  events,
+  emptyState,
+}: {
+  title: string;
+  events: StrategyHistoryEntry[];
+  emptyState: string;
+}) {
+  return (
+    <div className="strategy-section">
+      <p className="mini-label">{title}</p>
+      {events.length ? (
+        <div className="history-list">
+          {events.map((event) => (
+            <article className="history-item" key={event.event_id}>
+              <div className="history-item-head">
+                <div>
+                  <div className="card-title history-title">{event.title}</div>
+                  <div className="card-meta">{formatTimestamp(event.timestamp)} · {event.kind}</div>
+                </div>
+                <StatusChip value={event.status} />
+              </div>
+              <p className="card-meta">{event.summary}</p>
+              <code>{event.path}</code>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="muted history-empty">{emptyState}</div>
+      )}
+    </div>
+  );
+}
+
 function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
   const proposalItems: KeyValueItem[] = [
     { label: "proposal family", value: view.proposal.proposal_family },
@@ -436,11 +489,21 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
           <strong>{view.metrics.synthetic_proven_count}</strong>
           <p>Positive-case verifier receipts present.</p>
         </article>
+        <article className="metric-card">
+          <span className="mini-label">History Events</span>
+          <strong>{view.metrics.history_event_count}</strong>
+          <p>Family timeline entries sourced locally.</p>
+        </article>
+        <article className="metric-card">
+          <span className="mini-label">Verifier Receipts</span>
+          <strong>{view.metrics.verifier_receipt_count}</strong>
+          <p>Synthetic verifier history carried into the browser.</p>
+        </article>
       </div>
 
       <section className="panel">
         <div className="panel-header">
-          <h3>Strategy Powerhouse / Strategy Cards</h3>
+          <h3>Strategy Powerhouse / Family History Browser</h3>
           <span className="pill">LOCAL ARTIFACTS ONLY</span>
         </div>
         <div className="strategy-card-grid">
@@ -458,8 +521,44 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
                 </div>
               </div>
 
-              <p className="strategy-note">{card.handoff_readiness}</p>
-              <p className="card-meta">next gate: {card.next_gate ?? "—"}</p>
+              <p className="strategy-note">{card.handoff_state}</p>
+              <KeyValueGrid
+                items={[
+                  { label: "current gate", value: card.current_gate ?? "—" },
+                  { label: "handoff state", value: card.handoff_state },
+                  { label: "latest packet", value: card.latest_packet?.title ?? "No family packet found" },
+                  { label: "latest packet kind", value: card.latest_packet?.kind ?? "—" },
+                ]}
+              />
+
+              {card.latest_packet ? (
+                <div className="strategy-section">
+                  <p className="mini-label">Latest Packet</p>
+                  <article className="history-item history-item-highlight">
+                    <div className="history-item-head">
+                      <div>
+                        <div className="card-title history-title">{card.latest_packet.title}</div>
+                        <div className="card-meta">{formatTimestamp(card.latest_packet.timestamp)} · {card.latest_packet.kind}</div>
+                      </div>
+                      <StatusChip value={card.latest_packet.status} />
+                    </div>
+                    <p className="card-meta">{card.latest_packet.summary}</p>
+                    <code>{card.latest_packet.path}</code>
+                  </article>
+                </div>
+              ) : null}
+
+              <HistoryList
+                title="Verifier History"
+                events={card.verifier_history}
+                emptyState="No verifier history exists for this family yet."
+              />
+
+              <HistoryList
+                title="Family Timeline"
+                events={card.family_timeline}
+                emptyState="No family timeline exists yet; this surface is intentionally sparse when local artifacts are missing."
+              />
 
               <div className="strategy-section">
                 <p className="mini-label">Selected Parameter Pack</p>

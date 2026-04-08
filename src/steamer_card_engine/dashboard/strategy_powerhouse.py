@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -45,9 +46,41 @@ PROPOSAL_PLAN_RELATIVE_PATH = Path(
 ACTIVE_PLAN_RELATIVE_PATH = Path(
     ".state/steamer/card-engine-morning-paired-lane/active_deck_plan.json"
 )
+MORNING_PACKET_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_distinct_families_morning_packet.md"
+)
+BOUNDED_BACKTEST_MD_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_distinct_families_bounded_backtest.md"
+)
+BOUNDED_BACKTEST_JSON_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_distinct_families_bounded_backtest.json"
+)
 SYNTHETIC_VERIFIER_RELATIVE_PATH = Path(
     "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers/"
     "2026-04-09_distinct_families_synthetic_verifier.md"
+)
+SYNTHETIC_VERIFIER_JSON_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers/"
+    "2026-04-09_distinct_families_synthetic_verifier.json"
+)
+GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_tw_gap_reclaim_long_param_estimate.md"
+)
+GAP_PARAM_ESTIMATE_JSON_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_tw_gap_reclaim_long_param_estimate.json"
+)
+VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_tw_vcp_dryup_reclaim_blocker_surgery.md"
+)
+VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
+    "2026-04-09_tw_vcp_dryup_reclaim_blocker_surgery.json"
 )
 
 SECTION_RE = re.compile(r"^## (?P<title>[^\n]+)\n(?P<body>.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
@@ -97,6 +130,10 @@ def _extract_sections(markdown: str) -> dict[str, str]:
     return {match.group("title").strip(): match.group("body").strip() for match in SECTION_RE.finditer(markdown)}
 
 
+def _extract_family_sections(markdown: str) -> dict[str, str]:
+    return {match.group("family").strip(): match.group("body").strip() for match in FAMILY_SECTION_RE.finditer(markdown)}
+
+
 def _extract_family_statuses(markdown: str) -> dict[str, str]:
     statuses: dict[str, str] = {}
     for match in FAMILY_SECTION_RE.finditer(markdown):
@@ -144,6 +181,13 @@ def _extract_positive_case_families(markdown: str) -> set[str]:
     )
 
 
+def _extract_packet_recorded_at(markdown: str) -> str | None:
+    match = re.search(r"^- recorded:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", markdown, re.MULTILINE)
+    if match is None:
+        return None
+    return match.group(1)
+
+
 def _extract_contract_only_families(markdown: str) -> set[str]:
     sections = _extract_sections(markdown)
     body = sections.get("Synthetic verifier status", "")
@@ -186,25 +230,242 @@ def _proposal_state_label(candidate_id: str, active_target_ids: set[str], propos
     return "unlisted"
 
 
+def _normalize_timestamp(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    value = str(raw_value).strip()
+    if not value:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return f"{value}T00:00:00+08:00"
+    return value
+
+
+def _timestamp_sort_key(raw_value: str | None) -> tuple[int, float, str]:
+    value = _normalize_timestamp(raw_value)
+    if value is None:
+        return (0, float("-inf"), "")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return (1, parsed.timestamp(), value)
+    except ValueError:
+        return (0, float("-inf"), value)
+
+
+def _format_bps(value: float | int | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):+.1f} bps"
+
+
+def _latest_packet_sort_key(item: dict[str, Any]) -> tuple[int, tuple[int, float, str]]:
+    kind_priority = {
+        "gate-analysis": 4,
+        "parameter-estimate": 3,
+        "packet": 2,
+        "backtest": 1,
+    }
+    return (kind_priority.get(str(item.get("kind")), 0), _timestamp_sort_key(item.get("timestamp")))
+
+
+def _build_history_entry(
+    *,
+    event_id: str,
+    timestamp: str | None,
+    kind: str,
+    title: str,
+    summary: str,
+    path: str,
+    source_kind: str,
+    status: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "event_id": event_id,
+        "timestamp": _normalize_timestamp(timestamp),
+        "kind": kind,
+        "title": title,
+        "summary": summary,
+        "status": status,
+        "path": path,
+        "source_kind": source_kind,
+    }
+
+
+def _backtest_history_entry(
+    *,
+    family_id: str,
+    family_report: dict[str, Any],
+    bounded_backtest: dict[str, Any],
+    workspace_root: Path,
+) -> dict[str, Any]:
+    signals = int(family_report.get("selected_signals_total", 0) or 0)
+    days = int(family_report.get("selected_signal_days", 0) or 0)
+    summary = (
+        f"{signals} signals / {days} days / avg {_format_bps(family_report.get('selected_avg_return_bps'))} "
+        f"/ median {_format_bps(family_report.get('selected_median_return_bps'))}."
+    )
+    status = "hold" if signals == 0 else "recorded-signal"
+    return _build_history_entry(
+        event_id=f"{family_id}-bounded-backtest",
+        timestamp=str(bounded_backtest.get("generated_at_utc") or ""),
+        kind="backtest",
+        title="Bounded backtest packet",
+        summary=summary,
+        status=status,
+        path=_safe_relpath(workspace_root / BOUNDED_BACKTEST_MD_RELATIVE_PATH, workspace_root),
+        source_kind="backtest",
+    )
+
+
+def _verifier_history_entry(
+    *,
+    family_id: str,
+    verifier_payload: dict[str, Any],
+    workspace_root: Path,
+    positive_case_families: set[str],
+    contract_only_families: set[str],
+) -> dict[str, Any]:
+    result = dict(verifier_payload.get("positive_case_results", {}).get(family_id, {}))
+    trigger_result = dict(result.get("trigger_result", {}))
+    summary_parts: list[str] = []
+    symbol = trigger_result.get("symbol")
+    if symbol:
+        summary_parts.append(f"synthetic trigger on {symbol}")
+    if trigger_result.get("return_bps") is not None:
+        summary_parts.append(f"return {_format_bps(trigger_result.get('return_bps'))}")
+
+    status = "missing"
+    if family_id in contract_only_families:
+        status = "contract-only"
+        summary_parts.append("latest handoff still carries this family as contract-only")
+    elif family_id in positive_case_families:
+        status = "positive-case"
+        summary_parts.append("morning packet carries this verifier as a positive-case bridge")
+
+    if not summary_parts:
+        summary_parts.append("Verifier receipt exists for this family.")
+
+    if not result:
+        summary_parts.append("verifier file does not contain a dedicated result for this family")
+
+    return _build_history_entry(
+        event_id=f"{family_id}-synthetic-verifier",
+        timestamp=str(verifier_payload.get("generated_at_utc") or ""),
+        kind="verifier",
+        title="Synthetic verifier receipt",
+        summary="; ".join(summary_parts),
+        status=status,
+        path=_safe_relpath(workspace_root / SYNTHETIC_VERIFIER_RELATIVE_PATH, workspace_root),
+        source_kind="verifier",
+    )
+
+
+def _vcp_blocker_history_entry(*, blocker_payload: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+    latest10d = dict(blocker_payload.get("latest10d", {}))
+    rows_total = int(latest10d.get("rows_total", 0) or 0)
+    summary = dict(blocker_payload.get("summary", {}))
+    main_blocker = summary.get("main_blocker") or "recorded VCP context not materialized"
+    return _build_history_entry(
+        event_id="tw_vcp_dryup_reclaim-blocker-surgery",
+        timestamp=str(blocker_payload.get("generated_at") or ""),
+        kind="gate-analysis",
+        title="Blocker surgery packet",
+        summary=f"Verdict HOLD after {rows_total:,} latest10d rows: {main_blocker}.",
+        status=str(blocker_payload.get("verdict") or "hold").lower(),
+        path=_safe_relpath(workspace_root / VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH, workspace_root),
+        source_kind="gate-analysis",
+    )
+
+
+def _gap_param_history_entry(*, gap_payload: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+    selected = dict(gap_payload.get("selected", {}))
+    summary = (
+        f"Selected {selected.get('signals_total', 0)} signals / {selected.get('signal_days', 0)} days "
+        f"with avg {_format_bps(selected.get('avg_return_bps'))} and median {_format_bps(selected.get('median_return_bps'))}."
+    )
+    return _build_history_entry(
+        event_id="tw_gap_reclaim_long-parameter-estimate",
+        timestamp=str(gap_payload.get("generated_at_utc") or ""),
+        kind="parameter-estimate",
+        title="Targeted parameter estimate",
+        summary=summary,
+        status="selected",
+        path=_safe_relpath(workspace_root / GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH, workspace_root),
+        source_kind="backtest",
+    )
+
+
+def _packet_history_entry(
+    *,
+    family_id: str,
+    packet_body: str,
+    packet_status: str | None,
+    packet_path: Path,
+    workspace_root: Path,
+    packet_recorded_at: str | None,
+    handoff_readiness: str,
+) -> dict[str, Any]:
+    why_match = re.search(r"- why distinct: ([^\n]+)", packet_body)
+    why_text = why_match.group(1).strip() if why_match else "Family carried in the distinct-family morning packet."
+    status = "hold" if (packet_status or "").lower().startswith("hold") else "packetized"
+    summary = f"{why_text} Handoff: {handoff_readiness}."
+    return _build_history_entry(
+        event_id=f"{family_id}-morning-packet",
+        timestamp=packet_recorded_at,
+        kind="packet",
+        title="Morning packet handoff",
+        summary=summary,
+        status=status,
+        path=_safe_relpath(packet_path, workspace_root),
+        source_kind="packet",
+    )
+
+
+def _proposal_history_entry(
+    *,
+    family_id: str,
+    candidate_id: str,
+    proposal_plan: dict[str, Any],
+    proposal_plan_path: Path,
+    workspace_root: Path,
+) -> dict[str, Any]:
+    return _build_history_entry(
+        event_id=f"{family_id}-proposal-plan",
+        timestamp=str(proposal_plan.get("prepared_at") or ""),
+        kind="plan",
+        title="Distinct-family proposal plan",
+        summary=(
+            f"Candidate `{candidate_id}` remains proposal truth only; active deck plan was not silently replaced."
+        ),
+        status="proposal-only",
+        path=_safe_relpath(proposal_plan_path, workspace_root),
+        source_kind="control",
+    )
+
+
 def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     repo = root or repo_root()
     workspace_root = _workspace_root(repo)
 
     proposal_plan_path = workspace_root / PROPOSAL_PLAN_RELATIVE_PATH
     active_plan_path = workspace_root / ACTIVE_PLAN_RELATIVE_PATH
+    source_packet_path = workspace_root / MORNING_PACKET_RELATIVE_PATH
     verifier_path = workspace_root / SYNTHETIC_VERIFIER_RELATIVE_PATH
+    verifier_json_path = workspace_root / SYNTHETIC_VERIFIER_JSON_RELATIVE_PATH
+    bounded_backtest_json_path = workspace_root / BOUNDED_BACKTEST_JSON_RELATIVE_PATH
+    bounded_backtest_md_path = workspace_root / BOUNDED_BACKTEST_MD_RELATIVE_PATH
+    gap_param_estimate_json_path = workspace_root / GAP_PARAM_ESTIMATE_JSON_RELATIVE_PATH
+    vcp_blocker_json_path = workspace_root / VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH
 
     proposal_plan = _load_json(proposal_plan_path)
     active_plan = _load_json(active_plan_path)
-
-    source_packet_raw = str(proposal_plan.get("source_packet", ""))
-    if not source_packet_raw:
-        raise StrategyPowerhouseDataError("proposal plan is missing source_packet")
-    source_packet_path = _resolve_workspace_path(workspace_root, source_packet_raw)
-
     morning_packet = _load_text(source_packet_path)
+    bounded_backtest = _load_json(bounded_backtest_json_path)
+    verifier_payload = _load_json(verifier_json_path)
 
     packet_sections = _extract_sections(morning_packet)
+    family_packet_sections = _extract_family_sections(morning_packet)
+    packet_recorded_at = _extract_packet_recorded_at(morning_packet)
     readiness_section = packet_sections.get("Morning/live-sim readiness", "")
     family_statuses = _extract_family_statuses(morning_packet)
     attachable_candidates = _extract_attachable_candidates(readiness_section)
@@ -222,7 +483,38 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         if item.get("variant_id") and item.get("deck_path")
     }
 
+    vcp_blocker_payload = _load_json(vcp_blocker_json_path) if vcp_blocker_json_path.exists() else None
+    gap_param_estimate_payload = _load_json(gap_param_estimate_json_path) if gap_param_estimate_json_path.exists() else None
+
     cards: list[dict[str, Any]] = []
+    used_source_map: dict[str, dict[str, str]] = {
+        _safe_relpath(proposal_plan_path, workspace_root): {
+            "label": "proposal plan",
+            "kind": "proposal",
+            "path": _safe_relpath(proposal_plan_path, workspace_root),
+        },
+        _safe_relpath(active_plan_path, workspace_root): {
+            "label": "active plan",
+            "kind": "control",
+            "path": _safe_relpath(active_plan_path, workspace_root),
+        },
+        _safe_relpath(source_packet_path, workspace_root): {
+            "label": "morning packet",
+            "kind": "packet",
+            "path": _safe_relpath(source_packet_path, workspace_root),
+        },
+        _safe_relpath(verifier_path, workspace_root): {
+            "label": "synthetic verifier",
+            "kind": "verifier",
+            "path": _safe_relpath(verifier_path, workspace_root),
+        },
+        _safe_relpath(bounded_backtest_md_path, workspace_root): {
+            "label": "bounded backtest",
+            "kind": "backtest",
+            "path": _safe_relpath(bounded_backtest_md_path, workspace_root),
+        },
+    }
+
     for source in CARD_SOURCES:
         card_path = repo / source.card_relpath
         deck_path = _resolve_workspace_path(
@@ -238,6 +530,9 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         deck = _load_toml(deck_path)
         parameters = dict(card.get("parameters", {}))
         metadata = dict(card.get("metadata", {}))
+        family_report = dict(bounded_backtest.get("family_reports", {}).get(source.family_id, {}))
+        if not family_report:
+            raise StrategyPowerhouseDataError(f"missing bounded backtest family report for {source.family_id}")
 
         hold_gate = _extract_hold_line(readiness_section, source.candidate_id)
         packet_status = family_statuses.get(source.family_id)
@@ -295,6 +590,11 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "kind": "proposal",
                 "path": _safe_relpath(proposal_plan_path, workspace_root),
             },
+            {
+                "label": "bounded backtest",
+                "kind": "backtest",
+                "path": _safe_relpath(bounded_backtest_md_path, workspace_root),
+            },
         ]
         backtest_packet = metadata.get("backtest_packet")
         if isinstance(backtest_packet, str) and backtest_packet:
@@ -306,6 +606,74 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 }
             )
 
+        family_timeline = [
+            _proposal_history_entry(
+                family_id=source.family_id,
+                candidate_id=source.candidate_id,
+                proposal_plan=proposal_plan,
+                proposal_plan_path=proposal_plan_path,
+                workspace_root=workspace_root,
+            ),
+            _packet_history_entry(
+                family_id=source.family_id,
+                packet_body=family_packet_sections.get(source.family_id, ""),
+                packet_status=packet_status,
+                packet_path=source_packet_path,
+                workspace_root=workspace_root,
+                packet_recorded_at=packet_recorded_at,
+                handoff_readiness=handoff_readiness,
+            ),
+            _backtest_history_entry(
+                family_id=source.family_id,
+                family_report=family_report,
+                bounded_backtest=bounded_backtest,
+                workspace_root=workspace_root,
+            ),
+            _verifier_history_entry(
+                family_id=source.family_id,
+                verifier_payload=verifier_payload,
+                workspace_root=workspace_root,
+                positive_case_families=positive_case_families,
+                contract_only_families=contract_only_families,
+            ),
+        ]
+
+        if source.family_id == "tw_vcp_dryup_reclaim" and vcp_blocker_payload is not None:
+            family_timeline.append(
+                _vcp_blocker_history_entry(blocker_payload=vcp_blocker_payload, workspace_root=workspace_root)
+            )
+            blocker_path = _safe_relpath(workspace_root / VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH, workspace_root)
+            links.append({"label": "blocker surgery", "kind": "gate-analysis", "path": blocker_path})
+            used_source_map[blocker_path] = {
+                "label": "blocker surgery",
+                "kind": "gate-analysis",
+                "path": blocker_path,
+            }
+        if source.family_id == "tw_gap_reclaim_long" and gap_param_estimate_payload is not None:
+            family_timeline.append(
+                _gap_param_history_entry(gap_payload=gap_param_estimate_payload, workspace_root=workspace_root)
+            )
+            gap_path = _safe_relpath(workspace_root / GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH, workspace_root)
+            links.append({"label": "parameter estimate", "kind": "backtest", "path": gap_path})
+            used_source_map[gap_path] = {
+                "label": "parameter estimate",
+                "kind": "backtest",
+                "path": gap_path,
+            }
+
+        family_timeline.sort(
+            key=lambda item: (_timestamp_sort_key(item.get("timestamp")), item.get("event_id", "")),
+            reverse=True,
+        )
+        packet_candidates = [
+            item for item in family_timeline if item["kind"] in {"gate-analysis", "parameter-estimate", "packet", "backtest"}
+        ]
+        latest_packet = max(packet_candidates, key=_latest_packet_sort_key) if packet_candidates else None
+        verifier_history = [item for item in family_timeline if item["kind"] == "verifier"]
+
+        for link in links:
+            used_source_map.setdefault(link["path"], link)
+
         cards.append(
             {
                 "candidate_id": source.candidate_id,
@@ -315,7 +683,9 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "deck_id": str(deck.get("deck_id", "unknown")),
                 "status": status.lower(),
                 "validation_status": proof_state,
+                "current_gate": next_gate,
                 "next_gate": next_gate,
+                "handoff_state": handoff_readiness,
                 "handoff_readiness": handoff_readiness,
                 "proposal_state": _proposal_state_label(
                     source.candidate_id,
@@ -328,6 +698,9 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "selected_parameter_summary": _parameter_summary(parameters),
                 "symbol_pool": list(card.get("symbol_pool", [])),
                 "feature_requirements": list(card.get("feature_requirements", [])),
+                "latest_packet": latest_packet,
+                "verifier_history": verifier_history,
+                "family_timeline": family_timeline,
                 "related_links": links,
             }
         )
@@ -343,13 +716,15 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     ready_count = sum(1 for card in cards if card["status"] == "ready")
     hold_count = sum(1 for card in cards if card["status"] == "hold")
     synthetic_count = sum(1 for card in cards if card["validation_status"] == "synthetic-proven")
+    history_event_count = sum(len(card["family_timeline"]) for card in cards)
+    verifier_receipt_count = sum(len(card["verifier_history"]) for card in cards)
 
     return {
         "updated_at": proposal_plan.get("prepared_at"),
         "topology_changed": False,
         "boundary": {
             "note": (
-                "This tab is a read-only local artifact summary. It exposes research/control truth from local files, "
+                "This tab is a read-only local artifact history browser. It exposes research/control truth from local files, "
                 "not live execution authority, and it does not mutate governance state."
             ),
             "execution_authority": "none",
@@ -376,28 +751,9 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             "ready_count": ready_count,
             "hold_count": hold_count,
             "synthetic_proven_count": synthetic_count,
+            "history_event_count": history_event_count,
+            "verifier_receipt_count": verifier_receipt_count,
         },
-        "sources": [
-            {
-                "label": "proposal plan",
-                "kind": "proposal",
-                "path": _safe_relpath(proposal_plan_path, workspace_root),
-            },
-            {
-                "label": "active plan",
-                "kind": "control",
-                "path": _safe_relpath(active_plan_path, workspace_root),
-            },
-            {
-                "label": "morning packet",
-                "kind": "packet",
-                "path": _safe_relpath(source_packet_path, workspace_root),
-            },
-            {
-                "label": "synthetic verifier",
-                "kind": "verifier",
-                "path": _safe_relpath(verifier_path, workspace_root),
-            },
-        ],
+        "sources": list(used_source_map.values()),
         "cards": cards,
     }

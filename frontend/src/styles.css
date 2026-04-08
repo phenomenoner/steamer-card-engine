@@ -419,6 +419,50 @@ button {
   gap: 10px;
 }
 
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.history-item-highlight {
+  border-color: var(--line-strong);
+  background: rgba(94, 243, 177, 0.04);
+}
+
+.history-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.history-title {
+  font-size: 0.95rem;
+}
+
+.history-item code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.history-empty {
+  font-size: 0.82rem;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+}
+
 .strategy-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -582,7 +626,8 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .strategy-summary-head {
+  .strategy-summary-head,
+  .history-item-head {
     flex-direction: column;
   }
 
