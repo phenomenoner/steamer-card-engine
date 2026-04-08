@@ -103,6 +103,12 @@ def _load_json(path: Path) -> dict[str, Any]:
         return json.load(file)
 
 
+def _load_optional_json(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    return _load_json(path)
+
+
 def _load_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -256,6 +262,122 @@ def _format_bps(value: float | int | None) -> str:
     if value is None:
         return "n/a"
     return f"{float(value):+.1f} bps"
+
+
+def _summarize_plan_targets(plan: dict[str, Any] | None, *, workspace_root: Path) -> list[dict[str, Any]]:
+    if not plan:
+        return []
+
+    targets: list[dict[str, Any]] = []
+    for item in plan.get("targets", []) or []:
+        variant_id = str(item.get("variant_id") or "unknown")
+        raw_deck_path = item.get("deck_path")
+        resolved_deck_path = (
+            _resolve_workspace_path(workspace_root, raw_deck_path)
+            if raw_deck_path
+            else None
+        )
+        deck_manifest_present = bool(resolved_deck_path and resolved_deck_path.exists())
+        deck_id = None
+        if deck_manifest_present and resolved_deck_path is not None:
+            deck_payload = _load_toml(resolved_deck_path)
+            raw_deck_id = deck_payload.get("deck_id")
+            if raw_deck_id is not None:
+                deck_id = str(raw_deck_id)
+
+        targets.append(
+            {
+                "variant_id": variant_id,
+                "deck_id": deck_id,
+                "deck_path": (
+                    _safe_relpath(resolved_deck_path, workspace_root)
+                    if resolved_deck_path is not None
+                    else None
+                ),
+                "deck_manifest_present": deck_manifest_present,
+            }
+        )
+
+    return targets
+
+
+def _target_display_labels(targets: list[dict[str, Any]]) -> list[str]:
+    labels: list[str] = []
+    for item in targets:
+        deck_id = item.get("deck_id")
+        variant_id = item.get("variant_id")
+        if deck_id and variant_id:
+            labels.append(f"{deck_id} ({variant_id})")
+        elif deck_id:
+            labels.append(str(deck_id))
+        elif variant_id:
+            labels.append(str(variant_id))
+    return labels
+
+
+def _divergence_state(
+    *,
+    active_family: str | None,
+    proposal_family: str | None,
+    active_target_ids: set[str],
+    proposed_target_ids: set[str],
+    active_truth_state: str,
+) -> dict[str, Any]:
+    if active_truth_state != "present":
+        note = "Active plan truth is missing or empty, so proposed-vs-active divergence cannot be fully confirmed."
+        return {
+            "state": "unknown",
+            "family_differs": proposal_family is not None,
+            "target_differs": bool(proposed_target_ids),
+            "note": note,
+        }
+
+    family_differs = bool((active_family or "").strip() != (proposal_family or "").strip())
+    target_differs = active_target_ids != proposed_target_ids
+    if family_differs or target_differs:
+        note = (
+            "Proposed family/targets diverge from the current active paired-lane plan; "
+            "strategy-powerhouse remains support only and has not changed active execution."
+        )
+        state = "diverged"
+    else:
+        note = "Proposed family/targets match the active plan truth."
+        state = "aligned"
+
+    return {
+        "state": state,
+        "family_differs": family_differs,
+        "target_differs": target_differs,
+        "note": note,
+    }
+
+
+def _baton_readiness_state(active_truth_state: str) -> str:
+    if active_truth_state == "present":
+        return "proposed-read-only"
+    if active_truth_state == "empty":
+        return "active-truth-empty"
+    return "active-truth-missing"
+
+
+def _baton_readiness_summary(
+    *,
+    active_family: str | None,
+    active_truth_state: str,
+    cards: list[dict[str, Any]],
+) -> str:
+    if active_truth_state != "present":
+        return (
+            "Active plan truth is missing or empty. Proposed families remain read-only proposal truth and do not "
+            "replace the active paired lane."
+        )
+
+    proposal_parts = [f"{card['candidate_id']}: {card['handoff_readiness']}" for card in cards]
+    return (
+        f"Active paired lane remains `{active_family or 'unknown'}` in steamer-card-engine. Proposal baton stays read-only: "
+        + "; ".join(proposal_parts)
+        + "."
+    )
 
 
 def _latest_packet_sort_key(item: dict[str, Any]) -> tuple[int, tuple[int, float, str]]:
@@ -458,7 +580,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     vcp_blocker_json_path = workspace_root / VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH
 
     proposal_plan = _load_json(proposal_plan_path)
-    active_plan = _load_json(active_plan_path)
+    active_plan = _load_optional_json(active_plan_path)
     morning_packet = _load_text(source_packet_path)
     bounded_backtest = _load_json(bounded_backtest_json_path)
     verifier_payload = _load_json(verifier_json_path)
@@ -474,7 +596,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     priority_candidate = _extract_priority_candidate(readiness_section)
 
     proposed_targets = proposal_plan.get("targets", [])
-    active_targets = active_plan.get("targets", [])
+    active_targets = active_plan.get("targets", []) if active_plan else []
     proposed_target_ids = {str(item.get("variant_id")) for item in proposed_targets}
     active_target_ids = {str(item.get("variant_id")) for item in active_targets}
     proposed_deck_paths = {
@@ -718,6 +840,27 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     synthetic_count = sum(1 for card in cards if card["validation_status"] == "synthetic-proven")
     history_event_count = sum(len(card["family_timeline"]) for card in cards)
     verifier_receipt_count = sum(len(card["verifier_history"]) for card in cards)
+    active_plan_targets = _summarize_plan_targets(active_plan, workspace_root=workspace_root)
+    proposed_plan_targets = _summarize_plan_targets(proposal_plan, workspace_root=workspace_root)
+
+    active_truth_state = "present"
+    if active_plan is None:
+        active_truth_state = "missing"
+    elif not active_plan_targets:
+        active_truth_state = "empty"
+
+    divergence = _divergence_state(
+        active_family=str(active_plan.get("family")) if active_plan and active_plan.get("family") else None,
+        proposal_family=str(proposal_plan.get("family")) if proposal_plan.get("family") else None,
+        active_target_ids=active_target_ids,
+        proposed_target_ids=proposed_target_ids,
+        active_truth_state=active_truth_state,
+    )
+    readiness_summary = _baton_readiness_summary(
+        active_family=str(active_plan.get("family")) if active_plan and active_plan.get("family") else None,
+        active_truth_state=active_truth_state,
+        cards=cards,
+    )
 
     return {
         "updated_at": proposal_plan.get("prepared_at"),
@@ -732,18 +875,61 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             "primary_execution_surface": "steamer-card-engine",
             "strategy_powerhouse_role": "research / packaging / control-plane support only",
         },
+        "baton_line": {
+            "today": str(proposal_plan.get("prepared_at") or "")[:10] or None,
+            "read_only_note": (
+                "Read-only support surface only. strategy-powerhouse does not own execution; "
+                "steamer-card-engine remains the execution surface."
+            ),
+            "active": {
+                "truth_state": active_truth_state,
+                "family": active_plan.get("family") if active_plan else None,
+                "prepared_at": active_plan.get("prepared_at") if active_plan else None,
+                "source_packet": (
+                    _safe_relpath(
+                        _resolve_workspace_path(workspace_root, active_plan.get("source_packet", "")),
+                        workspace_root,
+                    )
+                    if active_plan and active_plan.get("source_packet")
+                    else None
+                ),
+                "targets": active_plan_targets,
+                "target_labels": _target_display_labels(active_plan_targets),
+                "attachment_summary": (
+                    f"{len(active_plan_targets)} active deck target(s) attached to the current paired-lane plan."
+                    if active_truth_state == "present"
+                    else (
+                        "Active plan file exists but carries no attached deck targets."
+                        if active_truth_state == "empty"
+                        else "No active plan file was found for the paired lane."
+                    )
+                ),
+            },
+            "proposal": {
+                "family": proposal_plan.get("family"),
+                "prepared_at": proposal_plan.get("prepared_at"),
+                "source_packet": _safe_relpath(source_packet_path, workspace_root),
+                "targets": proposed_plan_targets,
+                "target_labels": _target_display_labels(proposed_plan_targets),
+            },
+            "handoff_readiness": {
+                "state": _baton_readiness_state(active_truth_state),
+                "summary": readiness_summary,
+            },
+            "divergence": divergence,
+        },
         "proposal": {
             "proposal_family": proposal_plan.get("family"),
             "proposal_prepared_at": proposal_plan.get("prepared_at"),
             "proposal_state": "proposed-not-active",
             "source_packet": _safe_relpath(source_packet_path, workspace_root),
             "truthful_boundary": proposal_plan.get("truthful_boundary"),
-            "active_family": active_plan.get("family"),
+            "active_family": active_plan.get("family") if active_plan else None,
             "active_plan_source": _safe_relpath(
                 _resolve_workspace_path(workspace_root, active_plan.get("source_packet", "")),
                 workspace_root,
             )
-            if active_plan.get("source_packet")
+            if active_plan and active_plan.get("source_packet")
             else None,
         },
         "metrics": {

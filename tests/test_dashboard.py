@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+import shutil
+
 from fastapi.testclient import TestClient
 
 from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fixture_dates
+from steamer_card_engine.dashboard.fixtures import repo_root
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 
 
@@ -70,6 +74,24 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
 
     assert surface["boundary"]["execution_authority"] == "none"
     assert surface["proposal"]["proposal_state"] == "proposed-not-active"
+    assert surface["baton_line"]["active"]["truth_state"] == "present"
+    assert surface["baton_line"]["active"]["family"] == "tw_vcp_dryup_plus_reclaim"
+    assert surface["baton_line"]["active"]["target_labels"] == [
+        "tw-cash-vcp-dryup-reclaim-s2 (tw_vcp_dryup_plus_reclaim_s2)",
+        "tw-cash-vcp-dryup-reclaim-s5 (tw_vcp_dryup_plus_reclaim_s5)",
+        "tw-cash-vcp-dryup-reclaim-s10 (tw_vcp_dryup_plus_reclaim_s10)",
+    ]
+    assert surface["baton_line"]["proposal"]["target_labels"] == [
+        "tw-cash-vcp-dryup-reclaim-bounded (tw_vcp_dryup_reclaim_bounded)",
+        "tw-cash-orb-reclaim-long-5m (tw_orb_reclaim_long_5m)",
+        "tw-cash-gap-reclaim-long-3m (tw_gap_reclaim_long_3m)",
+    ]
+    assert surface["baton_line"]["handoff_readiness"]["state"] == "proposed-read-only"
+    assert surface["baton_line"]["divergence"]["state"] == "diverged"
+    assert surface["baton_line"]["divergence"]["family_differs"] is True
+    assert surface["baton_line"]["divergence"]["target_differs"] is True
+    assert "priority-1 observation proposal" in surface["baton_line"]["handoff_readiness"]["summary"]
+    assert "HOLD until a recorded trigger exists beyond synthetic proof" in surface["baton_line"]["handoff_readiness"]["summary"]
     assert surface["metrics"]["card_count"] == 3
     assert surface["metrics"]["hold_count"] == 1
     assert surface["metrics"]["history_event_count"] >= 13
@@ -86,6 +108,40 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
     assert cards["tw_orb_reclaim_long_5m"]["verifier_history"][0]["status"] == "contract-only"
     assert any(event["kind"] == "plan" for event in cards["tw_gap_reclaim_long_3m"]["family_timeline"])
     assert any(link["kind"] == "verifier" for link in cards["tw_gap_reclaim_long_3m"]["related_links"])
+
+
+def test_strategy_powerhouse_view_explicitly_flags_missing_active_plan_truth(tmp_path: Path) -> None:
+    real_repo = repo_root()
+    workspace_root = tmp_path
+    repo = workspace_root / "steamer-card-engine"
+    repo.mkdir()
+
+    (repo / "examples").symlink_to(real_repo / "examples", target_is_directory=True)
+    (workspace_root / "StrategyExecuter_Steamer-Antigravity").symlink_to(
+        real_repo.parent / "StrategyExecuter_Steamer-Antigravity",
+        target_is_directory=True,
+    )
+
+    state_dir = workspace_root / ".state" / "steamer" / "card-engine-morning-paired-lane"
+    state_dir.mkdir(parents=True)
+    shutil.copy2(
+        real_repo.parent
+        / ".state"
+        / "steamer"
+        / "card-engine-morning-paired-lane"
+        / "proposed_distinct_families_20260409.json",
+        state_dir / "proposed_distinct_families_20260409.json",
+    )
+
+    surface = build_strategy_powerhouse_view(repo)
+
+    assert surface["baton_line"]["active"]["truth_state"] == "missing"
+    assert surface["baton_line"]["active"]["family"] is None
+    assert surface["baton_line"]["active"]["targets"] == []
+    assert surface["baton_line"]["handoff_readiness"]["state"] == "active-truth-missing"
+    assert surface["baton_line"]["divergence"]["state"] == "unknown"
+    assert "missing or empty" in surface["baton_line"]["divergence"]["note"]
+    assert "do not replace the active paired lane" in surface["baton_line"]["handoff_readiness"]["summary"]
 
 
 def test_dashboard_api_routes() -> None:
@@ -139,6 +195,11 @@ def test_dashboard_api_routes() -> None:
     assert strategy_payload["metrics"]["card_count"] == 3
     assert strategy_payload["metrics"]["history_event_count"] >= 13
     assert strategy_payload["cards"][0]["family_timeline"]
+    assert strategy_payload["baton_line"]["active"]["family"] == "tw_vcp_dryup_plus_reclaim"
+    assert strategy_payload["baton_line"]["active"]["targets"][0]["deck_id"] == "tw-cash-vcp-dryup-reclaim-s2"
+    assert strategy_payload["baton_line"]["proposal"]["targets"][0]["deck_id"] == "tw-cash-vcp-dryup-reclaim-bounded"
+    assert strategy_payload["baton_line"]["handoff_readiness"]["state"] == "proposed-read-only"
+    assert strategy_payload["baton_line"]["divergence"]["state"] == "diverged"
 
 
 def test_dashboard_api_404_for_unknown_day() -> None:

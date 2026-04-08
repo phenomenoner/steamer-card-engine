@@ -70,6 +70,7 @@ No new dashboard tab was added and `Live Sim` semantics were not changed.
 
 The existing `/api/strategy-powerhouse` surface was extended to carry:
 
+- top-level `baton_line` truth for the current active paired lane vs the proposed distinct-family lane
 - `metrics.history_event_count`
 - `metrics.verifier_receipt_count`
 - per-family `current_gate`
@@ -78,7 +79,12 @@ The existing `/api/strategy-powerhouse` surface was extended to carry:
 - per-family `verifier_history`
 - per-family `family_timeline`
 
-The frontend now renders those sections directly inside each family card.
+The frontend now renders those sections directly inside each family card, and adds a thin top-of-tab baton strip for:
+
+- today’s active family
+- current active plan/deck attachment
+- read-only handoff readiness summary
+- explicit proposed-vs-active divergence
 
 ## Verifiers / smokes
 
@@ -106,6 +112,6 @@ This is still a **bounded local artifact browser**, not a generalized research w
 
 Next useful blade if we keep pushing this line:
 
-1. add an active-family handoff strip that truthfully shows the current active paired lane (`tw_vcp_dryup_plus_reclaim`) beside the proposal families
-2. optionally dedupe/normalize family-history source discovery so future family packets can be added with less explicit path wiring
-3. if the strategy-powerhouse packet cadence broadens, separate `timeline` vs `verifier-only` discovery into a thin indexed backend helper rather than hand-curated family maps
+1. optionally dedupe/normalize family-history source discovery so future family packets can be added with less explicit path wiring
+2. if the strategy-powerhouse packet cadence broadens, separate `timeline` vs `verifier-only` discovery into a thin indexed backend helper rather than hand-curated family maps
+3. if operators want same-day change visibility, add a bounded “last active-plan change” breadcrumb while keeping strategy-powerhouse explicitly non-authoritative

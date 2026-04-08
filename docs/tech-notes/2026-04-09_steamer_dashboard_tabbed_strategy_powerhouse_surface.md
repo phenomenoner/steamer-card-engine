@@ -50,6 +50,14 @@ For each strategy-powerhouse card, the dashboard now shows:
 - proposal state (`proposed`, not silently active)
 - packet / verifier / proposal path references
 
+The strategy tab now also opens with a thin read-only **active-family baton line** that makes the current handoff posture visible without implying control authority:
+
+- today’s active family from the current active paired-lane plan
+- the active plan source packet and attached deck manifests
+- proposal handoff readiness summarized from the proposed distinct-family cards
+- explicit proposed-vs-active divergence when the proposal family/targets do not match the current active paired lane
+- explicit missing/empty active-plan truth when no active plan file is present
+
 ## Truth boundary
 
 This slice is intentionally read-only.
@@ -68,6 +76,11 @@ This slice is intentionally read-only.
     - `tw_orb_reclaim_long_5m` → `ready`
     - `tw_gap_reclaim_long_3m` → `synthetic-proven`
     - `tw_vcp_dryup_reclaim_bounded` → `hold`
+  - `/api/strategy-powerhouse` baton line returns:
+    - active family `tw_vcp_dryup_plus_reclaim`
+    - active deck attachments `s2`, `s5`, `s10`
+    - proposal-vs-active divergence = `diverged`
+    - handoff readiness summary remains proposal-only / read-only
 
 ## Remaining limit
 

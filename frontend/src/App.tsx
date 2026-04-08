@@ -238,6 +238,13 @@ type StrategyHistoryEntry = {
   source_kind: string;
 };
 
+type StrategyPlanTarget = {
+  variant_id: string;
+  deck_id: string | null;
+  deck_path: string | null;
+  deck_manifest_present: boolean;
+};
+
 type StrategyPowerhouseCard = {
   candidate_id: string;
   family_id: string;
@@ -272,6 +279,36 @@ type StrategyPowerhouseView = {
     governance_mutation: boolean;
     primary_execution_surface: string;
     strategy_powerhouse_role: string;
+  };
+  baton_line: {
+    today: string | null;
+    read_only_note: string;
+    active: {
+      truth_state: string;
+      family: string | null;
+      prepared_at: string | null;
+      source_packet: string | null;
+      targets: StrategyPlanTarget[];
+      target_labels: string[];
+      attachment_summary: string;
+    };
+    proposal: {
+      family: string | null;
+      prepared_at: string | null;
+      source_packet: string;
+      targets: StrategyPlanTarget[];
+      target_labels: string[];
+    };
+    handoff_readiness: {
+      state: string;
+      summary: string;
+    };
+    divergence: {
+      state: string;
+      family_differs: boolean;
+      target_differs: boolean;
+      note: string;
+    };
   };
   proposal: {
     proposal_family: string | null;
@@ -349,7 +386,7 @@ function getRowString(row: EvidenceRow, key: string): string | null {
 
 function statusTone(value: string | null | undefined): "accent" | "alert" | "muted" {
   const normalized = (value ?? "").toLowerCase();
-  if (normalized.includes("hold") || normalized.includes("needs")) return "alert";
+  if (normalized.includes("hold") || normalized.includes("needs") || normalized.includes("diverg") || normalized.includes("unknown") || normalized.includes("missing")) return "alert";
   if (normalized.includes("ready") || normalized.includes("synthetic") || normalized.includes("active") || normalized.includes("proposed")) return "accent";
   return "muted";
 }
@@ -403,6 +440,24 @@ function StatusChip({ value }: { value: string | null | undefined }) {
   return <span className={`status-chip status-chip-${statusTone(value)}`}>{value.replace(/-/g, " ").toUpperCase()}</span>;
 }
 
+function TargetList({ targets, emptyState }: { targets: StrategyPlanTarget[]; emptyState: string }) {
+  if (!targets.length) {
+    return <div className="muted baton-empty">{emptyState}</div>;
+  }
+
+  return (
+    <ul className="baton-target-list">
+      {targets.map((target) => (
+        <li key={`${target.variant_id}-${target.deck_path ?? "missing-deck"}`}>
+          <strong>{target.deck_id ?? target.variant_id}</strong>
+          <span className="card-meta">{target.variant_id}</span>
+          <code>{target.deck_path ?? "No deck path recorded"}</code>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function HistoryList({
   title,
   events,
@@ -447,9 +502,69 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
     { label: "execution authority", value: view.boundary.execution_authority },
     { label: "governance mutation", value: String(view.boundary.governance_mutation) },
   ];
+  const activeFamilyLabel = view.baton_line.active.family ?? "No active family truth present";
+  const proposalFamilyLabel = view.baton_line.proposal.family ?? "No proposal family recorded";
 
   return (
     <main className="strategy-surface">
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Active-Family Baton Line</h3>
+          <span className="pill">READ ONLY / NO AUTHORITY</span>
+        </div>
+        <div className="panel-body">
+          <p className="strategy-note strategy-boundary-note">{view.baton_line.read_only_note}</p>
+          <div className="baton-grid">
+            <article className="baton-card">
+              <div className="baton-head">
+                <span className="mini-label">Today&apos;s Active Family</span>
+                <StatusChip value={view.baton_line.active.truth_state} />
+              </div>
+              <strong className="baton-value">{activeFamilyLabel}</strong>
+              <p className="card-meta">{formatTimestamp(view.baton_line.active.prepared_at)}</p>
+              <p className="card-meta">{view.baton_line.active.attachment_summary}</p>
+            </article>
+
+            <article className="baton-card">
+              <div className="baton-head">
+                <span className="mini-label">Attached Plan / Decks</span>
+                <StatusChip value={view.baton_line.active.targets.length ? "attached" : view.baton_line.active.truth_state} />
+              </div>
+              <code>{view.baton_line.active.source_packet ?? "No active plan source packet recorded"}</code>
+              <TargetList
+                targets={view.baton_line.active.targets}
+                emptyState="No active deck attachment truth is available."
+              />
+            </article>
+
+            <article className="baton-card">
+              <div className="baton-head">
+                <span className="mini-label">Handoff Readiness</span>
+                <StatusChip value={view.baton_line.handoff_readiness.state} />
+              </div>
+              <strong className="baton-value">{view.baton_line.today ?? "Current day"}</strong>
+              <p className="strategy-note">{view.baton_line.handoff_readiness.summary}</p>
+            </article>
+
+            <article className="baton-card">
+              <div className="baton-head">
+                <span className="mini-label">Proposed vs Active</span>
+                <StatusChip value={view.baton_line.divergence.state} />
+              </div>
+              <strong className="baton-value">{proposalFamilyLabel}</strong>
+              <p className="card-meta">{formatTimestamp(view.baton_line.proposal.prepared_at)}</p>
+              <p className="strategy-note">{view.baton_line.divergence.note}</p>
+              <code>{view.baton_line.proposal.source_packet}</code>
+              <div className="baton-inline-list">
+                {view.baton_line.proposal.target_labels.length
+                  ? view.baton_line.proposal.target_labels.join(" · ")
+                  : "No proposed deck attachments recorded."}
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-header">
           <h3>Authority Boundary</h3>
