@@ -82,6 +82,7 @@ Launch confirmation meaning:
 - The main risk is **fake readiness**: product docs can sound live-ready before capability, operator control, and guardrails are explicitly connected.
 - The second risk is **milestone collision**: if Sprint A and Product Sprint P1 are allowed to own the same gate, both lines will drift and fake progress.
 - The third risk is **authority ambiguity**: if auth/session posture does not visibly state `trade_enabled`, live-capability claims become unsafe theater.
+- The fourth risk is **market-phase ambiguity at the open**: current repo truth does not yet operationalize 盤前試搓 vs 正式開盤 semantics, pre-open order-style restrictions, or full-session coverage validation; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-08_steamer_card_engine_market-phase-gating-gap_backlog.md`.
 
 ## Allowed auto-actions
 
@@ -157,3 +158,4 @@ Current sprint read:
 - 2026-04-06 — progress pass: upstream Steamer added official TWSE holiday calendar gating; synced `docs/DAYTRADING_GUARDRAILS.md` with a market-day gating guardrail to keep P1 live-capability posture honest. (Topology unchanged.)
 
 - 2026-04-07 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-08 — dashboard truth check surfaced a missing open-phase contract edge: current repo truth already defines `full-session` as `09:00–13:30`, but the replay/live-sim bundle path still reflects source min/max timing and does not operationalize 盤前試搓 vs 正式開盤 gating, pre-open ROD-only constraints, or official-open confirmation before normal intraday execution requests. Backlog note added at `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-08_steamer_card_engine_market-phase-gating-gap_backlog.md`. (Topology unchanged.)
