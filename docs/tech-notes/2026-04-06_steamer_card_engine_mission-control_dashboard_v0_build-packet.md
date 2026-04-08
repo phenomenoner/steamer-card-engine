@@ -1,5 +1,7 @@
 # 2026-04-06 — steamer-card-engine Mission Control Dashboard v0 build packet
 
+> Update 2026-04-09: the committed dashboard fixture index is no longer March-only. The backend now discovers representative `manual-live-paired-*` compare bundles as well as the original `replay-sim_*` fixtures, yielding browser dates from `2026-03-06` through `2026-04-08`. The surface is still **one representative compare bundle per session date**; same-date variants remain collapsed.
+
 ## Verdict
 
 The right product cut is a **read-only browser Mission Control dashboard** for `steamer-card-engine`, not a broker-facing GUI and not a generic SaaS analytics page.
@@ -49,18 +51,28 @@ Why this repo, not Steamer core:
 ## Demo-first truth surfaces available today
 
 ### A. Demoable committed compare bundles
-Committed comparison directories already exist for:
+Committed comparison directories already exist for the original replay-sim March set plus recent paired-live representatives across:
 - `2026-03-06`
 - `2026-03-10`
 - `2026-03-12`
+- `2026-03-20`
+- `2026-03-24`
+- `2026-03-25`
+- `2026-03-26`
+- `2026-03-27`
+- `2026-03-30`
+- `2026-03-31`
+- `2026-04-01`
+- `2026-04-02`
+- `2026-04-08`
 
 Representative pass receipts:
-- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-06-full-session_baseline_20260315T082717Z__replay-sim_tw-paper-sim-twse-2026-03-06-full-session_candidate_20260315T082717Z/summary.md`
-- `comparisons/replay-sim_tw-paper-sim-twse-2026-03-10-full-session_baseline_20260315T082721Z__replay-sim_tw-paper-sim-twse-2026-03-10-full-session_candidate_20260315T082721Z/summary.md`
 - `comparisons/replay-sim_tw-paper-sim-twse-2026-03-12-full-session_baseline_20260315T082719Z__replay-sim_tw-paper-sim-twse-2026-03-12-full-session_candidate_20260315T082719Z/summary.md`
+- `comparisons/manual-live-paired-20260320-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260320T012107Z/summary.md`
+- `comparisons/manual-live-paired-20260408-entry-mode-long-one-vcp-vcp-min-trend-slope-10-tick-volume-mode-auto-feed-neoapitest-20260408T010601Z/summary.md`
 
 ### B. Demoable bundle inputs already on disk
-For the three March days above, the repo already has:
+For those committed dashboard dates, the repo already has:
 - `runs/.../event-log.jsonl`
 - `runs/.../intent-log.jsonl`
 - `runs/.../feature-provenance.jsonl`
@@ -89,7 +101,7 @@ Therefore the opening browser demo should be framed as:
 - transaction / PnL panels included, but rendered truthfully with zero-state / placeholder-state contracts where data is not yet present
 
 Topology note:
-- unchanged; this build packet is a truthful recut of the opening demo contract from the previously claimed April set to the committed March fixture set
+- unchanged; this packet originally recut the opening demo contract to the committed March set, and the current implementation now truthfully expands discovery to representative paired-live dates through `2026-04-08`
 
 ## Product cut
 
@@ -174,16 +186,17 @@ Main body:
 
 ## Demo pages that are truthful right now
 
-Using the committed March replay/compare lineage, the first demo should explicitly ship these pages:
+Using the committed replay-sim + paired-live lineage, the current demo can truthfully ship these pages:
 
-1. **History index** over `20260306`, `20260310`, `20260312`
-2. **Daily command view** for `20260312`
-3. **Strategy-card detail** for the baseline and candidate lanes
-4. **Replay / event timeline** backed by local bundle event logs
+1. **History index** over representative dates from `20260306` through `20260408`
+2. **Daily command view** for the current hero day `20260408`
+3. **Strategy-card detail** for dates that actually carry card/intents data (for example the March replay fixtures)
+4. **Replay / event timeline** backed by local bundle event logs, including paired-live event-only days
 5. **Transaction/PnL panel** with a truthful zero-state contract where compare-lane trade surfaces remain empty
 
-If we want one explicit “receipt wall” demo panel, use:
-- the 2026-03-12 compare-manifest / diff / summary triple
+If we want one explicit “receipt wall” demo panel, use either:
+- the 2026-03-12 replay compare-manifest / diff / summary triple, or
+- a recent manual-live representative such as `2026-04-08`
 
 ## UI/UX posture
 
@@ -247,8 +260,8 @@ It explicitly excludes:
 ## Verifier plan
 
 ### Backend / aggregator
-- fixture selection for `20260306`, `20260310`, `20260312`
-- parse tests for bundle discovery
+- fixture selection for the committed representative date index (`20260306` → `20260408`)
+- parse tests for bundle discovery across replay-sim and manual-live compare families
 - summary generation tests
 - empty-state correctness tests for transactions/PnL
 - missing-file behavior tests
@@ -274,7 +287,7 @@ It explicitly excludes:
 
 ## Next recommended move
 
-Use the committed March replay/compare lineage as the first truthful demo fixture set and execute the dashboard as a **櫻花刀舞 serial queue**:
+Use the committed replay-sim + paired-live lineage as the truthful demo fixture set and execute the dashboard as a **櫻花刀舞 serial queue**:
 
 1. fixture contract
 2. day-bundle aggregator

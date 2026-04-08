@@ -454,8 +454,8 @@ def _lane_payload(
                 "No populated fill, order-lifecycle, or position rows exist in this committed fixture bundle."
             ),
             "truth_note": (
-                "Intent, risk, and execution shells are present, but trade-surface artifacts remain empty "
-                "placeholders in the March demo set."
+                "This selected fixture keeps the trade surface empty: the dashboard shows that committed artifact "
+                "truth directly instead of inventing fill/order/position activity."
             ),
         },
     }
@@ -493,16 +493,39 @@ def _resolve_fixture(date: str, root: Path | None = None) -> FixtureDay:
     raise DashboardDataError(f"unknown fixture date: {date}")
 
 
+def _dashboard_truth_contract(repo: Path) -> dict[str, Any]:
+    fixtures = discover_fixture_days(repo)
+    fixture_dates = [fixture.date for fixture in fixtures]
+    return {
+        "topology_changed": False,
+        "available_fixture_dates": fixture_dates,
+        "hero_day": fixture_dates[0] if fixture_dates else None,
+        "selection_rule": (
+            "Dashboard currently collapses multiple compare bundles for the same session date to one "
+            "representative fixture. Selection prefers pass status, then comparison family priority "
+            "(manual-live-paired > replay-sim > prep > phase3 > other), then comparison directory name."
+        ),
+        "note": (
+            "The Mission Control dashboard now discovers committed replay-sim and recent paired live-sim "
+            "dates from compare manifests, but it is still a one-entry-per-session-date surface."
+        ),
+    }
+
+
 def list_fixture_dates(root: Path | None = None) -> list[dict[str, Any]]:
     repo = root or repo_root()
+    fixtures = discover_fixture_days(repo)
+    hero_day = fixtures[0].date if fixtures else None
     items = []
-    for fixture in discover_fixture_days(repo):
+    for fixture in fixtures:
         bundle = build_day_bundle(fixture.date, repo)
         items.append(
             {
                 "date": fixture.date,
-                "hero": fixture.date == max(day.date for day in discover_fixture_days(repo)),
+                "hero": fixture.date == hero_day,
                 "compare_status": bundle["compare"]["status"],
+                "compare_version": fixture.compare_version,
+                "comparison_family": fixture.comparison_family,
                 "scenario_id": bundle["daily_summary"]["scenario_id"],
                 "comparison_dir": bundle["fixture"]["comparison_dir"],
                 "dominant_lane": bundle["daily_summary"]["dominant_lane"],
@@ -571,12 +594,11 @@ def build_day_bundle(date: str, root: Path | None = None) -> dict[str, Any]:
         "empty_state_metadata": {
             "state": "empty" if transaction_empty else "partial",
             "empty_reason": (
-                "The March demo fixtures carry intent, risk, and execution shells, but no populated fills, "
-                "orders, or positions."
+                "The selected fixture carries no populated fills, orders, or positions across either lane."
             ),
             "truth_note": (
-                "Transaction/PnL panels are intentionally read-only and explicit about placeholder-empty trade "
-                "surfaces. This is a data contract truth, not a UI loading failure."
+                "Transaction/PnL panels stay read-only and explicit about empty trade surfaces. This is a "
+                "committed artifact truth, not a UI loading failure."
             ),
         },
     }
@@ -639,7 +661,7 @@ def build_day_bundle(date: str, root: Path | None = None) -> dict[str, Any]:
         "counts": diff["counts"],
         "anomalies": diff["anomalies"],
         "pnl_reported": diff["pnl_reported"],
-        "scaffold_placeholders": diff["scaffold_placeholders"],
+        "scaffold_placeholders": diff.get("scaffold_placeholders", {}),
     }
 
     snapshots = {
@@ -711,19 +733,14 @@ def build_day_bundle(date: str, root: Path | None = None) -> dict[str, Any]:
             "date": date,
             "comparison_dir": str(fixture.comparison_dir),
             "comparison_relpath": _safe_relpath(fixture.comparison_dir, repo),
+            "comparison_family": fixture.comparison_family,
+            "compare_status": fixture.compare_status,
+            "compare_version": fixture.compare_version,
             "baseline_bundle_dir": str(fixture.baseline_dir),
             "baseline_bundle_relpath": _safe_relpath(fixture.baseline_dir, repo),
             "candidate_bundle_dir": str(fixture.candidate_dir),
             "candidate_bundle_relpath": _safe_relpath(fixture.candidate_dir, repo),
-            "truth_contract": {
-                "topology_changed": False,
-                "opening_fixture_set": ["20260306", "20260310", "20260312"],
-                "hero_day": "20260312",
-                "note": (
-                    "The Mission Control demo contract was truthfully recut to the March fixtures that are "
-                    "actually committed in this worktree."
-                ),
-            },
+            "truth_contract": _dashboard_truth_contract(repo),
         },
         "daily_summary": daily_summary,
         "strategy_card_summaries": all_cards,
@@ -803,11 +820,11 @@ def build_card_detail(
     truth_notes: list[str] = []
     if qty_requested and all(float(qty) == 0.0 for qty in qty_requested if qty is not None):
         truth_notes.append(
-            "All intent requested_qty values are 0.0 in the committed March fixtures (placeholder shells)."
+            "All intent requested_qty values are 0.0 in this committed fixture bundle (placeholder shells)."
         )
     if qty_exec and all(float(qty) == 0.0 for qty in qty_exec if qty is not None):
         truth_notes.append(
-            "All execution request qty values are 0.0 in the committed March fixtures (no live fills)."
+            "All execution request qty values are 0.0 in this committed fixture bundle (no live fills)."
         )
 
     return {

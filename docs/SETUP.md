@@ -77,14 +77,17 @@ uv run pytest
 uv run ruff check .
 ```
 
-## Mission Control dashboard demo (read-only, March fixtures only)
+## Mission Control dashboard demo (read-only, committed fixture index)
 
 Truth contract for the local browser demo:
 
-- fixture set: `2026-03-06`, `2026-03-10`, `2026-03-12`
-- hero day: `2026-03-12`
+- discovered fixture dates: `2026-03-06`, `2026-03-10`, `2026-03-12`, `2026-03-20`, `2026-03-24`, `2026-03-25`, `2026-03-26`, `2026-03-27`, `2026-03-30`, `2026-03-31`, `2026-04-01`, `2026-04-02`, `2026-04-08`
+- hero day: `2026-04-08`
+- discovery source: committed compare manifests with one representative comparison bundle per session date
+- current selection rule for same-date variants: pass status first, then comparison family priority (`manual-live-paired` > `replay-sim` > `prep` > `phase3` > other), then comparison directory name
 - topology: unchanged
 - transaction/PnL surfaces: intentionally truthful empty/incomplete panels when fills/orders/positions are empty in the committed artifacts
+- still unsupported in the browser surface: showing multiple compare variants for the same session date as separate dashboard entries
 
 Frontend prerequisites:
 
@@ -131,7 +134,7 @@ Authoritative outer compose contract for this environment:
 Then open from the parent system:
 
 - `http://127.0.0.1:8780/` for the browser dashboard
-- `http://127.0.0.1:8780/api/dates` for the discovered March fixture index
+- `http://127.0.0.1:8780/api/dates` for the discovered committed fixture index
 - `http://127.0.0.1:8780/api/docs` for the read-only API docs
 
 ### Outer compose launch
