@@ -154,6 +154,9 @@ Acceptance target:
 Implementation-planning packet:
 - `/root/.openclaw/workspace/steamer-card-engine/ops/execution-packets/2026-04-08_steamer-card-engine_market-phase-gating-and-dashboard-truth.packet.md`
 
+Legacy-reconciliation rule:
+- reconcile the legacy bot's all-session semantics into a **generalized session-phase contract** first; preserve phase/order-routing truths, but do not hardcode legacy timing/order literals as engine DNA
+
 ## Topology statement
 
 - runtime/system topology: unchanged
