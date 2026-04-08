@@ -8,6 +8,14 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from .session_phase import (
+    TWSE_TIMEZONE,
+    append_phase_transition,
+    assess_twse_session_phase,
+    build_twse_phase_contract,
+    parse_utc_timestamp,
+)
+
 
 BUNDLE_REQUIRED_FILES = [
     "run-manifest.json",
@@ -238,6 +246,8 @@ def normalize_baseline_bundle(
         run_id = f"normalize-{lane}-{session_date}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
 
     anomalies: list[dict[str, Any]] = []
+    session_phase_trace = []
+
     def add_anomaly(severity: str, category: str, message: str, related_ids: list[str] | None = None) -> None:
         anomalies.append(
             {
@@ -322,6 +332,12 @@ def normalize_baseline_bundle(
 
                 event_id = str(row.get("event_id") or row.get("raw_id") or f"event-{source.stem}-{line_no}")
                 event_type = str(row.get("event_type") or row.get("raw_event") or "market_tick")
+                phase_assessment = assess_twse_session_phase(event_time)
+                append_phase_transition(
+                    session_phase_trace,
+                    timestamp_utc=event_time,
+                    assessment=phase_assessment,
+                )
 
                 seq_no += 1
                 normalized = {
@@ -330,6 +346,10 @@ def normalize_baseline_bundle(
                     "event_time_utc": event_time,
                     "symbol": symbol,
                     "event_type": event_type,
+                    "market_phase": phase_assessment.phase if phase_assessment else None,
+                    "session_contract_status": (
+                        phase_assessment.contract_status if phase_assessment else "unknown"
+                    ),
                     "payload": row,
                 }
                 event_file.write(json.dumps(normalized, ensure_ascii=False) + "\n")
@@ -359,6 +379,12 @@ def normalize_baseline_bundle(
                 _parse_timestamp_to_utc(row.get("ts"))
                 or _parse_timestamp_to_utc(row.get("time"))
                 or now_utc_iso()
+            )
+            phase_assessment = assess_twse_session_phase(decision_ts)
+            append_phase_transition(
+                session_phase_trace,
+                timestamp_utc=decision_ts,
+                assessment=phase_assessment,
             )
             if min_event_time is None or decision_ts < min_event_time:
                 min_event_time = decision_ts
@@ -409,6 +435,7 @@ def normalize_baseline_bundle(
                         "side": side,
                         "requested_qty": 0.0,
                         "reason_code": reason_code,
+                        "market_phase": phase_assessment.phase if phase_assessment else None,
                     }
                     intent_file.write(json.dumps(intent_payload, ensure_ascii=False) + "\n")
                     intent_total += 1
@@ -423,6 +450,7 @@ def normalize_baseline_bundle(
                     "policy_name": "legacy_gate",
                     "reason_code": reason_code,
                     "adjusted_qty": None if ok else 0.0,
+                    "market_phase": phase_assessment.phase if phase_assessment else None,
                 }
                 risk_file.write(json.dumps(risk_payload, ensure_ascii=False) + "\n")
                 risk_total += 1
@@ -434,6 +462,17 @@ def normalize_baseline_bundle(
                         "execution-skipped-unknown-side",
                         f"Entry execution skipped due to unknown side {raw_side!r} (line {line_no}).",
                     )
+                elif phase_assessment is not None and not phase_assessment.allows_regular_entry:
+                    add_anomaly(
+                        "major",
+                        "entry-phase-blocked",
+                        (
+                            "Entry execution request suppressed because the decision fell outside the "
+                            f"generalized regular-session entry window (phase={phase_assessment.phase}, "
+                            f"local_time={phase_assessment.local_time}, line={line_no})."
+                        ),
+                        related_ids=[intent_id, risk_decision_id, exec_request_id],
+                    )
                 else:
                     execution_payload = {
                         "exec_request_id": exec_request_id,
@@ -442,6 +481,11 @@ def normalize_baseline_bundle(
                         "symbol": symbol,
                         "side": side,
                         "order_type": "market",
+                        "time_in_force": "IOC",
+                        "market_phase": phase_assessment.phase if phase_assessment else None,
+                        "session_contract_status": (
+                            phase_assessment.contract_status if phase_assessment else "unknown"
+                        ),
                         "qty": 0.0,
                         "limit_price": None,
                     }
@@ -490,6 +534,8 @@ def normalize_baseline_bundle(
         "fill_model": fill_model,
         "random_seed": None,
     }
+
+    session_phase_contract = build_twse_phase_contract()
 
     if scenario_spec_path is not None:
         scenario_spec = _parse_json(scenario_spec_path)
@@ -541,6 +587,48 @@ def normalize_baseline_bundle(
                 "notes": determinism_note,
             },
         }
+
+    session_slice = scenario_spec.get("session_slice") if isinstance(scenario_spec, dict) else None
+    if isinstance(session_slice, dict):
+        start_local = session_slice.get("start_local")
+        end_local = session_slice.get("end_local")
+        if (
+            isinstance(start_local, str)
+            and isinstance(end_local, str)
+            and min_event_time is not None
+            and max_event_time is not None
+        ):
+            try:
+                session_start_local = datetime.fromisoformat(f"{session_date}T{start_local}").replace(
+                    tzinfo=TWSE_TIMEZONE
+                )
+                session_end_local = datetime.fromisoformat(f"{session_date}T{end_local}").replace(
+                    tzinfo=TWSE_TIMEZONE
+                )
+            except ValueError:
+                session_start_local = None
+                session_end_local = None
+            observed_start = parse_utc_timestamp(min_event_time)
+            observed_end = parse_utc_timestamp(max_event_time)
+            if (
+                session_start_local is not None
+                and session_end_local is not None
+                and observed_start is not None
+                and observed_end is not None
+            ):
+                observed_start_local = observed_start.astimezone(TWSE_TIMEZONE)
+                observed_end_local = observed_end.astimezone(TWSE_TIMEZONE)
+                if observed_start_local > session_start_local or observed_end_local < session_end_local:
+                    add_anomaly(
+                        "major",
+                        "session-coverage-partial",
+                        (
+                            "Observed source coverage does not span the declared session slice "
+                            f"({observed_start_local.strftime('%H:%M:%S')} -> "
+                            f"{observed_end_local.strftime('%H:%M:%S')} vs declared "
+                            f"{start_local} -> {end_local})."
+                        ),
+                    )
 
     scenario_fingerprint = sha256_hex(canonical_json_bytes(scenario_spec))
     scenario_spec_path_out = output_dir / "scenario-spec.json"
@@ -644,6 +732,8 @@ def normalize_baseline_bundle(
             },
             "adjustment_mode": "raw",
         },
+        "session_phase_contract": session_phase_contract,
+        "session_phase_trace": [entry.as_dict() for entry in session_phase_trace],
         "execution_model": execution_model,
         "capability_posture": {
             "market_data_enabled": True,

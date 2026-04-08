@@ -153,6 +153,18 @@ type DeckView = {
       lane: string;
     }>;
     timeline: TimelineEvent[];
+    phase_truth_summary: {
+      baseline: {
+        execution_phase_counts: Record<string, number>;
+        contract_violation_count: number;
+        phase_classifier: string;
+      };
+      candidate: {
+        execution_phase_counts: Record<string, number>;
+        contract_violation_count: number;
+        phase_classifier: string;
+      };
+    };
     comparison_summary_markdown: string;
     comparison_summary_relpath: string;
   };
@@ -348,12 +360,15 @@ function App() {
         { label: "qty", value: details.adjusted_qty },
       ];
     }
-    if (activeEvent.kind === "execution-request") {
+    if (activeEvent.kind === "execution-request" || activeEvent.kind === "execution-phase-violation") {
       return [
         { label: "symbol", value: details.symbol },
         { label: "side", value: details.side },
         { label: "qty", value: details.qty },
         { label: "price", value: details.limit_price },
+        { label: "phase", value: details.market_phase },
+        { label: "contract", value: details.session_contract_status },
+        { label: "tif", value: details.time_in_force },
       ];
     }
     return [{ label: "kind", value: activeEvent.kind }];
@@ -405,6 +420,13 @@ function App() {
               <span className="mini-label">Status</span>
               <strong className={deck.cover.compare_status === "pass" ? "" : "text-alert"}>{deck.cover.compare_status.toUpperCase()}</strong>
               <p>{deck.cover.scenario_id}</p>
+            </article>
+            <article className="metric-card">
+              <span className="mini-label">Phase Violations</span>
+              <strong className={deck.evidence.phase_truth_summary.candidate.contract_violation_count > 0 ? "text-alert" : ""}>
+                {deck.evidence.phase_truth_summary.candidate.contract_violation_count}
+              </strong>
+              <p>{deck.evidence.phase_truth_summary.candidate.phase_classifier}</p>
             </article>
           </div>
 
@@ -489,7 +511,10 @@ function App() {
                       <span className="timeline-time">
                         {new Date(event.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'})}
                       </span>
-                      <span>{event.title.toUpperCase()}</span>
+                      <span>
+                        <div>{event.title.toUpperCase()}</div>
+                        <div className="mini-label">{event.subtitle}</div>
+                      </span>
                     </button>
                     {isActive && (
                       <div className="expansion-panel">

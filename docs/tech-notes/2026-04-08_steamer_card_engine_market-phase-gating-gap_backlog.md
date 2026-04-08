@@ -159,6 +159,21 @@ Implementation-planning packet:
 Legacy-reconciliation rule:
 - reconcile the legacy bot's all-session semantics into a **generalized session-phase contract** first; preserve phase/order-routing truths, but do not hardcode legacy timing/order literals as engine DNA
 
+## Implementation status — 2026-04-08 slice 1
+
+Landed in repo truth/code:
+- a shared TWSE session-phase classifier for replay-sim and captured-baseline-dir live-sim bundle emission
+- phase-aware suppression of pre-open / open-discovery / final-auction / post-close **regular entry** execution-request artifacts in `sim_compare.py`
+- phase-aware `execution-log.jsonl` fields for allowed regular-session entry requests (`time_in_force`, `market_phase`, `session_contract_status`)
+- `session_phase_contract` + `session_phase_trace` disclosure in `run-manifest.json`
+- dashboard truth-surface labeling for historical pre-open execution attempts (`execution-phase-violation` instead of ordinary execution-request)
+- regression tests covering phase boundaries, replay/live-sim contract sharing, and historical March fixture truth
+
+Still open after slice 1:
+- richer open-discovery semantics beyond time-window classification
+- generalized forced-close executor semantics
+- broader order-profile matrix beyond the first regular-entry lane
+
 ## Topology statement
 
 - runtime/system topology: unchanged

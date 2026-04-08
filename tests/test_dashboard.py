@@ -19,6 +19,19 @@ def test_dashboard_bundle_truthful_empty_transaction_state() -> None:
     assert bundle["compare"]["counts"]["fills"]["candidate"] == 0
     assert bundle["daily_summary"]["dominant_lane"] == "steamer-card-engine"
     assert bundle["strategy_card_summaries"]
+    assert bundle["phase_truth_summary"]["candidate"]["contract_violation_count"] > 0
+
+
+def test_dashboard_flags_pre_open_execution_attempts_as_phase_violations() -> None:
+    bundle = build_day_bundle("2026-03-12")
+
+    violation_rows = [
+        item for item in bundle["event_timeline"] if item["kind"] == "execution-phase-violation"
+    ]
+
+    assert violation_rows
+    assert any("pre_open_trial_match" in row["subtitle"] for row in violation_rows)
+    assert all(row["status"] == "warn" for row in violation_rows)
 
 
 def test_dashboard_api_routes() -> None:

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -20,7 +22,12 @@ def _load_json(path: Path) -> dict:
         return json.load(file)
 
 
-def _build_minimal_baseline(tmp_path: Path) -> Path:
+def _twse_us(date: str, clock: str) -> int:
+    local = datetime.fromisoformat(f"{date}T{clock}").replace(tzinfo=ZoneInfo("Asia/Taipei"))
+    return int(local.timestamp() * 1_000_000)
+
+
+def _build_baseline(tmp_path: Path, *, tick_times: list[str], decision_time: str) -> Path:
     baseline = tmp_path / "baseline"
     baseline.mkdir()
 
@@ -28,24 +35,18 @@ def _build_minimal_baseline(tmp_path: Path) -> Path:
         baseline / "ticks.jsonl",
         [
             {
-                "raw_id": "t1",
+                "raw_id": f"t{index + 1}",
                 "raw_event": "data",
                 "symbol": "2330",
-                "time": 1773363249201491,
-                "price": 950.0,
-                "size": 10,
-            },
-            {
-                "raw_id": "t2",
-                "raw_event": "data",
-                "symbol": "2330",
-                "time": 1773363250201491,
-                "price": 951.0,
-                "size": 5,
-            },
+                "time": _twse_us("2026-03-13", tick_time),
+                "price": 950.0 + index,
+                "size": 10 - index,
+            }
+            for index, tick_time in enumerate(tick_times)
         ],
     )
 
+    decision_ts = str(_twse_us("2026-03-13", decision_time))
     _write_jsonl(
         baseline / "decisions.jsonl",
         [
@@ -55,7 +56,7 @@ def _build_minimal_baseline(tmp_path: Path) -> Path:
                 "reason": "features:ok",
                 "side": "long",
                 "symbol": "2330",
-                "ts": "1773363250201491",
+                "ts": decision_ts,
                 "metrics": {"bars": 100, "ret_from_open": 0.01},
             },
             {
@@ -64,7 +65,7 @@ def _build_minimal_baseline(tmp_path: Path) -> Path:
                 "reason": "gate:ok",
                 "side": "long",
                 "symbol": "2330",
-                "ts": "1773363250201491",
+                "ts": decision_ts,
                 "metrics": {"bars": 100},
             },
             {
@@ -73,7 +74,7 @@ def _build_minimal_baseline(tmp_path: Path) -> Path:
                 "reason": "signal:long_trigger",
                 "side": "long",
                 "symbol": "2330",
-                "ts": "1773363250201491",
+                "ts": decision_ts,
                 "metrics": {"bars": 100},
             },
             {
@@ -82,13 +83,29 @@ def _build_minimal_baseline(tmp_path: Path) -> Path:
                 "reason": "entry:entered",
                 "side": "long",
                 "symbol": "2330",
-                "ts": "1773363250201491",
+                "ts": decision_ts,
                 "metrics": {"bars": 100},
             },
         ],
     )
 
     return baseline
+
+
+def _build_minimal_baseline(tmp_path: Path) -> Path:
+    return _build_baseline(
+        tmp_path,
+        tick_times=["08:54:09", "08:54:10"],
+        decision_time="08:54:10",
+    )
+
+
+def _build_regular_session_baseline(tmp_path: Path) -> Path:
+    return _build_baseline(
+        tmp_path,
+        tick_times=["08:59:50", "09:00:05", "09:01:10"],
+        decision_time="09:01:10",
+    )
 
 
 def test_sim_normalize_baseline_emits_bundle(tmp_path: Path, capsys) -> None:
@@ -116,11 +133,16 @@ def test_sim_normalize_baseline_emits_bundle(tmp_path: Path, capsys) -> None:
 
     assert code == 0
     assert payload["counts"]["events"] == 2
-    assert payload["counts"]["execution_requests"] == 1
+    assert payload["counts"]["execution_requests"] == 0
+    assert payload["counts"]["anomalies"] >= 1
 
     run_manifest = _load_json(output_dir / "run-manifest.json")
+    anomalies = _load_json(output_dir / "anomalies.json")
     assert run_manifest["capability_posture"]["trade_enabled"] is False
     assert run_manifest["execution_model"]["fill_model"] == "sim-fill-v1"
+    assert run_manifest["session_phase_contract"]["version"] == "twse-session-phase/v0"
+    assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
+    assert any(item["category"] == "entry-phase-blocked" for item in anomalies["anomalies"])
 
     compare_required = [
         "run-manifest.json",
@@ -140,6 +162,91 @@ def test_sim_normalize_baseline_emits_bundle(tmp_path: Path, capsys) -> None:
     ]
     for name in compare_required:
         assert (output_dir / name).exists(), name
+
+
+def test_sim_normalize_baseline_regular_session_emits_execution_request(tmp_path: Path, capsys) -> None:
+    baseline = _build_regular_session_baseline(tmp_path)
+    output_dir = tmp_path / "bundle_regular"
+
+    code = main(
+        [
+            "sim",
+            "normalize-baseline",
+            "--baseline-dir",
+            str(baseline),
+            "--output-dir",
+            str(output_dir),
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    execution_rows = [json.loads(line) for line in (output_dir / "execution-log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    run_manifest = _load_json(output_dir / "run-manifest.json")
+
+    assert code == 0
+    assert payload["counts"]["execution_requests"] == 1
+    assert execution_rows[0]["market_phase"] == "regular_session"
+    assert execution_rows[0]["time_in_force"] == "IOC"
+    assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
+    assert run_manifest["session_phase_trace"][-1]["phase"] == "regular_session"
+
+
+def test_sim_run_live_shares_phase_trace_with_replay_bundle(tmp_path: Path, capsys) -> None:
+    baseline = _build_regular_session_baseline(tmp_path)
+    replay_output = tmp_path / "replay_bundle"
+    live_output_root = tmp_path / "runs"
+
+    replay_code = main(
+        [
+            "sim",
+            "normalize-baseline",
+            "--baseline-dir",
+            str(baseline),
+            "--output-dir",
+            str(replay_output),
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--json",
+        ]
+    )
+    replay_payload = json.loads(capsys.readouterr().out)
+
+    live_code = main(
+        [
+            "sim",
+            "run-live",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-live-sim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(baseline),
+            "--output-root",
+            str(live_output_root),
+            "--json",
+        ]
+    )
+    live_payload = json.loads(capsys.readouterr().out)
+
+    replay_manifest = _load_json(replay_output / "run-manifest.json")
+    live_manifest = _load_json(Path(live_payload["bundle_dir"]) / "run-manifest.json")
+
+    assert replay_code == 0
+    assert live_code == 0
+    assert replay_payload["counts"]["execution_requests"] == 1
+    assert live_payload["mode"] == "live-sim"
+    assert replay_manifest["session_phase_trace"] == live_manifest["session_phase_trace"]
+    assert live_manifest["capability_posture"]["trade_enabled"] is False
 
 
 def test_sim_compare_hard_fails_execution_model_mismatch(tmp_path: Path, capsys) -> None:

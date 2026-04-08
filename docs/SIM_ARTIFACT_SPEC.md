@@ -114,6 +114,8 @@ Recommended (v1, for stronger cross-lane checks):
 
 - `scenario_spec_version` (for example `"scenario-spec/v1"`)
 - `scenario_fingerprint` (hash of canonical ScenarioSpec payload)
+- `session_phase_contract` (explicit phase classifier contract used by the run)
+- `session_phase_trace` (phase transitions observed across the normalized stream)
 
 `provenance` minimum:
 
@@ -224,6 +226,11 @@ Minimum per record:
 - `order_type`
 - `qty`
 - `limit_price` (nullable)
+
+Recommended when session truth matters:
+- `time_in_force`
+- `market_phase`
+- `session_contract_status`
 
 ### 7) `order-lifecycle.jsonl` (required)
 

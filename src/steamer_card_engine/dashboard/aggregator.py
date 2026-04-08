@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from steamer_card_engine.session_phase import assess_twse_session_phase
+
 from .fixtures import FixtureDay, discover_fixture_days, repo_root
 
 
@@ -81,6 +83,40 @@ def _sample_rows(rows: list[dict[str, Any]], sample_size: int = 12) -> list[dict
 
     target_indexes = {round(index * (len(rows) - 1) / (sample_size - 1)) for index in range(sample_size)}
     return [row for index, row in enumerate(rows) if index in target_indexes]
+
+
+def _execution_phase_truth(execution: dict[str, Any]) -> dict[str, Any]:
+    timestamp = execution.get("request_time_utc")
+    assessment = assess_twse_session_phase(timestamp)
+    if assessment is None:
+        return {
+            "market_phase": execution.get("market_phase"),
+            "contract_status": execution.get("session_contract_status", "unknown"),
+            "display_kind": "execution-request",
+            "title_prefix": "",
+            "subtitle_suffix": "phase unknown",
+            "status": "neutral",
+        }
+
+    market_phase = execution.get("market_phase") or assessment.phase
+    contract_status = execution.get("session_contract_status") or assessment.contract_status
+    is_violation = not assessment.allows_regular_entry
+    display_kind = "execution-phase-violation" if is_violation else "execution-request"
+    title_prefix = f"{assessment.phase.replace('_', ' ')} · " if is_violation else ""
+    subtitle_suffix = (
+        f"phase={assessment.phase} / contract={contract_status}"
+        if is_violation
+        else f"phase={assessment.phase}"
+    )
+    status = "warn" if is_violation else "neutral"
+    return {
+        "market_phase": market_phase,
+        "contract_status": contract_status,
+        "display_kind": display_kind,
+        "title_prefix": title_prefix,
+        "subtitle_suffix": subtitle_suffix,
+        "status": status,
+    }
 
 
 def _extract_markdown_notes(markdown: str) -> list[str]:
@@ -163,6 +199,15 @@ def _lane_payload(
     risks = _load_jsonl(bundle_dir / "risk-receipts.jsonl")
     executions = _load_jsonl(bundle_dir / "execution-log.jsonl")
     features = _load_jsonl(bundle_dir / "feature-provenance.jsonl")
+
+    execution_phase_counts = Counter[str]()
+    contract_violation_count = 0
+    for execution in executions:
+        truth = _execution_phase_truth(execution)
+        phase = truth.get("market_phase") or "unknown"
+        execution_phase_counts[str(phase)] += 1
+        if truth["display_kind"] == "execution-phase-violation":
+            contract_violation_count += 1
 
     counts = {
         "events": _count_jsonl(bundle_dir / "event-log.jsonl"),
@@ -356,19 +401,25 @@ def _lane_payload(
     for execution in executions:
         risk = risk_by_id.get(execution.get("risk_decision_id"))
         intent = intent_by_id.get(risk.get("intent_id")) if risk else None
+        truth = _execution_phase_truth(execution)
+        details = dict(execution)
+        details.setdefault("market_phase", truth["market_phase"])
+        details.setdefault("session_contract_status", truth["contract_status"])
         timeline.append(
             {
                 "event_key": f"{lane}:{execution['exec_request_id']}",
                 "timestamp": execution["request_time_utc"],
                 "lane": lane,
-                "kind": "execution-request",
-                "title": f"{execution['side']} {execution['symbol']} execution request",
-                "subtitle": execution["order_type"],
+                "kind": truth["display_kind"],
+                "title": (
+                    f"{truth['title_prefix']}{execution['side']} {execution['symbol']} execution request"
+                ),
+                "subtitle": f"{execution['order_type']} · {truth['subtitle_suffix']}",
                 "symbol": execution["symbol"],
                 "card_id": intent.get("card_id") if intent else None,
                 "intent_id": risk.get("intent_id") if risk else None,
-                "status": "neutral",
-                "details": execution,
+                "status": truth["status"],
+                "details": details,
             }
         )
 
@@ -409,6 +460,12 @@ def _lane_payload(
         },
     }
 
+    phase_truth_summary = {
+        "execution_phase_counts": dict(execution_phase_counts),
+        "contract_violation_count": contract_violation_count,
+        "phase_classifier": "twse-session-phase/v0",
+    }
+
     return {
         "lane": lane,
         "bundle_dir": str(bundle_dir),
@@ -423,6 +480,7 @@ def _lane_payload(
         "cards": cards,
         "timeline": timeline,
         "transaction_surface": transaction_surface,
+        "phase_truth_summary": phase_truth_summary,
         "feature_samples": features[:12],
     }
 
@@ -634,6 +692,10 @@ def build_day_bundle(date: str, root: Path | None = None) -> dict[str, Any]:
         "evidence": {
             "anomalies": anomaly_rows,
             "timeline": event_timeline,
+            "phase_truth_summary": {
+                "baseline": baseline["phase_truth_summary"],
+                "candidate": candidate["phase_truth_summary"],
+            },
             "comparison_summary_markdown": compare_summary_markdown,
             "comparison_summary_relpath": _safe_relpath(fixture.summary, repo),
         },
@@ -668,6 +730,10 @@ def build_day_bundle(date: str, root: Path | None = None) -> dict[str, Any]:
         "event_timeline": event_timeline,
         "transaction_surface": transaction_surface,
         "compare": compare,
+        "phase_truth_summary": {
+            "baseline": baseline["phase_truth_summary"],
+            "candidate": candidate["phase_truth_summary"],
+        },
         "snapshots": snapshots,
         "deck_view": deck_view,
     }
