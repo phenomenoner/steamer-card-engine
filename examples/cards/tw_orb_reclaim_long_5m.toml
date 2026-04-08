@@ -1,0 +1,45 @@
+card_id = "tw-orb-reclaim-long-5m-v1"
+name = "TW ORB Reclaim Long 5m"
+version = "0.1.0"
+strategy_family = "tw-orb-reclaim-long"
+instrument_scope = ["TW_EQUITY"]
+status = "replay-only"
+entry_module = "cards.tw_orb_reclaim_long:build_card"
+
+symbol_pool = ["1303", "1312", "00637L", "00665L"]
+feature_requirements = [
+  "bars.1m",
+  "bars.5m",
+  "opening-range.5m",
+]
+
+[parameters]
+candidate_id = "tw_orb_reclaim_long_5m"
+orb_minutes = 5
+pullback_pct = 0.4
+reclaim_buffer_pct = 0.1
+entry_deadline_minutes = 35
+hold_minutes = 20
+
+[capital_controls]
+max_order_notional = 150000
+max_daily_notional = 500000
+max_open_positions = 2
+
+[risk_policy.stop_loss]
+mode = "percent_from_open"
+value = 1.6
+
+[risk_policy.take_profit]
+mode = "risk_reward_multiple"
+value = 1.8
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"
+
+[metadata]
+owner = "steamer-marshal"
+provenance = "2026-04-09 distinct families bounded backtest"
+backtest_packet = "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/2026-04-09_distinct_families_bounded_backtest.md"
+notes = "Best long-side non-VCP family in the bounded sweep: 61 signals / 5 days, avg +26.0 bps, median +7.4 bps."

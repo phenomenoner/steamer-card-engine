@@ -204,4 +204,5 @@ Canonical note:
 - Mission Control dashboard sprint truth: `ops/sprints/steamer-card-engine-mission-control-dashboard-v0-sprint.md`
 - Mission Control dashboard build packet: `docs/tech-notes/2026-04-06_steamer_card_engine_mission-control_dashboard_v0_build-packet.md`
 - Mission Control dashboard fixture discovery now indexes committed replay-sim + manual-live-paired representatives across `2026-03-06` → `2026-04-08`; same-date compare variants remain collapsed to one representative entry; topology unchanged
+- The browser surface is now a broader read-only `Steamer Dashboard` with two truthful tabs: `Live Sim` (execution receipts) and `Strategy Powerhouse / Strategy Cards` (local research/control artifact summary only). It does not change execution or governance topology.
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`

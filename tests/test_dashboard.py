@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fixture_dates
+from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 
 
 def test_dashboard_fixture_dates_include_recent_manual_live_days() -> None:
@@ -64,6 +65,23 @@ def test_dashboard_flags_pre_open_execution_attempts_as_phase_violations() -> No
     assert all(row["status"] == "warn" for row in violation_rows)
 
 
+def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
+    surface = build_strategy_powerhouse_view()
+
+    assert surface["boundary"]["execution_authority"] == "none"
+    assert surface["proposal"]["proposal_state"] == "proposed-not-active"
+    assert surface["metrics"]["card_count"] == 3
+    assert surface["metrics"]["hold_count"] == 1
+
+    cards = {card["candidate_id"]: card for card in surface["cards"]}
+    assert cards["tw_orb_reclaim_long_5m"]["status"] == "ready"
+    assert cards["tw_gap_reclaim_long_3m"]["status"] == "synthetic-proven"
+    assert cards["tw_vcp_dryup_reclaim_bounded"]["status"] == "hold"
+    assert cards["tw_vcp_dryup_reclaim_bounded"]["next_gate"] == "needs-real-trigger"
+    assert cards["tw_gap_reclaim_long_3m"]["validation_status"] == "synthetic-proven"
+    assert any(link["kind"] == "verifier" for link in cards["tw_gap_reclaim_long_3m"]["related_links"])
+
+
 def test_dashboard_api_routes() -> None:
     client = TestClient(create_app())
 
@@ -108,6 +126,10 @@ def test_dashboard_api_routes() -> None:
     snapshot_response = client.get("/api/days/2026-03-10/snapshots/scenario")
     assert snapshot_response.status_code == 200
     assert snapshot_response.json()["payload"]["scenario_id"] == "tw-paper-sim.twse.2026-03-10.full-session"
+
+    strategy_powerhouse_response = client.get("/api/strategy-powerhouse")
+    assert strategy_powerhouse_response.status_code == 200
+    assert strategy_powerhouse_response.json()["metrics"]["card_count"] == 3
 
 
 def test_dashboard_api_404_for_unknown_day() -> None:

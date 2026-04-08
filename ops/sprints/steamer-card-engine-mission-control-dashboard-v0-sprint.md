@@ -151,3 +151,4 @@ If topology does not change, say so explicitly.
 - 2026-04-06 — sprint opened after CK approved a browser mission-control line for `steamer-card-engine` and explicitly requested a formal build packet with `櫻花刀舞` planning.
 - 2026-04-06 — remote repo selection locked to `phenomenoner/steamer-card-engine`; topology unchanged.
 - 2026-04-06 — April fixture claims were removed after repo verification; the opening demo contract was truthfully recut to the committed March bundles in `runs/` and `comparisons/`, with `20260312` as the opening hero day. Topology unchanged.
+- 2026-04-09 — dashboard slice upgraded the browser surface from Mission Control-only into a broader read-only `Steamer Dashboard`: `Live Sim` preserves the existing execution-truth view, and `Strategy Powerhouse / Strategy Cards` adds a local-artifact research/control tab with explicit no-authority / no-mutation boundary wording. Topology unchanged.

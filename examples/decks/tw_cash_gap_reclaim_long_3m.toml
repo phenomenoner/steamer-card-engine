@@ -1,0 +1,15 @@
+deck_id = "tw-cash-gap-reclaim-long-3m"
+market = "TW_CASH"
+session = "intraday"
+
+auth_profile = "profiles/tw_cash_agent_assist.toml"
+
+cards = [
+  "tw-gap-reclaim-long-3m-v1",
+]
+
+symbol_scope = ["1312", "1310", "1303", "1305"]
+
+[policy]
+live_mode = false
+allow_card_symbol_pool = true

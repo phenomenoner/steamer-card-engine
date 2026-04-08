@@ -1,0 +1,15 @@
+deck_id = "tw-cash-orb-reclaim-long-5m"
+market = "TW_CASH"
+session = "intraday"
+
+auth_profile = "profiles/tw_cash_agent_assist.toml"
+
+cards = [
+  "tw-orb-reclaim-long-5m-v1",
+]
+
+symbol_scope = ["1303", "1312", "00637L", "00665L"]
+
+[policy]
+live_mode = false
+allow_card_symbol_pool = true

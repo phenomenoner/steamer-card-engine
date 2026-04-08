@@ -1,0 +1,47 @@
+card_id = "tw-gap-reclaim-long-3m-v1"
+name = "TW Gap Reclaim Long 3m"
+version = "0.1.0"
+strategy_family = "tw-gap-reclaim-long"
+instrument_scope = ["TW_EQUITY"]
+status = "replay-only"
+entry_module = "cards.tw_gap_reclaim_long:build_card"
+
+symbol_pool = ["1312", "1310", "1303", "1305"]
+feature_requirements = [
+  "bars.1m",
+  "opening-range.3m",
+  "gap-context.daily",
+]
+
+[parameters]
+candidate_id = "tw_gap_reclaim_long_3m"
+min_gap_up_pct = 3.0
+orb_minutes = 3
+pullback_pct = 0.5
+reclaim_buffer_pct = 0.0
+max_gap_fill_slack_pct = 0.2
+entry_deadline_minutes = 35
+hold_minutes = 20
+
+[capital_controls]
+max_order_notional = 150000
+max_daily_notional = 500000
+max_open_positions = 2
+
+[risk_policy.stop_loss]
+mode = "percent_from_open"
+value = 1.6
+
+[risk_policy.take_profit]
+mode = "risk_reward_multiple"
+value = 1.6
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"
+
+[metadata]
+owner = "steamer-marshal"
+provenance = "2026-04-09 distinct long-only families bounded backtest"
+backtest_packet = "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/2026-04-09_distinct_families_bounded_backtest.md"
+notes = "Bullish gap-reclaim family chosen from the long-only recut: 11 signals / 4 days, avg +18.3 bps, median +29.4 bps on the bounded sample."

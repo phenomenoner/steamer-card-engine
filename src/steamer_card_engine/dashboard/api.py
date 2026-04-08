@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
+from .strategy_powerhouse import StrategyPowerhouseDataError, build_strategy_powerhouse_view
 
 
 def create_app() -> FastAPI:
@@ -70,8 +71,19 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown snapshot: {snapshot_id}") from error
         return {"date": date, "snapshot_id": snapshot_id, "payload": payload}
 
+    @app.get("/api/strategy-powerhouse")
+    def strategy_powerhouse() -> dict:
+        return build_strategy_powerhouse_view(root)
+
     @app.exception_handler(DashboardDataError)
     async def dashboard_data_error_handler(_request, error: DashboardDataError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(error)})
+
+    @app.exception_handler(StrategyPowerhouseDataError)
+    async def strategy_powerhouse_data_error_handler(
+        _request,
+        error: StrategyPowerhouseDataError,
+    ) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(error)})
 
     if (frontend_dist / "assets").exists():

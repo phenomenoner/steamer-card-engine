@@ -1,5 +1,7 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 
+type DashboardTab = "live-sim" | "strategy-powerhouse";
+
 type DateItem = {
   date: string;
   hero: boolean;
@@ -219,8 +221,62 @@ type CardDetail = {
   truth_notes: string[];
 };
 
-type EvidenceRow = Record<string, unknown>;
+type StrategyLink = {
+  label: string;
+  kind: string;
+  path: string;
+};
 
+type StrategyPowerhouseCard = {
+  candidate_id: string;
+  family_id: string;
+  display_name: string;
+  card_id: string;
+  deck_id: string;
+  status: string;
+  validation_status: string;
+  next_gate: string | null;
+  handoff_readiness: string;
+  proposal_state: string;
+  proposal_priority: string;
+  notes: string;
+  proof_note: string;
+  selected_parameter_summary: Array<{ label: string; value: unknown }>;
+  symbol_pool: string[];
+  feature_requirements: string[];
+  related_links: StrategyLink[];
+};
+
+type StrategyPowerhouseView = {
+  updated_at: string | null;
+  topology_changed: boolean;
+  boundary: {
+    note: string;
+    execution_authority: string;
+    governance_mutation: boolean;
+    primary_execution_surface: string;
+    strategy_powerhouse_role: string;
+  };
+  proposal: {
+    proposal_family: string | null;
+    proposal_prepared_at: string | null;
+    proposal_state: string;
+    source_packet: string;
+    truthful_boundary: string;
+    active_family: string | null;
+    active_plan_source: string | null;
+  };
+  metrics: {
+    card_count: number;
+    ready_count: number;
+    hold_count: number;
+    synthetic_proven_count: number;
+  };
+  sources: StrategyLink[];
+  cards: StrategyPowerhouseCard[];
+};
+
+type EvidenceRow = Record<string, unknown>;
 type KeyValueItem = { label: string; value: unknown };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -240,6 +296,21 @@ function formatDate(date: string) {
   });
 }
 
+function formatTimestamp(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Taipei",
+  });
+}
+
 function stringifyValue(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "—";
@@ -256,6 +327,13 @@ function stringifyValue(value: unknown): string {
 function getRowString(row: EvidenceRow, key: string): string | null {
   const value = row[key];
   return typeof value === "string" ? value : typeof value === "number" ? String(value) : null;
+}
+
+function statusTone(value: string | null | undefined): "accent" | "alert" | "muted" {
+  const normalized = (value ?? "").toLowerCase();
+  if (normalized.includes("hold") || normalized.includes("needs")) return "alert";
+  if (normalized.includes("ready") || normalized.includes("synthetic") || normalized.includes("active") || normalized.includes("proposed")) return "accent";
+  return "muted";
 }
 
 function KeyValueGrid({ items }: { items: KeyValueItem[] }) {
@@ -302,15 +380,175 @@ function EvidenceStack({
   );
 }
 
+function StatusChip({ value }: { value: string | null | undefined }) {
+  if (!value) return null;
+  return <span className={`status-chip status-chip-${statusTone(value)}`}>{value.replace(/-/g, " ").toUpperCase()}</span>;
+}
+
+function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
+  const proposalItems: KeyValueItem[] = [
+    { label: "proposal family", value: view.proposal.proposal_family },
+    { label: "prepared", value: formatTimestamp(view.proposal.proposal_prepared_at) },
+    { label: "proposal state", value: view.proposal.proposal_state },
+    { label: "active family", value: view.proposal.active_family },
+    { label: "execution authority", value: view.boundary.execution_authority },
+    { label: "governance mutation", value: String(view.boundary.governance_mutation) },
+  ];
+
+  return (
+    <main className="strategy-surface">
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Authority Boundary</h3>
+          <span className="pill">READ ONLY</span>
+        </div>
+        <div className="panel-body">
+          <p className="strategy-note strategy-boundary-note">{view.boundary.note}</p>
+          <KeyValueGrid
+            items={[
+              { label: "primary execution surface", value: view.boundary.primary_execution_surface },
+              { label: "strategy-powerhouse role", value: view.boundary.strategy_powerhouse_role },
+              { label: "topology changed", value: String(view.topology_changed) },
+              { label: "updated", value: formatTimestamp(view.updated_at) },
+            ]}
+          />
+        </div>
+      </section>
+
+      <div className="metrics-row">
+        <article className="metric-card">
+          <span className="mini-label">Cards</span>
+          <strong>{view.metrics.card_count}</strong>
+          <p>Current local proposal surface.</p>
+        </article>
+        <article className="metric-card">
+          <span className="mini-label">Ready</span>
+          <strong>{view.metrics.ready_count}</strong>
+          <p>Observation-ready families.</p>
+        </article>
+        <article className="metric-card">
+          <span className="mini-label">Hold</span>
+          <strong className={view.metrics.hold_count > 0 ? "text-alert" : ""}>{view.metrics.hold_count}</strong>
+          <p>Families blocked by current truth.</p>
+        </article>
+        <article className="metric-card">
+          <span className="mini-label">Synthetic Proven</span>
+          <strong>{view.metrics.synthetic_proven_count}</strong>
+          <p>Positive-case verifier receipts present.</p>
+        </article>
+      </div>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Strategy Powerhouse / Strategy Cards</h3>
+          <span className="pill">LOCAL ARTIFACTS ONLY</span>
+        </div>
+        <div className="strategy-card-grid">
+          {view.cards.map((card) => (
+            <article className="strategy-summary-card" key={card.candidate_id}>
+              <div className="strategy-summary-head">
+                <div>
+                  <div className="card-title">{card.display_name}</div>
+                  <div className="card-meta">{card.candidate_id} · {card.family_id}</div>
+                </div>
+                <div className="strategy-chip-row">
+                  <StatusChip value={card.status} />
+                  <StatusChip value={card.validation_status} />
+                  <StatusChip value={card.proposal_state} />
+                </div>
+              </div>
+
+              <p className="strategy-note">{card.handoff_readiness}</p>
+              <p className="card-meta">next gate: {card.next_gate ?? "—"}</p>
+
+              <div className="strategy-section">
+                <p className="mini-label">Selected Parameter Pack</p>
+                <div className="parameter-grid">
+                  {card.selected_parameter_summary.map((item) => (
+                    <div className="parameter-item" key={`${card.candidate_id}-${item.label}`}>
+                      <span className="mini-label">{item.label}</span>
+                      <strong>{stringifyValue(item.value)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="strategy-section strategy-columns">
+                <div>
+                  <p className="mini-label">Universe / Features</p>
+                  <p className="card-meta">symbols: {card.symbol_pool.join(", ") || "—"}</p>
+                  <p className="card-meta">features: {card.feature_requirements.join(", ") || "—"}</p>
+                </div>
+                <div>
+                  <p className="mini-label">Research Notes</p>
+                  <p className="card-meta">{card.notes}</p>
+                  <p className="card-meta">{card.proof_note}</p>
+                </div>
+              </div>
+
+              <div className="strategy-section">
+                <p className="mini-label">Related Packets / Receipts</p>
+                <ul className="path-list">
+                  {card.related_links.map((link) => (
+                    <li key={`${card.candidate_id}-${link.label}-${link.path}`}>
+                      <span className="path-label">{link.label}</span>
+                      <code>{link.path}</code>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Proposal / Control Truth</h3>
+          <span className="pill">NO MUTATION</span>
+        </div>
+        <div className="panel-body">
+          <KeyValueGrid items={proposalItems} />
+          <p className="strategy-note">{view.proposal.truthful_boundary}</p>
+          <ul className="path-list">
+            <li>
+              <span className="path-label">proposal source packet</span>
+              <code>{view.proposal.source_packet}</code>
+            </li>
+            {view.proposal.active_plan_source ? (
+              <li>
+                <span className="path-label">active plan source</span>
+                <code>{view.proposal.active_plan_source}</code>
+              </li>
+            ) : null}
+          </ul>
+          <div className="sources-grid">
+            {view.sources.map((source) => (
+              <div className="source-card" key={`${source.kind}-${source.path}`}>
+                <span className="mini-label">{source.kind}</span>
+                <strong>{source.label}</strong>
+                <code>{source.path}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function App() {
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>("live-sim");
   const [dates, setDates] = useState<DateItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [deck, setDeck] = useState<DeckView | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [activeEventKey, setActiveEventKey] = useState<string | null>(null);
   const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
+  const [strategyPowerhouse, setStrategyPowerhouse] = useState<StrategyPowerhouseView | null>(null);
   const [deckLoading, setDeckLoading] = useState(true);
   const [cardLoading, setCardLoading] = useState(false);
+  const [strategyLoading, setStrategyLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -320,6 +558,11 @@ function App() {
         if (payload.length > 0) setSelectedDate(payload[0].date);
       })
       .catch((reason) => setError(String(reason)));
+
+    getJson<StrategyPowerhouseView>("/api/strategy-powerhouse")
+      .then((payload) => setStrategyPowerhouse(payload))
+      .catch((reason) => setError(String(reason)))
+      .finally(() => setStrategyLoading(false));
   }, []);
 
   useEffect(() => {
@@ -340,7 +583,7 @@ function App() {
       setCardDetail(null);
       return;
     }
-    const card = deck.strategy.cards.find(c => c.id === activeCardId);
+    const card = deck.strategy.cards.find((item) => item.id === activeCardId);
     if (!card) return;
 
     setCardLoading(true);
@@ -389,176 +632,214 @@ function App() {
     return [{ label: "kind", value: activeEvent.kind }];
   }, [activeEvent]);
 
+  const liveSimSubtitle = deck
+    ? `Execution truth from committed ${deck.fixture.comparison_relpath}.`
+    : "Execution truth from committed replay/live-sim fixture bundles.";
+
   return (
     <div className="page-shell">
       <header className="hero">
-        <div className="hero-info">
-          <h1>Mission Control</h1>
-          <p>Steamer Card Engine → Daily Replay Deck Analysis</p>
-        </div>
-        <nav className="deck-selector">
-          {dates.map((date) => (
+        <div className="hero-copy">
+          <div className="hero-info">
+            <h1>Steamer Dashboard</h1>
+            <p>
+              {dashboardTab === "live-sim"
+                ? liveSimSubtitle
+                : "Research/control truth from local strategy-powerhouse artifacts. Read-only; no execution authority."}
+            </p>
+          </div>
+          <nav className="dashboard-tabs">
             <button
-              key={date.date}
-              className={`deck-tab ${selectedDate === date.date ? "deck-tab-active" : ""}`}
-              onClick={() => startTransition(() => setSelectedDate(date.date))}
+              className={`dashboard-tab ${dashboardTab === "live-sim" ? "dashboard-tab-active" : ""}`}
+              onClick={() => setDashboardTab("live-sim")}
               type="button"
             >
-              <div className="deck-tab-date">{formatDate(date.date)}</div>
-              <div className="deck-tab-status">{date.compare_status.toUpperCase()}</div>
+              Live Sim
             </button>
-          ))}
-        </nav>
+            <button
+              className={`dashboard-tab ${dashboardTab === "strategy-powerhouse" ? "dashboard-tab-active" : ""}`}
+              onClick={() => setDashboardTab("strategy-powerhouse")}
+              type="button"
+            >
+              Strategy Powerhouse / Strategy Cards
+            </button>
+          </nav>
+        </div>
+
+        {dashboardTab === "live-sim" ? (
+          <nav className="deck-selector">
+            {dates.map((date) => (
+              <button
+                key={date.date}
+                className={`deck-tab ${selectedDate === date.date ? "deck-tab-active" : ""}`}
+                onClick={() => startTransition(() => setSelectedDate(date.date))}
+                type="button"
+              >
+                <div className="deck-tab-date">{formatDate(date.date)}</div>
+                <div className="deck-tab-status">{date.compare_status.toUpperCase()}</div>
+              </button>
+            ))}
+          </nav>
+        ) : null}
       </header>
 
-      {deckLoading ? (
-        <div className="state-block">Engaging deck link…</div>
-      ) : deck ? (
-        <main className="dashboard-surface">
-          <div className="metrics-row">
-            <article className="metric-card">
-              <span className="mini-label">Dominant Lane</span>
-              <strong>{deck.cover.dominant_lane === "steamer-card-engine" ? "CANDIDATE" : "BASELINE"}</strong>
-              <p>{deck.cover.dominant_card_label ?? "No card resolved"}</p>
-            </article>
-            <article className="metric-card">
-              <span className="mini-label">Anomalies</span>
-              <strong className={deck.cover.anomaly_total > 0 ? "text-alert" : ""}>{deck.cover.anomaly_total}</strong>
-              <p>Detected in session logs.</p>
-            </article>
-            <article className="metric-card">
-              <span className="mini-label">Intents</span>
-              <strong>{deck.cover.delta_counts.intents?.candidate ?? 0}</strong>
-              <p>Strategy intents processed.</p>
-            </article>
-            <article className="metric-card">
-              <span className="mini-label">Status</span>
-              <strong className={deck.cover.compare_status === "pass" ? "" : "text-alert"}>{deck.cover.compare_status.toUpperCase()}</strong>
-              <p>{deck.cover.scenario_id}</p>
-            </article>
-            <article className="metric-card">
-              <span className="mini-label">Phase Violations</span>
-              <strong className={deck.evidence.phase_truth_summary.candidate.contract_violation_count > 0 ? "text-alert" : ""}>
-                {deck.evidence.phase_truth_summary.candidate.contract_violation_count}
-              </strong>
-              <p>{deck.evidence.phase_truth_summary.candidate.phase_classifier}</p>
-            </article>
-            <article className="metric-card">
-              <span className="mini-label">Open Discovery</span>
-              <strong>
-                {deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_official_open_signal ? "SEEN" : "N/A"}
-              </strong>
-              <p>
-                trial={String(Boolean(deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_trial_match_event))}
-              </p>
-            </article>
-          </div>
+      {dashboardTab === "live-sim" ? (
+        deckLoading ? (
+          <div className="state-block">Engaging deck link…</div>
+        ) : deck ? (
+          <main className="dashboard-surface">
+            <div className="metrics-row">
+              <article className="metric-card">
+                <span className="mini-label">Dominant Lane</span>
+                <strong>{deck.cover.dominant_lane === "steamer-card-engine" ? "CANDIDATE" : "BASELINE"}</strong>
+                <p>{deck.cover.dominant_card_label ?? "No card resolved"}</p>
+              </article>
+              <article className="metric-card">
+                <span className="mini-label">Anomalies</span>
+                <strong className={deck.cover.anomaly_total > 0 ? "text-alert" : ""}>{deck.cover.anomaly_total}</strong>
+                <p>Detected in session logs.</p>
+              </article>
+              <article className="metric-card">
+                <span className="mini-label">Intents</span>
+                <strong>{deck.cover.delta_counts.intents?.candidate ?? 0}</strong>
+                <p>Strategy intents processed.</p>
+              </article>
+              <article className="metric-card">
+                <span className="mini-label">Status</span>
+                <strong className={deck.cover.compare_status === "pass" ? "" : "text-alert"}>{deck.cover.compare_status.toUpperCase()}</strong>
+                <p>{deck.cover.scenario_id}</p>
+              </article>
+              <article className="metric-card">
+                <span className="mini-label">Phase Violations</span>
+                <strong className={deck.evidence.phase_truth_summary.candidate.contract_violation_count > 0 ? "text-alert" : ""}>
+                  {deck.evidence.phase_truth_summary.candidate.contract_violation_count}
+                </strong>
+                <p>{deck.evidence.phase_truth_summary.candidate.phase_classifier}</p>
+              </article>
+              <article className="metric-card">
+                <span className="mini-label">Open Discovery</span>
+                <strong>
+                  {deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_official_open_signal ? "SEEN" : "N/A"}
+                </strong>
+                <p>
+                  trial={String(Boolean(deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_trial_match_event))}
+                </p>
+              </article>
+            </div>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h3>Strategy Cards</h3>
-              <span className="pill">{deck.strategy.cards.length} ACTIVE</span>
-            </div>
-            <div className="cards-list">
-              {deck.strategy.cards.map((card) => {
-                const isActive = activeCardId === card.id;
-                return (
-                  <div key={card.id} className={`card-item ${isActive ? "card-item-active" : ""}`}>
-                    <button
-                      className="card-trigger"
-                      onClick={() => setActiveCardId(isActive ? null : card.id)}
-                      type="button"
-                    >
-                      <div>
-                        <div className="card-title">{card.card_id}</div>
-                        <div className="card-meta">{card.lane.toUpperCase()} · v{card.card_version}</div>
-                      </div>
-                      <div className="card-meta">
-                        {card.execution_request_count} E / {card.allowed_risk_count} A / {card.blocked_risk_count} B
-                      </div>
-                    </button>
-                    {isActive && (
-                      <div className="expansion-panel">
-                        {cardLoading ? (
-                          <div className="muted">Scanning archives…</div>
-                        ) : cardDetail ? (
-                          <>
-                            <div className="kv-grid">
-                              <div className="kv-item">
-                                <span className="mini-label">Intents</span>
-                                <strong>{cardDetail.counts.intents}</strong>
+            <section className="panel">
+              <div className="panel-header">
+                <h3>Strategy Cards</h3>
+                <span className="pill">{deck.strategy.cards.length} ACTIVE</span>
+              </div>
+              <div className="cards-list">
+                {deck.strategy.cards.map((card) => {
+                  const isActive = activeCardId === card.id;
+                  return (
+                    <div key={card.id} className={`card-item ${isActive ? "card-item-active" : ""}`}>
+                      <button
+                        className="card-trigger"
+                        onClick={() => setActiveCardId(isActive ? null : card.id)}
+                        type="button"
+                      >
+                        <div>
+                          <div className="card-title">{card.card_id}</div>
+                          <div className="card-meta">{card.lane.toUpperCase()} · v{card.card_version}</div>
+                        </div>
+                        <div className="card-meta">
+                          {card.execution_request_count} E / {card.allowed_risk_count} A / {card.blocked_risk_count} B
+                        </div>
+                      </button>
+                      {isActive && (
+                        <div className="expansion-panel">
+                          {cardLoading ? (
+                            <div className="muted">Scanning archives…</div>
+                          ) : cardDetail ? (
+                            <>
+                              <div className="kv-grid">
+                                <div className="kv-item">
+                                  <span className="mini-label">Intents</span>
+                                  <strong>{cardDetail.counts.intents}</strong>
+                                </div>
+                                <div className="kv-item">
+                                  <span className="mini-label">Execution</span>
+                                  <strong>{cardDetail.counts.execution_requests}</strong>
+                                </div>
                               </div>
-                              <div className="kv-item">
-                                <span className="mini-label">Execution</span>
-                                <strong>{cardDetail.counts.execution_requests}</strong>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                                <EvidenceStack
+                                  title="Recent Intents"
+                                  rows={cardDetail.samples.intents}
+                                  getKey={(row, index) => getRowString(row, "intent_id") ?? `i${index}`}
+                                  renderPrimary={(row) => `${getRowString(row, "side")?.toUpperCase()} ${getRowString(row, "symbol")}`}
+                                />
+                                <EvidenceStack
+                                  title="Risk Decisions"
+                                  rows={cardDetail.samples.risk_decisions}
+                                  getKey={(row, index) => getRowString(row, "risk_decision_id") ?? `r${index}`}
+                                  renderPrimary={(row) => `${getRowString(row, "decision")?.toUpperCase()} ${getRowString(row, "reason_code")}`}
+                                />
                               </div>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                              <EvidenceStack
-                                title="Recent Intents"
-                                rows={cardDetail.samples.intents}
-                                getKey={(r, i) => getRowString(r, "intent_id") ?? `i${i}`}
-                                renderPrimary={(r) => `${getRowString(r, "side")?.toUpperCase()} ${getRowString(r, "symbol")}`}
-                              />
-                              <EvidenceStack
-                                title="Risk Decisions"
-                                rows={cardDetail.samples.risk_decisions}
-                                getKey={(r, i) => getRowString(r, "risk_decision_id") ?? `r${i}`}
-                                renderPrimary={(r) => `${getRowString(r, "decision")?.toUpperCase()} ${getRowString(r, "reason_code")}`}
-                              />
-                            </div>
-                          </>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+                            </>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h3>Evidence Feed</h3>
-              <span className="pill">TIMELINE</span>
-            </div>
-            <div className="timeline-container">
-              {deck.evidence.timeline.slice(0, 50).map((event) => {
-                const isActive = activeEventKey === event.event_key;
-                return (
-                  <div key={event.event_key} className={`timeline-item ${isActive ? "timeline-item-active" : ""}`}>
-                    <button
-                      className="timeline-trigger"
-                      onClick={() => setActiveEventKey(isActive ? null : event.event_key)}
-                      type="button"
-                    >
-                      <span className="timeline-time">
-                        {new Date(event.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'})}
-                      </span>
-                      <span>
-                        <div>{event.title.toUpperCase()}</div>
-                        <div className="mini-label">{event.subtitle}</div>
-                      </span>
-                    </button>
-                    {isActive && (
-                      <div className="expansion-panel">
-                        <KeyValueGrid items={eventSummaryItems} />
-                        <details>
-                          <summary className="mini-label" style={{ cursor: "pointer", marginTop: "12px" }}>[RAW PAYLOAD]</summary>
-                          <pre className="json-block">{JSON.stringify(event.details, null, 2)}</pre>
-                        </details>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </main>
+            <section className="panel">
+              <div className="panel-header">
+                <h3>Evidence Feed</h3>
+                <span className="pill">TIMELINE</span>
+              </div>
+              <div className="timeline-container">
+                {deck.evidence.timeline.slice(0, 50).map((event) => {
+                  const isActive = activeEventKey === event.event_key;
+                  return (
+                    <div key={event.event_key} className={`timeline-item ${isActive ? "timeline-item-active" : ""}`}>
+                      <button
+                        className="timeline-trigger"
+                        onClick={() => setActiveEventKey(isActive ? null : event.event_key)}
+                        type="button"
+                      >
+                        <span className="timeline-time">
+                          {new Date(event.timestamp).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </span>
+                        <span>
+                          <div>{event.title.toUpperCase()}</div>
+                          <div className="mini-label">{event.subtitle}</div>
+                        </span>
+                      </button>
+                      {isActive && (
+                        <div className="expansion-panel">
+                          <KeyValueGrid items={eventSummaryItems} />
+                          <details>
+                            <summary className="mini-label" style={{ cursor: "pointer", marginTop: "12px" }}>[RAW PAYLOAD]</summary>
+                            <pre className="json-block">{JSON.stringify(event.details, null, 2)}</pre>
+                          </details>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </main>
+        ) : (
+          <div className="state-block">Select a deck to begin.</div>
+        )
+      ) : strategyLoading ? (
+        <div className="state-block">Loading strategy-powerhouse surface…</div>
+      ) : strategyPowerhouse ? (
+        <StrategySurface view={strategyPowerhouse} />
       ) : (
-        <div className="state-block">Select a deck to begin.</div>
+        <div className="state-block">Strategy-powerhouse artifacts are unavailable.</div>
       )}
-      {error && <div className="state-block text-alert">ERROR: {error}</div>}
+
+      {error ? <div className="state-block text-alert">ERROR: {error}</div> : null}
     </div>
   );
 }

@@ -54,8 +54,16 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  gap: 24px;
   border-bottom: 1px solid var(--line-strong);
   padding-bottom: 24px;
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 .hero-info h1 {
@@ -70,6 +78,31 @@ button {
   color: var(--muted);
   font-size: 0.9rem;
   margin-top: 4px;
+  max-width: 760px;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-tab {
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.dashboard-tab:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.dashboard-tab-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(94, 243, 177, 0.06);
 }
 
 .deck-selector {
@@ -143,6 +176,10 @@ button {
   background: var(--bg-panel);
   border: 1px solid var(--line);
   backdrop-filter: blur(10px);
+}
+
+.panel-body {
+  padding: 20px;
 }
 
 .panel-header {
@@ -330,6 +367,135 @@ button {
   margin-top: 12px;
 }
 
+/* --- Strategy Powerhouse Surface --- */
+
+.strategy-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.strategy-boundary-note,
+.strategy-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.strategy-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.strategy-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  padding: 18px;
+}
+
+.strategy-summary-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.strategy-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.strategy-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.strategy-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.parameter-item {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.parameter-item strong,
+.source-card strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.95rem;
+}
+
+.path-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.path-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.path-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.path-list code,
+.source-card code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 /* --- Utilities --- */
 
 .badge {
@@ -352,6 +518,35 @@ button {
   border: 1px solid var(--line);
 }
 
+.status-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-size: 0.68rem;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.08em;
+}
+
+.status-chip-accent {
+  color: var(--accent);
+  border-color: rgba(94, 243, 177, 0.35);
+  background: rgba(94, 243, 177, 0.08);
+}
+
+.status-chip-alert {
+  color: var(--alert);
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.status-chip-muted {
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
 .state-block {
   padding: 40px;
   text-align: center;
@@ -365,10 +560,33 @@ button {
   .dashboard-surface {
     grid-template-columns: 1fr;
   }
+
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 768px) {
   .metrics-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .strategy-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .metrics-row {
+    grid-template-columns: 1fr;
+  }
+
+  .strategy-summary-head {
+    flex-direction: column;
+  }
+
+  .timeline-trigger {
+    grid-template-columns: 80px minmax(0, 1fr);
   }
 }
