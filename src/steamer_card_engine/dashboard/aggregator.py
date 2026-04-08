@@ -464,6 +464,7 @@ def _lane_payload(
         "execution_phase_counts": dict(execution_phase_counts),
         "contract_violation_count": contract_violation_count,
         "phase_classifier": "twse-session-phase/v1",
+        "open_discovery_summary": run_manifest.get("open_discovery_summary"),
     }
 
     return {

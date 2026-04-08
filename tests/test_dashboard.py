@@ -21,6 +21,7 @@ def test_dashboard_bundle_truthful_empty_transaction_state() -> None:
     assert bundle["strategy_card_summaries"]
     assert bundle["phase_truth_summary"]["candidate"]["contract_violation_count"] > 0
     assert bundle["phase_truth_summary"]["candidate"]["phase_classifier"] == "twse-session-phase/v1"
+    assert "open_discovery_summary" in bundle["phase_truth_summary"]["candidate"]
 
 
 def test_dashboard_flags_pre_open_execution_attempts_as_phase_violations() -> None:

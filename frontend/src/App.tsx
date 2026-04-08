@@ -158,11 +158,23 @@ type DeckView = {
         execution_phase_counts: Record<string, number>;
         contract_violation_count: number;
         phase_classifier: string;
+        open_discovery_summary?: {
+          saw_trial_match_event?: boolean;
+          saw_official_open_signal?: boolean;
+          first_trial_match_utc?: string | null;
+          first_official_open_signal_utc?: string | null;
+        } | null;
       };
       candidate: {
         execution_phase_counts: Record<string, number>;
         contract_violation_count: number;
         phase_classifier: string;
+        open_discovery_summary?: {
+          saw_trial_match_event?: boolean;
+          saw_official_open_signal?: boolean;
+          first_trial_match_utc?: string | null;
+          first_official_open_signal_utc?: string | null;
+        } | null;
       };
     };
     comparison_summary_markdown: string;
@@ -430,6 +442,15 @@ function App() {
                 {deck.evidence.phase_truth_summary.candidate.contract_violation_count}
               </strong>
               <p>{deck.evidence.phase_truth_summary.candidate.phase_classifier}</p>
+            </article>
+            <article className="metric-card">
+              <span className="mini-label">Open Discovery</span>
+              <strong>
+                {deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_official_open_signal ? "SEEN" : "N/A"}
+              </strong>
+              <p>
+                trial={String(Boolean(deck.evidence.phase_truth_summary.candidate.open_discovery_summary?.saw_trial_match_event))}
+              </p>
             </article>
           </div>
 

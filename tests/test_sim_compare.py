@@ -300,6 +300,7 @@ def test_sim_normalize_baseline_emits_forced_exit_execution_request(tmp_path: Pa
     payload = json.loads(capsys.readouterr().out)
     execution_rows = [json.loads(line) for line in (output_dir / "execution-log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     risk_rows = [json.loads(line) for line in (output_dir / "risk-receipts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    lifecycle_rows = [json.loads(line) for line in (output_dir / "order-lifecycle.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
 
     assert code == 0
     assert payload["counts"]["execution_requests"] == 1
@@ -309,6 +310,9 @@ def test_sim_normalize_baseline_emits_forced_exit_execution_request(tmp_path: Pa
     assert execution_rows[0]["order_profile_name"] == "forced-exit-market-rod"
     assert execution_rows[0]["requested_user_def_suffix"] == "Close"
     assert risk_rows[0]["policy_name"] == "legacy_forced_exit_policy"
+    assert lifecycle_rows[0]["exec_request_id"] == execution_rows[0]["exec_request_id"]
+    assert lifecycle_rows[0]["state"] == "new"
+    assert lifecycle_rows[0]["order_profile_name"] == "forced-exit-market-rod"
 
 
 def test_sim_run_live_shares_phase_trace_with_replay_bundle(tmp_path: Path, capsys) -> None:

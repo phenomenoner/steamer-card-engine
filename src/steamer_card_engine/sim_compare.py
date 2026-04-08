@@ -260,6 +260,29 @@ def _build_execution_payload(
     }
 
 
+def _build_lifecycle_placeholder(
+    *,
+    execution_payload: dict[str, Any],
+    reason_code: str,
+) -> dict[str, Any]:
+    exec_request_id = str(execution_payload["exec_request_id"])
+    return {
+        "lifecycle_event_id": f"lifecycle-{exec_request_id}",
+        "exec_request_id": exec_request_id,
+        "order_id": f"order-{exec_request_id}",
+        "event_time_utc": execution_payload["request_time_utc"],
+        "state": "new",
+        "cum_qty": 0.0,
+        "leaves_qty": float(execution_payload.get("qty") or 0.0),
+        "last_fill_qty": None,
+        "last_fill_price": None,
+        "reason_code": reason_code,
+        "market_phase": execution_payload.get("market_phase"),
+        "phase_semantic_label": execution_payload.get("phase_semantic_label"),
+        "order_profile_name": execution_payload.get("order_profile_name"),
+    }
+
+
 def _write_json(path: Path, payload: Any) -> None:
     with path.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2, sort_keys=True)
@@ -585,7 +608,13 @@ def normalize_baseline_bundle(
                             phase_assessment=phase_assessment,
                         )
                         execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        lifecycle_payload = _build_lifecycle_placeholder(
+                            execution_payload=execution_payload,
+                            reason_code=reason_code,
+                        )
+                        lifecycle_file.write(json.dumps(lifecycle_payload, ensure_ascii=False) + "\n")
                         execution_total += 1
+                        order_lifecycle_total += 1
                 elif stage in {"exit", "reduce"}:
                     if phase_assessment is not None and phase_assessment.allows_exit_monitoring:
                         execution_payload = _build_execution_payload(
@@ -597,7 +626,13 @@ def normalize_baseline_bundle(
                             phase_assessment=phase_assessment,
                         )
                         execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        lifecycle_payload = _build_lifecycle_placeholder(
+                            execution_payload=execution_payload,
+                            reason_code=reason_code,
+                        )
+                        lifecycle_file.write(json.dumps(lifecycle_payload, ensure_ascii=False) + "\n")
                         execution_total += 1
+                        order_lifecycle_total += 1
                     else:
                         add_anomaly(
                             "major",
@@ -619,7 +654,13 @@ def normalize_baseline_bundle(
                             phase_assessment=phase_assessment,
                         )
                         execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        lifecycle_payload = _build_lifecycle_placeholder(
+                            execution_payload=execution_payload,
+                            reason_code=reason_code,
+                        )
+                        lifecycle_file.write(json.dumps(lifecycle_payload, ensure_ascii=False) + "\n")
                         execution_total += 1
+                        order_lifecycle_total += 1
                     else:
                         add_anomaly(
                             "major",
