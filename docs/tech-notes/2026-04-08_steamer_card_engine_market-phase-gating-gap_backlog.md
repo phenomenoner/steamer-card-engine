@@ -130,6 +130,8 @@ Acceptance target:
 4. pre-open participation requires explicit strategy/deck opt-in
 5. when pre-open participation is enabled, allowed order styles are explicitly constrained (starting default: `ROD` only)
 6. a `full-session` scenario whose source coverage does not actually span the declared session window can be flagged truthfully in emitted artifacts / validation
+7. replay-sim and captured-baseline-dir live-sim must share the same generalized session-phase contract downstream of the event-source adapter edge
+8. post-development verification must include a bounded historical tick-data ladder that checks phase-trace consistency across replay-sim and live-sim, plus truthful dashboard treatment of phase-derived fields
 
 #### Issue 2 — dashboard truth surface for pre-open attempts
 
