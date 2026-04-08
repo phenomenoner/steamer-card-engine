@@ -20,6 +20,7 @@ def test_dashboard_bundle_truthful_empty_transaction_state() -> None:
     assert bundle["daily_summary"]["dominant_lane"] == "steamer-card-engine"
     assert bundle["strategy_card_summaries"]
     assert bundle["phase_truth_summary"]["candidate"]["contract_violation_count"] > 0
+    assert bundle["phase_truth_summary"]["candidate"]["phase_classifier"] == "twse-session-phase/v1"
 
 
 def test_dashboard_flags_pre_open_execution_attempts_as_phase_violations() -> None:

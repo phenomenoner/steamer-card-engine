@@ -41,9 +41,19 @@ The docs should say this out loud.
 
 Cards should be able to define a forced-exit start window if take-profit / stop-loss conditions have not resolved the position.
 
+At the generalized session-contract layer, this should sit inside a broader intraday phase model such as:
+- pre-open / warmup
+- open discovery
+- regular entry window
+- exit-monitoring-only window after entry cutoff
+- forced-exit / forced-close window
+- final-auction flatten
+- post-close
+
 Example questions the config should answer:
 
 - when does the card start flattening?
+- when does normal **new entry** stop, even if exit monitoring continues?
 - does it exit all at once or in stages?
 - what price aggressiveness is allowed?
 - does behavior differ in replay sim vs live sim vs live?

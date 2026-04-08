@@ -174,6 +174,20 @@ Still open after slice 1:
 - generalized forced-close executor semantics
 - broader order-profile matrix beyond the first regular-entry lane
 
+## Implementation status — 2026-04-08 slice 2a
+
+Landed in repo truth/code:
+- generalized TWSE phase contract now includes entry-cutoff / monitor-only / forced-exit / final-auction windows
+- `session_phase_contract` advanced to `twse-session-phase/v1` with semantic labels and policy windows
+- allowed regular-session entry execution artifacts now carry `phase_semantic_label`, `order_profile_name`, and `requested_user_def_suffix`
+- bundle validation now hard-fails missing/invalid phase-contract disclosure in `run-manifest.json`
+- phase semantics are covered in tests at `09:00`, `09:01`, `12:01`, `13:18`, `13:25`, `13:30`
+
+Still open after slice 2a:
+- open-discovery behavior that depends on actual market/open-state evidence rather than time-window approximation only
+- forced-close executor behavior beyond contract disclosure (chunking, pacing, lifecycle receipts)
+- phase-aware non-entry execution artifacts / richer order-profile matrix implementation
+
 ## Topology statement
 
 - runtime/system topology: unchanged

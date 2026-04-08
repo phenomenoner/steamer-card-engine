@@ -140,8 +140,9 @@ def test_sim_normalize_baseline_emits_bundle(tmp_path: Path, capsys) -> None:
     anomalies = _load_json(output_dir / "anomalies.json")
     assert run_manifest["capability_posture"]["trade_enabled"] is False
     assert run_manifest["execution_model"]["fill_model"] == "sim-fill-v1"
-    assert run_manifest["session_phase_contract"]["version"] == "twse-session-phase/v0"
+    assert run_manifest["session_phase_contract"]["version"] == "twse-session-phase/v1"
     assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
+    assert run_manifest["session_phase_trace"][0]["semantic_label"] == "pre_open_warmup"
     assert any(item["category"] == "entry-phase-blocked" for item in anomalies["anomalies"])
 
     compare_required = [
@@ -192,7 +193,10 @@ def test_sim_normalize_baseline_regular_session_emits_execution_request(tmp_path
     assert code == 0
     assert payload["counts"]["execution_requests"] == 1
     assert execution_rows[0]["market_phase"] == "regular_session"
+    assert execution_rows[0]["phase_semantic_label"] == "regular_entry"
     assert execution_rows[0]["time_in_force"] == "IOC"
+    assert execution_rows[0]["order_profile_name"] == "regular-entry-market-ioc"
+    assert execution_rows[0]["requested_user_def_suffix"] == "Enter"
     assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
     assert run_manifest["session_phase_trace"][-1]["phase"] == "regular_session"
 

@@ -367,8 +367,11 @@ function App() {
         { label: "qty", value: details.qty },
         { label: "price", value: details.limit_price },
         { label: "phase", value: details.market_phase },
+        { label: "semantic", value: details.phase_semantic_label },
         { label: "contract", value: details.session_contract_status },
         { label: "tif", value: details.time_in_force },
+        { label: "profile", value: details.order_profile_name },
+        { label: "user_def_suffix", value: details.requested_user_def_suffix },
       ];
     }
     return [{ label: "kind", value: activeEvent.kind }];

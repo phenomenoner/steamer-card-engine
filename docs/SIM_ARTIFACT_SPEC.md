@@ -230,7 +230,10 @@ Minimum per record:
 Recommended when session truth matters:
 - `time_in_force`
 - `market_phase`
+- `phase_semantic_label`
 - `session_contract_status`
+- `order_profile_name`
+- `requested_user_def_suffix`
 
 ### 7) `order-lifecycle.jsonl` (required)
 

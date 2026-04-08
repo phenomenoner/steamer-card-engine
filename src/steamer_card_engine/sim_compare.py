@@ -483,8 +483,17 @@ def normalize_baseline_bundle(
                         "order_type": "market",
                         "time_in_force": "IOC",
                         "market_phase": phase_assessment.phase if phase_assessment else None,
+                        "phase_semantic_label": (
+                            phase_assessment.semantic_label if phase_assessment else None
+                        ),
                         "session_contract_status": (
                             phase_assessment.contract_status if phase_assessment else "unknown"
+                        ),
+                        "order_profile_name": (
+                            phase_assessment.default_order_profile if phase_assessment else None
+                        ),
+                        "requested_user_def_suffix": (
+                            phase_assessment.requested_user_def_suffix if phase_assessment else None
                         ),
                         "qty": 0.0,
                         "limit_price": None,
@@ -900,6 +909,18 @@ def validate_bundle(bundle_dir: Path) -> BundleValidationResult:
             errors.append("capability_posture.trade_enabled must remain false for M1")
     else:
         warnings.append("capability_posture missing in run-manifest")
+
+    phase_contract = manifest.get("session_phase_contract")
+    if not isinstance(phase_contract, dict):
+        errors.append("run-manifest session_phase_contract is missing or not an object")
+    else:
+        version = phase_contract.get("version")
+        if not isinstance(version, str) or not version.startswith("twse-session-phase/"):
+            errors.append("run-manifest session_phase_contract.version is missing or invalid")
+
+    phase_trace = manifest.get("session_phase_trace")
+    if not isinstance(phase_trace, list) or not phase_trace:
+        errors.append("run-manifest session_phase_trace is missing or empty")
 
     return BundleValidationResult(
         bundle_dir=bundle_dir,

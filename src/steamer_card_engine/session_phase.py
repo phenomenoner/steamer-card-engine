@@ -8,10 +8,12 @@ from zoneinfo import ZoneInfo
 
 TWSE_TIMEZONE = ZoneInfo("Asia/Taipei")
 TWSE_CALENDAR = "TWSE"
-TWSE_SESSION_PHASE_CONTRACT_VERSION = "twse-session-phase/v0"
+TWSE_SESSION_PHASE_CONTRACT_VERSION = "twse-session-phase/v1"
 
 _PRE_OPEN_END = time(9, 0, 0)
-_REGULAR_OPEN_END = time(9, 1, 0)
+_OPEN_DISCOVERY_END = time(9, 1, 0)
+_ENTRY_CUTOFF = time(12, 1, 0)
+_FORCED_EXIT_START = time(13, 18, 0)
 _FINAL_AUCTION_START = time(13, 25, 0)
 _SESSION_END = time(13, 30, 0)
 
@@ -21,12 +23,17 @@ ENTRY_ALLOWED_PHASES = frozenset({"regular_session"})
 @dataclass(frozen=True, slots=True)
 class SessionPhaseAssessment:
     phase: str
+    semantic_label: str
     local_time: str
     timezone: str
     calendar: str
     allows_regular_entry: bool
+    allows_exit_monitoring: bool
+    forced_exit_active: bool
     contract_status: str
     violation_code: str | None = None
+    default_order_profile: str | None = None
+    requested_user_def_suffix: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -35,6 +42,7 @@ class SessionPhaseAssessment:
 @dataclass(frozen=True, slots=True)
 class SessionPhaseTraceEntry:
     phase: str
+    semantic_label: str
     effective_at_utc: str
     local_time: str
 
@@ -48,6 +56,7 @@ class SessionPhaseContract:
     timezone: str
     calendar: str
     entry_allowed_phases: tuple[str, ...]
+    policy_windows: dict[str, str]
     phases: tuple[dict[str, Any], ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -59,36 +68,91 @@ TWSE_SESSION_PHASE_CONTRACT = SessionPhaseContract(
     timezone="Asia/Taipei",
     calendar=TWSE_CALENDAR,
     entry_allowed_phases=tuple(sorted(ENTRY_ALLOWED_PHASES)),
+    policy_windows={
+        "pre_open_end": _PRE_OPEN_END.isoformat(),
+        "open_discovery_end": _OPEN_DISCOVERY_END.isoformat(),
+        "entry_cutoff": _ENTRY_CUTOFF.isoformat(),
+        "forced_exit_start": _FORCED_EXIT_START.isoformat(),
+        "final_auction_start": _FINAL_AUCTION_START.isoformat(),
+        "session_end": _SESSION_END.isoformat(),
+    },
     phases=(
         {
             "phase": "pre_open_trial_match",
+            "semantic_label": "pre_open_warmup",
             "start_local": None,
             "end_local": _PRE_OPEN_END.isoformat(),
             "allows_regular_entry": False,
+            "allows_exit_monitoring": False,
+            "forced_exit_active": False,
+            "default_order_profile": None,
+            "requested_user_def_suffix": None,
         },
         {
             "phase": "regular_session_open",
+            "semantic_label": "open_discovery",
             "start_local": _PRE_OPEN_END.isoformat(),
-            "end_local": _REGULAR_OPEN_END.isoformat(),
+            "end_local": _OPEN_DISCOVERY_END.isoformat(),
             "allows_regular_entry": False,
+            "allows_exit_monitoring": True,
+            "forced_exit_active": False,
+            "default_order_profile": None,
+            "requested_user_def_suffix": None,
         },
         {
             "phase": "regular_session",
-            "start_local": _REGULAR_OPEN_END.isoformat(),
-            "end_local": _FINAL_AUCTION_START.isoformat(),
+            "semantic_label": "regular_entry",
+            "start_local": _OPEN_DISCOVERY_END.isoformat(),
+            "end_local": _ENTRY_CUTOFF.isoformat(),
             "allows_regular_entry": True,
+            "allows_exit_monitoring": True,
+            "forced_exit_active": False,
+            "default_order_profile": "regular-entry-market-ioc",
+            "requested_user_def_suffix": "Enter",
+        },
+        {
+            "phase": "risk_monitor_only",
+            "semantic_label": "exit_monitoring_only",
+            "start_local": _ENTRY_CUTOFF.isoformat(),
+            "end_local": _FORCED_EXIT_START.isoformat(),
+            "allows_regular_entry": False,
+            "allows_exit_monitoring": True,
+            "forced_exit_active": False,
+            "default_order_profile": "exit-monitor-market-ioc",
+            "requested_user_def_suffix": "Exit",
+        },
+        {
+            "phase": "forced_exit",
+            "semantic_label": "forced_close",
+            "start_local": _FORCED_EXIT_START.isoformat(),
+            "end_local": _FINAL_AUCTION_START.isoformat(),
+            "allows_regular_entry": False,
+            "allows_exit_monitoring": True,
+            "forced_exit_active": True,
+            "default_order_profile": "forced-exit-market-rod",
+            "requested_user_def_suffix": "Close",
         },
         {
             "phase": "final_auction",
+            "semantic_label": "final_auction_flatten",
             "start_local": _FINAL_AUCTION_START.isoformat(),
             "end_local": _SESSION_END.isoformat(),
             "allows_regular_entry": False,
+            "allows_exit_monitoring": True,
+            "forced_exit_active": True,
+            "default_order_profile": "final-auction-flatten-rod",
+            "requested_user_def_suffix": "Close",
         },
         {
             "phase": "session_closed",
+            "semantic_label": "post_close",
             "start_local": _SESSION_END.isoformat(),
             "end_local": None,
             "allows_regular_entry": False,
+            "allows_exit_monitoring": False,
+            "forced_exit_active": False,
+            "default_order_profile": None,
+            "requested_user_def_suffix": None,
         },
     ),
 )
@@ -160,39 +224,108 @@ def assess_twse_session_phase(value: Any) -> SessionPhaseAssessment | None:
     local_clock = local.time()
 
     if local_clock < _PRE_OPEN_END:
-        phase = "pre_open_trial_match"
-        allows_regular_entry = False
-        contract_status = "blocked"
-        violation_code = "pre-open-regular-entry-blocked"
-    elif local_clock < _REGULAR_OPEN_END:
-        phase = "regular_session_open"
-        allows_regular_entry = False
-        contract_status = "blocked"
-        violation_code = "open-discovery-regular-entry-blocked"
-    elif local_clock < _FINAL_AUCTION_START:
-        phase = "regular_session"
-        allows_regular_entry = True
-        contract_status = "allowed"
-        violation_code = None
-    elif local_clock < _SESSION_END:
-        phase = "final_auction"
-        allows_regular_entry = False
-        contract_status = "blocked"
-        violation_code = "final-auction-regular-entry-blocked"
-    else:
-        phase = "session_closed"
-        allows_regular_entry = False
-        contract_status = "blocked"
-        violation_code = "session-closed-regular-entry-blocked"
-
+        return SessionPhaseAssessment(
+            phase="pre_open_trial_match",
+            semantic_label="pre_open_warmup",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=False,
+            allows_exit_monitoring=False,
+            forced_exit_active=False,
+            contract_status="blocked",
+            violation_code="pre-open-regular-entry-blocked",
+            default_order_profile=None,
+            requested_user_def_suffix=None,
+        )
+    if local_clock < _OPEN_DISCOVERY_END:
+        return SessionPhaseAssessment(
+            phase="regular_session_open",
+            semantic_label="open_discovery",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=False,
+            allows_exit_monitoring=True,
+            forced_exit_active=False,
+            contract_status="blocked",
+            violation_code="open-discovery-regular-entry-blocked",
+            default_order_profile=None,
+            requested_user_def_suffix=None,
+        )
+    if local_clock < _ENTRY_CUTOFF:
+        return SessionPhaseAssessment(
+            phase="regular_session",
+            semantic_label="regular_entry",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=True,
+            allows_exit_monitoring=True,
+            forced_exit_active=False,
+            contract_status="allowed",
+            violation_code=None,
+            default_order_profile="regular-entry-market-ioc",
+            requested_user_def_suffix="Enter",
+        )
+    if local_clock < _FORCED_EXIT_START:
+        return SessionPhaseAssessment(
+            phase="risk_monitor_only",
+            semantic_label="exit_monitoring_only",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=False,
+            allows_exit_monitoring=True,
+            forced_exit_active=False,
+            contract_status="blocked",
+            violation_code="entry-cutoff-regular-entry-blocked",
+            default_order_profile="exit-monitor-market-ioc",
+            requested_user_def_suffix="Exit",
+        )
+    if local_clock < _FINAL_AUCTION_START:
+        return SessionPhaseAssessment(
+            phase="forced_exit",
+            semantic_label="forced_close",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=False,
+            allows_exit_monitoring=True,
+            forced_exit_active=True,
+            contract_status="blocked",
+            violation_code="forced-exit-regular-entry-blocked",
+            default_order_profile="forced-exit-market-rod",
+            requested_user_def_suffix="Close",
+        )
+    if local_clock < _SESSION_END:
+        return SessionPhaseAssessment(
+            phase="final_auction",
+            semantic_label="final_auction_flatten",
+            local_time=local.strftime("%H:%M:%S"),
+            timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
+            calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
+            allows_regular_entry=False,
+            allows_exit_monitoring=True,
+            forced_exit_active=True,
+            contract_status="blocked",
+            violation_code="final-auction-regular-entry-blocked",
+            default_order_profile="final-auction-flatten-rod",
+            requested_user_def_suffix="Close",
+        )
     return SessionPhaseAssessment(
-        phase=phase,
+        phase="session_closed",
+        semantic_label="post_close",
         local_time=local.strftime("%H:%M:%S"),
         timezone=TWSE_SESSION_PHASE_CONTRACT.timezone,
         calendar=TWSE_SESSION_PHASE_CONTRACT.calendar,
-        allows_regular_entry=allows_regular_entry,
-        contract_status=contract_status,
-        violation_code=violation_code,
+        allows_regular_entry=False,
+        allows_exit_monitoring=False,
+        forced_exit_active=False,
+        contract_status="blocked",
+        violation_code="session-closed-regular-entry-blocked",
+        default_order_profile=None,
+        requested_user_def_suffix=None,
     )
 
 
@@ -213,6 +346,7 @@ def append_phase_transition(
     trace.append(
         SessionPhaseTraceEntry(
             phase=assessment.phase,
+            semantic_label=assessment.semantic_label,
             effective_at_utc=timestamp_utc,
             local_time=assessment.local_time,
         )

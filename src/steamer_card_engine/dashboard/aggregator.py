@@ -102,7 +102,7 @@ def _execution_phase_truth(execution: dict[str, Any]) -> dict[str, Any]:
     contract_status = execution.get("session_contract_status") or assessment.contract_status
     is_violation = not assessment.allows_regular_entry
     display_kind = "execution-phase-violation" if is_violation else "execution-request"
-    title_prefix = f"{assessment.phase.replace('_', ' ')} · " if is_violation else ""
+    title_prefix = f"{assessment.semantic_label.replace('_', ' ')} · " if is_violation else ""
     subtitle_suffix = (
         f"phase={assessment.phase} / contract={contract_status}"
         if is_violation
@@ -463,7 +463,7 @@ def _lane_payload(
     phase_truth_summary = {
         "execution_phase_counts": dict(execution_phase_counts),
         "contract_violation_count": contract_violation_count,
-        "phase_classifier": "twse-session-phase/v0",
+        "phase_classifier": "twse-session-phase/v1",
     }
 
     return {
