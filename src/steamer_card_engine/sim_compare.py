@@ -195,6 +195,71 @@ def _hash_text(value: str) -> str:
     return sha256_hex(value.encode("utf-8"))
 
 
+def _time_in_force_for_profile(profile_name: str | None) -> str | None:
+    if profile_name is None:
+        return None
+    if profile_name.endswith("-rod"):
+        return "ROD"
+    if profile_name.endswith("-ioc"):
+        return "IOC"
+    return None
+
+
+def _event_observation_state(
+    row: dict[str, Any], event_type: str, phase: str | None
+) -> str | None:
+    payload = row if isinstance(row, dict) else {}
+    is_trial = payload.get("isTrial")
+    volume = payload.get("volume")
+
+    if is_trial is True:
+        return "trial-match"
+    if phase == "regular_session_open" and event_type in {"trade", "session"}:
+        return "official-open-signal"
+    if phase == "regular_session_open" and is_trial is False:
+        return "official-open-print"
+    if phase == "regular_session_open":
+        return "open-discovery"
+    if phase in {"regular_session", "risk_monitor_only", "forced_exit", "final_auction"}:
+        if is_trial is False or (is_trial is None and volume not in (None, 0)):
+            return "regular-market"
+    return None
+
+
+def _build_execution_payload(
+    *,
+    exec_request_id: str,
+    risk_decision_id: str,
+    decision_ts: str,
+    symbol: str,
+    side: str,
+    phase_assessment: Any,
+) -> dict[str, Any]:
+    profile_name = phase_assessment.default_order_profile if phase_assessment else None
+    return {
+        "exec_request_id": exec_request_id,
+        "risk_decision_id": risk_decision_id,
+        "request_time_utc": decision_ts,
+        "symbol": symbol,
+        "side": side,
+        "order_type": "market",
+        "time_in_force": _time_in_force_for_profile(profile_name),
+        "market_phase": phase_assessment.phase if phase_assessment else None,
+        "phase_semantic_label": (
+            phase_assessment.semantic_label if phase_assessment else None
+        ),
+        "session_contract_status": (
+            phase_assessment.contract_status if phase_assessment else "unknown"
+        ),
+        "order_profile_name": profile_name,
+        "requested_user_def_suffix": (
+            phase_assessment.requested_user_def_suffix if phase_assessment else None
+        ),
+        "qty": 0.0,
+        "limit_price": None,
+    }
+
+
 def _write_json(path: Path, payload: Any) -> None:
     with path.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2, sort_keys=True)
@@ -247,6 +312,13 @@ def normalize_baseline_bundle(
 
     anomalies: list[dict[str, Any]] = []
     session_phase_trace = []
+    risk_emitted_ids: set[str] = set()
+    open_discovery_summary = {
+        "saw_trial_match_event": False,
+        "saw_official_open_signal": False,
+        "first_trial_match_utc": None,
+        "first_official_open_signal_utc": None,
+    }
 
     def add_anomaly(severity: str, category: str, message: str, related_ids: list[str] | None = None) -> None:
         anomalies.append(
@@ -339,6 +411,22 @@ def normalize_baseline_bundle(
                     assessment=phase_assessment,
                 )
 
+                observation_state = _event_observation_state(
+                    row,
+                    event_type,
+                    phase_assessment.phase if phase_assessment else None,
+                )
+                if observation_state == "trial-match":
+                    open_discovery_summary["saw_trial_match_event"] = True
+                    open_discovery_summary["first_trial_match_utc"] = (
+                        open_discovery_summary["first_trial_match_utc"] or event_time
+                    )
+                if observation_state in {"official-open-signal", "official-open-print"}:
+                    open_discovery_summary["saw_official_open_signal"] = True
+                    open_discovery_summary["first_official_open_signal_utc"] = (
+                        open_discovery_summary["first_official_open_signal_utc"] or event_time
+                    )
+
                 seq_no += 1
                 normalized = {
                     "seq_no": seq_no,
@@ -347,9 +435,13 @@ def normalize_baseline_bundle(
                     "symbol": symbol,
                     "event_type": event_type,
                     "market_phase": phase_assessment.phase if phase_assessment else None,
+                    "phase_semantic_label": (
+                        phase_assessment.semantic_label if phase_assessment else None
+                    ),
                     "session_contract_status": (
                         phase_assessment.contract_status if phase_assessment else "unknown"
                     ),
+                    "market_observation_state": observation_state,
                     "payload": row,
                 }
                 event_file.write(json.dumps(normalized, ensure_ascii=False) + "\n")
@@ -416,7 +508,7 @@ def normalize_baseline_bundle(
                 feature_file.write(json.dumps(feature_payload, ensure_ascii=False) + "\n")
                 feature_total += 1
 
-            if stage in {"signal", "entry"}:
+            if stage in {"signal", "entry", "exit", "reduce", "forced_exit", "close", "flatten"}:
                 if side is None:
                     add_anomaly(
                         "minor",
@@ -435,71 +527,109 @@ def normalize_baseline_bundle(
                         "side": side,
                         "requested_qty": 0.0,
                         "reason_code": reason_code,
-                        "market_phase": phase_assessment.phase if phase_assessment else None,
-                    }
-                    intent_file.write(json.dumps(intent_payload, ensure_ascii=False) + "\n")
-                    intent_total += 1
-
-            if stage == "gate":
-                risk_payload = {
-                    "risk_decision_id": risk_decision_id,
-                    "intent_id": intent_id,
-                    "decision_time_utc": decision_ts,
-                    "decision": "allow" if ok else "block",
-                    "policy_scope": "global",
-                    "policy_name": "legacy_gate",
-                    "reason_code": reason_code,
-                    "adjusted_qty": None if ok else 0.0,
-                    "market_phase": phase_assessment.phase if phase_assessment else None,
-                }
-                risk_file.write(json.dumps(risk_payload, ensure_ascii=False) + "\n")
-                risk_total += 1
-
-            if stage == "entry" and ok:
-                if side is None:
-                    add_anomaly(
-                        "minor",
-                        "execution-skipped-unknown-side",
-                        f"Entry execution skipped due to unknown side {raw_side!r} (line {line_no}).",
-                    )
-                elif phase_assessment is not None and not phase_assessment.allows_regular_entry:
-                    add_anomaly(
-                        "major",
-                        "entry-phase-blocked",
-                        (
-                            "Entry execution request suppressed because the decision fell outside the "
-                            f"generalized regular-session entry window (phase={phase_assessment.phase}, "
-                            f"local_time={phase_assessment.local_time}, line={line_no})."
-                        ),
-                        related_ids=[intent_id, risk_decision_id, exec_request_id],
-                    )
-                else:
-                    execution_payload = {
-                        "exec_request_id": exec_request_id,
-                        "risk_decision_id": risk_decision_id,
-                        "request_time_utc": decision_ts,
-                        "symbol": symbol,
-                        "side": side,
-                        "order_type": "market",
-                        "time_in_force": "IOC",
+                        "intent_type": "enter" if stage in {"signal", "entry"} else "exit",
                         "market_phase": phase_assessment.phase if phase_assessment else None,
                         "phase_semantic_label": (
                             phase_assessment.semantic_label if phase_assessment else None
                         ),
-                        "session_contract_status": (
-                            phase_assessment.contract_status if phase_assessment else "unknown"
-                        ),
-                        "order_profile_name": (
-                            phase_assessment.default_order_profile if phase_assessment else None
-                        ),
-                        "requested_user_def_suffix": (
-                            phase_assessment.requested_user_def_suffix if phase_assessment else None
-                        ),
-                        "qty": 0.0,
-                        "limit_price": None,
                     }
-                    execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
-                    execution_total += 1
+                    intent_file.write(json.dumps(intent_payload, ensure_ascii=False) + "\n")
+                    intent_total += 1
+
+            if stage == "gate" or stage in {"exit", "reduce", "forced_exit", "close", "flatten"}:
+                if risk_decision_id not in risk_emitted_ids:
+                    risk_payload = {
+                        "risk_decision_id": risk_decision_id,
+                        "intent_id": intent_id,
+                        "decision_time_utc": decision_ts,
+                        "decision": "allow" if ok else "block",
+                        "policy_scope": "global",
+                        "policy_name": "legacy_gate" if stage == "gate" else f"legacy_{stage}_policy",
+                        "reason_code": reason_code,
+                        "adjusted_qty": None if ok else 0.0,
+                        "market_phase": phase_assessment.phase if phase_assessment else None,
+                        "phase_semantic_label": (
+                            phase_assessment.semantic_label if phase_assessment else None
+                        ),
+                    }
+                    risk_file.write(json.dumps(risk_payload, ensure_ascii=False) + "\n")
+                    risk_total += 1
+                    risk_emitted_ids.add(risk_decision_id)
+
+            if stage in {"entry", "exit", "reduce", "forced_exit", "close", "flatten"} and ok:
+                if side is None:
+                    add_anomaly(
+                        "minor",
+                        "execution-skipped-unknown-side",
+                        f"{stage} execution skipped due to unknown side {raw_side!r} (line {line_no}).",
+                    )
+                elif stage == "entry":
+                    if phase_assessment is not None and not phase_assessment.allows_regular_entry:
+                        add_anomaly(
+                            "major",
+                            "entry-phase-blocked",
+                            (
+                                "Entry execution request suppressed because the decision fell outside the "
+                                f"generalized regular-session entry window (phase={phase_assessment.phase}, "
+                                f"local_time={phase_assessment.local_time}, line={line_no})."
+                            ),
+                            related_ids=[intent_id, risk_decision_id, exec_request_id],
+                        )
+                    else:
+                        execution_payload = _build_execution_payload(
+                            exec_request_id=exec_request_id,
+                            risk_decision_id=risk_decision_id,
+                            decision_ts=decision_ts,
+                            symbol=symbol,
+                            side=side,
+                            phase_assessment=phase_assessment,
+                        )
+                        execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        execution_total += 1
+                elif stage in {"exit", "reduce"}:
+                    if phase_assessment is not None and phase_assessment.allows_exit_monitoring:
+                        execution_payload = _build_execution_payload(
+                            exec_request_id=exec_request_id,
+                            risk_decision_id=risk_decision_id,
+                            decision_ts=decision_ts,
+                            symbol=symbol,
+                            side=side,
+                            phase_assessment=phase_assessment,
+                        )
+                        execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        execution_total += 1
+                    else:
+                        add_anomaly(
+                            "major",
+                            "exit-phase-blocked",
+                            (
+                                f"{stage} execution request suppressed because exit monitoring is not active "
+                                f"(phase={phase_assessment.phase if phase_assessment else 'unknown'}, line={line_no})."
+                            ),
+                            related_ids=[intent_id, risk_decision_id, exec_request_id],
+                        )
+                else:
+                    if phase_assessment is not None and phase_assessment.forced_exit_active:
+                        execution_payload = _build_execution_payload(
+                            exec_request_id=exec_request_id,
+                            risk_decision_id=risk_decision_id,
+                            decision_ts=decision_ts,
+                            symbol=symbol,
+                            side=side,
+                            phase_assessment=phase_assessment,
+                        )
+                        execution_file.write(json.dumps(execution_payload, ensure_ascii=False) + "\n")
+                        execution_total += 1
+                    else:
+                        add_anomaly(
+                            "major",
+                            "forced-exit-phase-blocked",
+                            (
+                                f"{stage} execution request suppressed because forced-exit is not active "
+                                f"(phase={phase_assessment.phase if phase_assessment else 'unknown'}, line={line_no})."
+                            ),
+                            related_ids=[intent_id, risk_decision_id, exec_request_id],
+                        )
 
         orders_path = baseline_dir / "orders.jsonl"
         if orders_path.exists():
@@ -743,6 +873,7 @@ def normalize_baseline_bundle(
         },
         "session_phase_contract": session_phase_contract,
         "session_phase_trace": [entry.as_dict() for entry in session_phase_trace],
+        "open_discovery_summary": open_discovery_summary,
         "execution_model": execution_model,
         "capability_posture": {
             "market_data_enabled": True,

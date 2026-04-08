@@ -27,29 +27,35 @@ def _twse_us(date: str, clock: str) -> int:
     return int(local.timestamp() * 1_000_000)
 
 
-def _build_baseline(tmp_path: Path, *, tick_times: list[str], decision_time: str) -> Path:
+def _build_baseline(
+    tmp_path: Path,
+    *,
+    tick_times: list[str],
+    decision_time: str,
+    tick_overrides: list[dict] | None = None,
+    decision_rows: list[dict] | None = None,
+) -> Path:
     baseline = tmp_path / "baseline"
     baseline.mkdir()
 
-    _write_jsonl(
-        baseline / "ticks.jsonl",
-        [
-            {
-                "raw_id": f"t{index + 1}",
-                "raw_event": "data",
-                "symbol": "2330",
-                "time": _twse_us("2026-03-13", tick_time),
-                "price": 950.0 + index,
-                "size": 10 - index,
-            }
-            for index, tick_time in enumerate(tick_times)
-        ],
-    )
+    tick_rows = []
+    for index, tick_time in enumerate(tick_times):
+        row = {
+            "raw_id": f"t{index + 1}",
+            "raw_event": "data",
+            "symbol": "2330",
+            "time": _twse_us("2026-03-13", tick_time),
+            "price": 950.0 + index,
+            "size": max(1, 10 - index),
+        }
+        if tick_overrides and index < len(tick_overrides):
+            row.update(tick_overrides[index])
+        tick_rows.append(row)
+    _write_jsonl(baseline / "ticks.jsonl", tick_rows)
 
-    decision_ts = str(_twse_us("2026-03-13", decision_time))
-    _write_jsonl(
-        baseline / "decisions.jsonl",
-        [
+    if decision_rows is None:
+        decision_ts = str(_twse_us("2026-03-13", decision_time))
+        decision_rows = [
             {
                 "stage": "features",
                 "ok": True,
@@ -86,8 +92,8 @@ def _build_baseline(tmp_path: Path, *, tick_times: list[str], decision_time: str
                 "ts": decision_ts,
                 "metrics": {"bars": 100},
             },
-        ],
-    )
+        ]
+    _write_jsonl(baseline / "decisions.jsonl", decision_rows)
 
     return baseline
 
@@ -105,6 +111,45 @@ def _build_regular_session_baseline(tmp_path: Path) -> Path:
         tmp_path,
         tick_times=["08:59:50", "09:00:05", "09:01:10"],
         decision_time="09:01:10",
+    )
+
+
+def _build_open_discovery_baseline(tmp_path: Path) -> Path:
+    return _build_baseline(
+        tmp_path,
+        tick_times=["08:59:55", "09:00:05", "09:00:20", "09:01:10"],
+        decision_time="09:01:10",
+        tick_overrides=[
+            {"isTrial": True, "volume": 0},
+            {"isTrial": True, "volume": 0},
+            {"isTrial": False, "volume": 1200},
+            {"isTrial": False, "volume": 2400},
+        ],
+    )
+
+
+def _build_forced_exit_baseline(tmp_path: Path) -> Path:
+    ts = str(_twse_us("2026-03-13", "13:18:05"))
+    return _build_baseline(
+        tmp_path,
+        tick_times=["13:17:55", "13:18:05", "13:25:05"],
+        decision_time="13:18:05",
+        tick_overrides=[
+            {"isTrial": False, "volume": 10000},
+            {"isTrial": False, "volume": 10100},
+            {"isTrial": False, "volume": 12000},
+        ],
+        decision_rows=[
+            {
+                "stage": "forced_exit",
+                "ok": True,
+                "reason": "forced_exit:flatten_window",
+                "side": "sell",
+                "symbol": "2330",
+                "ts": ts,
+                "metrics": {"bars": 100},
+            }
+        ],
     )
 
 
@@ -199,6 +244,71 @@ def test_sim_normalize_baseline_regular_session_emits_execution_request(tmp_path
     assert execution_rows[0]["requested_user_def_suffix"] == "Enter"
     assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
     assert run_manifest["session_phase_trace"][-1]["phase"] == "regular_session"
+
+
+def test_sim_normalize_baseline_records_open_discovery_summary(tmp_path: Path, capsys) -> None:
+    baseline = _build_open_discovery_baseline(tmp_path)
+    output_dir = tmp_path / "bundle_open_discovery"
+
+    code = main(
+        [
+            "sim",
+            "normalize-baseline",
+            "--baseline-dir",
+            str(baseline),
+            "--output-dir",
+            str(output_dir),
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--json",
+        ]
+    )
+    capsys.readouterr()
+    run_manifest = _load_json(output_dir / "run-manifest.json")
+    event_rows = [json.loads(line) for line in (output_dir / "event-log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    assert code == 0
+    assert run_manifest["open_discovery_summary"]["saw_trial_match_event"] is True
+    assert run_manifest["open_discovery_summary"]["saw_official_open_signal"] is True
+    assert run_manifest["open_discovery_summary"]["first_trial_match_utc"] is not None
+    assert run_manifest["open_discovery_summary"]["first_official_open_signal_utc"] is not None
+    assert any(row["market_observation_state"] == "trial-match" for row in event_rows)
+    assert any(row["market_observation_state"] == "official-open-print" for row in event_rows)
+
+
+def test_sim_normalize_baseline_emits_forced_exit_execution_request(tmp_path: Path, capsys) -> None:
+    baseline = _build_forced_exit_baseline(tmp_path)
+    output_dir = tmp_path / "bundle_forced_exit"
+
+    code = main(
+        [
+            "sim",
+            "normalize-baseline",
+            "--baseline-dir",
+            str(baseline),
+            "--output-dir",
+            str(output_dir),
+            "--session-date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--json",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    execution_rows = [json.loads(line) for line in (output_dir / "execution-log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    risk_rows = [json.loads(line) for line in (output_dir / "risk-receipts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    assert code == 0
+    assert payload["counts"]["execution_requests"] == 1
+    assert execution_rows[0]["market_phase"] == "forced_exit"
+    assert execution_rows[0]["phase_semantic_label"] == "forced_close"
+    assert execution_rows[0]["time_in_force"] == "ROD"
+    assert execution_rows[0]["order_profile_name"] == "forced-exit-market-rod"
+    assert execution_rows[0]["requested_user_def_suffix"] == "Close"
+    assert risk_rows[0]["policy_name"] == "legacy_forced_exit_policy"
 
 
 def test_sim_run_live_shares_phase_trace_with_replay_bundle(tmp_path: Path, capsys) -> None:

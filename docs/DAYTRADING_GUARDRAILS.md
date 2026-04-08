@@ -118,6 +118,8 @@ Uses live market data but does not submit live broker orders.
 
 For the session-phase reconciliation line, replay sim and live sim may differ at the **event-source adapter edge**, but they should share the same downstream **session-phase classifier / intent / risk / execution truth**. The product should not quietly fork phase semantics by mode.
 
+Open-discovery should also be treated as a truth surface, not just a wall-clock approximation: when the normalized event stream carries trial/official-open hints (for example `isTrial`, trade/session markers, non-trial prints), those observations should be preserved in artifacts so later verifier passes can distinguish warmup/trial-match from the first official open evidence.
+
 These modes matter because they let the product validate:
 
 - emergency stop behavior

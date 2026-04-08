@@ -188,6 +188,21 @@ Still open after slice 2a:
 - forced-close executor behavior beyond contract disclosure (chunking, pacing, lifecycle receipts)
 - phase-aware non-entry execution artifacts / richer order-profile matrix implementation
 
+## Implementation status — 2026-04-08 slice 2b
+
+Landed in repo truth/code:
+- normalized event rows can now carry `market_observation_state` so open-discovery evidence preserves trial-match vs official-open observations when source payloads expose them
+- `run-manifest.json` now carries `open_discovery_summary`
+- the artifact bridge now supports a first non-entry execution surface for `exit` / `reduce` / `forced_exit` / `close` / `flatten` stages using phase-aware order profiles and user-def suffix hints
+- synthetic tests now cover:
+  - trial-match -> official-open observation summary
+  - forced-exit execution requests with `ROD` / `forced-exit-market-rod` / `Close`
+
+Still open after slice 2b:
+- open-discovery still relies on event-hint presence rather than a richer explicit exchange/open-state model
+- forced-close lifecycle behavior still stops at execution-request surface (no chunking/pacing/order-lifecycle receipts yet)
+- dashboard does not yet visualize open-discovery summaries directly
+
 ## Topology statement
 
 - runtime/system topology: unchanged

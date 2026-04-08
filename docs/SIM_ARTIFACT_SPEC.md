@@ -234,6 +234,7 @@ Recommended when session truth matters:
 - `session_contract_status`
 - `order_profile_name`
 - `requested_user_def_suffix`
+- `market_observation_state` on normalized event rows when open-discovery evidence matters
 
 ### 7) `order-lifecycle.jsonl` (required)
 
@@ -387,3 +388,4 @@ A run is v1-compliant only if:
 4. intent/risk/execution/order/fill/position chain is linkable by IDs
 5. `pnl-summary.json` includes gross + net fields
 6. `scenario_id` is present, and if `scenario-spec.json` exists it is consistent with `run-manifest.json`
+`run-manifest.json`
