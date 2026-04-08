@@ -77,9 +77,13 @@ uv run pytest
 uv run ruff check .
 ```
 
-## Mission Control dashboard demo (read-only, committed fixture index)
+## Steamer Dashboard demo (read-only, committed fixture index)
 
 Truth contract for the local browser demo:
+
+- top-level tabs: `Live Sim` + `Strategy Powerhouse / Strategy Cards`
+- strategy tab opens with a thin read-only active-family baton line sourced from local proposal/active plan artifacts
+- execution authority remains in `steamer-card-engine`; `strategy-powerhouse` stays research / packaging / control-plane support only
 
 - discovered fixture dates: `2026-03-06`, `2026-03-10`, `2026-03-12`, `2026-03-20`, `2026-03-24`, `2026-03-25`, `2026-03-26`, `2026-03-27`, `2026-03-30`, `2026-03-31`, `2026-04-01`, `2026-04-02`, `2026-04-08`
 - hero day: `2026-04-08`
@@ -110,7 +114,7 @@ npm run build
 cd ..
 ```
 
-Launch the local Mission Control demo inside the container/runtime:
+Launch the local Steamer Dashboard demo inside the container/runtime:
 
 ```bash
 uv run uvicorn steamer_card_engine.dashboard.api:create_app --factory --host 0.0.0.0 --port 8000

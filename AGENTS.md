@@ -5,8 +5,8 @@ This file is for coding agents and automation assistants working in this repo.
 ## 1) Mission and current boundary
 
 - Repo type: **docs-first seed runtime** for Taiwan stock intraday card/deck workflows.
-- Current reliable surface: manifest contracts (`auth/card/deck/global`) and CLI `validate/inspect` commands.
-- Replay/operator/runtime execution is still partial or placeholder.
+- Current reliable surface: manifest contracts (`auth/card/deck/global`), CLI `validate/inspect` commands, and the read-only Steamer Dashboard / API over committed or local artifacts.
+- Replay/operator/runtime execution authority is still partial or placeholder; the dashboard remains observability/support only and does not grant live control authority.
 
 Do not overclaim runtime completeness.
 
