@@ -12,7 +12,9 @@ The existing `Strategy Powerhouse / Strategy Cards` tab is now a smaller truthfu
 
 ## What changed
 
-The strategy tab still stays read-only and local-artifact-backed, but each surfaced family now carries:
+The strategy tab still stays read-only and local-artifact-backed, and its history / verifier / baton-source discovery now rides a thin shared index helper anchored on the latest distinct-family proposal plan.
+
+Each surfaced family now carries:
 
 - current gate
 - handoff state
@@ -25,6 +27,9 @@ The browser does **not** claim broker, order, auth, or governance authority.
 It remains a dashboard over local runtime-safe artifacts only.
 
 ## History sources used
+
+Source discovery is now indexed by `src/steamer_card_engine/dashboard/history_source_index.py`.
+The helper finds the latest `proposed_distinct_families_*.json`, derives its proposal day, and reuses that day to resolve the shared packet / bounded-backtest / verifier bundle plus recognized family-specific extras and the latest locally indexed baton-source receipt.
 
 Common local sources:
 
@@ -89,12 +94,16 @@ The frontend now renders those sections directly inside each family card, and ad
 ## Verifiers / smokes
 
 - `uv run pytest -q tests/test_dashboard.py`
+- focused helper assertion in `tests/test_dashboard.py::test_strategy_history_source_index_indexes_current_three_families`
 - `uv run pytest -q`
+- `uv run ruff check src/steamer_card_engine/dashboard/history_source_index.py src/steamer_card_engine/dashboard/strategy_powerhouse.py tests/test_dashboard.py`
 - `npm run build` in `frontend/`
 - API smoke via `TestClient(create_app())` confirming:
   - `tw_orb_reclaim_long_5m` latest packet = `packet`
   - `tw_gap_reclaim_long_3m` latest packet = `parameter-estimate`
   - `tw_vcp_dryup_reclaim_bounded` latest packet = `gate-analysis`
+  - verifier refs still resolve through the shared index helper
+  - baton breadcrumb / last baton source still resolve truthfully from local artifacts
   - timeline counts render truthfully from local artifacts
 
 ## Boundary / topology statement
@@ -110,8 +119,10 @@ The frontend now renders those sections directly inside each family card, and ad
 
 This is still a **bounded local artifact browser**, not a generalized research warehouse.
 
+The thin indexed backend helper is now landed for the current shared packet / verifier / family-extra / baton-source slice.
+
 Next useful blade if we keep pushing this line:
 
-1. optionally dedupe/normalize family-history source discovery so future family packets can be added with less explicit path wiring
-2. if the strategy-powerhouse packet cadence broadens, separate `timeline` vs `verifier-only` discovery into a thin indexed backend helper rather than hand-curated family maps
-3. landed: bounded “last active-plan change” breadcrumb now rides above the baton line while keeping strategy-powerhouse explicitly non-authoritative; any richer history should stay on the same read-only contract
+1. extend the helper with one more recognized family-extra suffix only when a new packet type actually lands; do not pre-build a warehouse
+2. if multiple same-family packets per day become normal, add bounded ordering/dedup rules inside the helper rather than pushing more path logic back into the view layer
+3. any richer baton history should stay read-only and should continue to cite local campaign receipts rather than inventing a new control plane

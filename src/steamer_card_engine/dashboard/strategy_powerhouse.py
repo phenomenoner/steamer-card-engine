@@ -9,6 +9,7 @@ import tomllib
 from typing import Any
 
 from .fixtures import repo_root
+from .history_source_index import IndexedArtifact, build_strategy_history_source_index
 
 
 @dataclass(frozen=True)
@@ -38,52 +39,6 @@ CARD_SOURCES = (
         card_relpath=Path("examples/cards/tw_gap_reclaim_long_3m.toml"),
         deck_relpath=Path("examples/decks/tw_cash_gap_reclaim_long_3m.toml"),
     ),
-)
-
-PROPOSAL_PLAN_RELATIVE_PATH = Path(
-    ".state/steamer/card-engine-morning-paired-lane/proposed_distinct_families_20260409.json"
-)
-ACTIVE_PLAN_RELATIVE_PATH = Path(
-    ".state/steamer/card-engine-morning-paired-lane/active_deck_plan.json"
-)
-MORNING_PACKET_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_distinct_families_morning_packet.md"
-)
-BOUNDED_BACKTEST_MD_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_distinct_families_bounded_backtest.md"
-)
-BOUNDED_BACKTEST_JSON_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_distinct_families_bounded_backtest.json"
-)
-SYNTHETIC_VERIFIER_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers/"
-    "2026-04-09_distinct_families_synthetic_verifier.md"
-)
-SYNTHETIC_VERIFIER_JSON_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers/"
-    "2026-04-09_distinct_families_synthetic_verifier.json"
-)
-GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_tw_gap_reclaim_long_param_estimate.md"
-)
-GAP_PARAM_ESTIMATE_JSON_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_tw_gap_reclaim_long_param_estimate.json"
-)
-VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_tw_vcp_dryup_reclaim_blocker_surgery.md"
-)
-VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
-    "2026-04-09_tw_vcp_dryup_reclaim_blocker_surgery.json"
-)
-CAMPAIGNS_RELATIVE_PATH = Path(
-    "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns"
 )
 
 SECTION_RE = re.compile(r"^## (?P<title>[^\n]+)\n(?P<body>.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
@@ -126,6 +81,13 @@ def _safe_relpath(path: Path, base: Path) -> str:
         return str(path.relative_to(base))
     except ValueError:
         return str(path)
+
+
+def _artifact_relpath(artifact: IndexedArtifact, base: Path) -> str:
+    primary_path = artifact.primary_path
+    if primary_path is None:
+        raise StrategyPowerhouseDataError(f"indexed artifact has no usable path: {artifact.kind}")
+    return _safe_relpath(primary_path, base)
 
 
 def _resolve_workspace_path(workspace_root: Path, raw_path: str | Path) -> Path:
@@ -278,54 +240,6 @@ def _extract_backtick_field(markdown: str, label: str) -> str | None:
     return match.group(1).strip()
 
 
-def _find_last_active_candidate_change(*, workspace_root: Path, active_family: str | None) -> dict[str, Any] | None:
-    if not active_family:
-        return None
-
-    campaigns_root = workspace_root / CAMPAIGNS_RELATIVE_PATH
-    if not campaigns_root.exists():
-        return None
-
-    candidates: list[dict[str, Any]] = []
-    for state_path in campaigns_root.glob("*/STATE.json"):
-        state = _load_optional_json(state_path)
-        if not state:
-            continue
-        if str(state.get("activeCandidateId") or "").strip() != active_family:
-            continue
-
-        receipts_dir = state_path.parent / "receipts"
-        if not receipts_dir.exists():
-            continue
-
-        for receipt_path in receipts_dir.glob("*.md"):
-            markdown = _load_text(receipt_path)
-            if _extract_backtick_field(markdown, "new active candidate") != active_family:
-                continue
-
-            candidates.append(
-                {
-                    "campaign_id": str(state.get("campaignId") or state_path.parent.name),
-                    "changed_at": _extract_backtick_field(markdown, "timestamp"),
-                    "from_family": _extract_backtick_field(markdown, "parked candidate"),
-                    "to_family": _extract_backtick_field(markdown, "new active candidate"),
-                    "path": _safe_relpath(receipt_path, workspace_root),
-                    "summary": _extract_backtick_field(markdown, "summary"),
-                    "forcing_evidence": _extract_backtick_field(markdown, "forcing evidence"),
-                    "prior_receipt": _extract_backtick_field(markdown, "prior campaign receipt"),
-                }
-            )
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda item: (_timestamp_sort_key(item.get("changed_at")), item.get("path") or ""),
-        reverse=True,
-    )
-    return candidates[0]
-
-
 def _divergence_freshness(
     *,
     divergence_state: str,
@@ -392,6 +306,7 @@ def _build_baton_breadcrumb(
     active_plan_targets: list[dict[str, Any]],
     active_truth_state: str,
     divergence: dict[str, Any],
+    history_index: Any,
 ) -> dict[str, Any]:
     active_family = str(active_plan.get("family")) if active_plan and active_plan.get("family") else None
     active_source_path = (
@@ -402,7 +317,7 @@ def _build_baton_breadcrumb(
         if active_plan and active_plan.get("source_packet")
         else None
     )
-    previous_change = _find_last_active_candidate_change(workspace_root=workspace_root, active_family=active_family)
+    previous_change = history_index.latest_baton_change(active_family)
     target_labels = _target_display_labels(active_plan_targets)
     target_summary = ", ".join(target_labels) if target_labels else "no indexed active deck targets"
     freshness = _divergence_freshness(
@@ -432,7 +347,7 @@ def _build_baton_breadcrumb(
         }
 
     if previous_change is not None:
-        from_family = previous_change.get("from_family") or "unknown"
+        from_family = previous_change.from_family or "unknown"
         change_summary = (
             f"{from_family} → {active_family or 'unknown'}; current active plan carries {len(active_plan_targets)} deck(s): "
             f"{target_summary}."
@@ -463,12 +378,12 @@ def _build_baton_breadcrumb(
         "last_baton_source": {
             "state": "indexed" if previous_change is not None else "unknown",
             "label": baton_label,
-            "path": previous_change.get("path") if previous_change else None,
-            "changed_at": previous_change.get("changed_at") if previous_change else None,
-            "from_family": previous_change.get("from_family") if previous_change else None,
-            "to_family": previous_change.get("to_family") if previous_change else active_family,
-            "forcing_evidence": previous_change.get("forcing_evidence") if previous_change else None,
-            "summary": previous_change.get("summary") if previous_change else None,
+            "path": _safe_relpath(previous_change.path, workspace_root) if previous_change else None,
+            "changed_at": previous_change.changed_at if previous_change else None,
+            "from_family": previous_change.from_family if previous_change else None,
+            "to_family": previous_change.to_family if previous_change else active_family,
+            "forcing_evidence": previous_change.forcing_evidence if previous_change else None,
+            "summary": previous_change.summary if previous_change else None,
         },
         "change_summary": change_summary,
         "divergence_freshness": freshness,
@@ -635,6 +550,7 @@ def _backtest_history_entry(
     family_id: str,
     family_report: dict[str, Any],
     bounded_backtest: dict[str, Any],
+    backtest_source: IndexedArtifact,
     workspace_root: Path,
 ) -> dict[str, Any]:
     signals = int(family_report.get("selected_signals_total", 0) or 0)
@@ -651,7 +567,7 @@ def _backtest_history_entry(
         title="Bounded backtest packet",
         summary=summary,
         status=status,
-        path=_safe_relpath(workspace_root / BOUNDED_BACKTEST_MD_RELATIVE_PATH, workspace_root),
+        path=_artifact_relpath(backtest_source, workspace_root),
         source_kind="backtest",
     )
 
@@ -660,6 +576,7 @@ def _verifier_history_entry(
     *,
     family_id: str,
     verifier_payload: dict[str, Any],
+    verifier_source: IndexedArtifact,
     workspace_root: Path,
     positive_case_families: set[str],
     contract_only_families: set[str],
@@ -694,12 +611,17 @@ def _verifier_history_entry(
         title="Synthetic verifier receipt",
         summary="; ".join(summary_parts),
         status=status,
-        path=_safe_relpath(workspace_root / SYNTHETIC_VERIFIER_RELATIVE_PATH, workspace_root),
+        path=_artifact_relpath(verifier_source, workspace_root),
         source_kind="verifier",
     )
 
 
-def _vcp_blocker_history_entry(*, blocker_payload: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+def _vcp_blocker_history_entry(
+    *,
+    blocker_payload: dict[str, Any],
+    blocker_source: IndexedArtifact,
+    workspace_root: Path,
+) -> dict[str, Any]:
     latest10d = dict(blocker_payload.get("latest10d", {}))
     rows_total = int(latest10d.get("rows_total", 0) or 0)
     summary = dict(blocker_payload.get("summary", {}))
@@ -711,12 +633,17 @@ def _vcp_blocker_history_entry(*, blocker_payload: dict[str, Any], workspace_roo
         title="Blocker surgery packet",
         summary=f"Verdict HOLD after {rows_total:,} latest10d rows: {main_blocker}.",
         status=str(blocker_payload.get("verdict") or "hold").lower(),
-        path=_safe_relpath(workspace_root / VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH, workspace_root),
+        path=_artifact_relpath(blocker_source, workspace_root),
         source_kind="gate-analysis",
     )
 
 
-def _gap_param_history_entry(*, gap_payload: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+def _gap_param_history_entry(
+    *,
+    gap_payload: dict[str, Any],
+    gap_source: IndexedArtifact,
+    workspace_root: Path,
+) -> dict[str, Any]:
     selected = dict(gap_payload.get("selected", {}))
     summary = (
         f"Selected {selected.get('signals_total', 0)} signals / {selected.get('signal_days', 0)} days "
@@ -729,7 +656,7 @@ def _gap_param_history_entry(*, gap_payload: dict[str, Any], workspace_root: Pat
         title="Targeted parameter estimate",
         summary=summary,
         status="selected",
-        path=_safe_relpath(workspace_root / GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH, workspace_root),
+        path=_artifact_relpath(gap_source, workspace_root),
         source_kind="backtest",
     )
 
@@ -739,7 +666,7 @@ def _packet_history_entry(
     family_id: str,
     packet_body: str,
     packet_status: str | None,
-    packet_path: Path,
+    packet_source: IndexedArtifact,
     workspace_root: Path,
     packet_recorded_at: str | None,
     handoff_readiness: str,
@@ -755,7 +682,7 @@ def _packet_history_entry(
         title="Morning packet handoff",
         summary=summary,
         status=status,
-        path=_safe_relpath(packet_path, workspace_root),
+        path=_artifact_relpath(packet_source, workspace_root),
         source_kind="packet",
     )
 
@@ -765,7 +692,7 @@ def _proposal_history_entry(
     family_id: str,
     candidate_id: str,
     proposal_plan: dict[str, Any],
-    proposal_plan_path: Path,
+    proposal_source: IndexedArtifact,
     workspace_root: Path,
 ) -> dict[str, Any]:
     return _build_history_entry(
@@ -777,7 +704,7 @@ def _proposal_history_entry(
             f"Candidate `{candidate_id}` remains proposal truth only; active deck plan was not silently replaced."
         ),
         status="proposal-only",
-        path=_safe_relpath(proposal_plan_path, workspace_root),
+        path=_artifact_relpath(proposal_source, workspace_root),
         source_kind="control",
     )
 
@@ -786,21 +713,31 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     repo = root or repo_root()
     workspace_root = _workspace_root(repo)
 
-    proposal_plan_path = workspace_root / PROPOSAL_PLAN_RELATIVE_PATH
-    active_plan_path = workspace_root / ACTIVE_PLAN_RELATIVE_PATH
-    source_packet_path = workspace_root / MORNING_PACKET_RELATIVE_PATH
-    verifier_path = workspace_root / SYNTHETIC_VERIFIER_RELATIVE_PATH
-    verifier_json_path = workspace_root / SYNTHETIC_VERIFIER_JSON_RELATIVE_PATH
-    bounded_backtest_json_path = workspace_root / BOUNDED_BACKTEST_JSON_RELATIVE_PATH
-    bounded_backtest_md_path = workspace_root / BOUNDED_BACKTEST_MD_RELATIVE_PATH
-    gap_param_estimate_json_path = workspace_root / GAP_PARAM_ESTIMATE_JSON_RELATIVE_PATH
-    vcp_blocker_json_path = workspace_root / VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH
+    try:
+        history_index = build_strategy_history_source_index(
+            repo=repo,
+            family_ids=[source.family_id for source in CARD_SOURCES],
+        )
+    except FileNotFoundError as error:
+        raise StrategyPowerhouseDataError(str(error)) from error
 
+    proposal_source = history_index.global_source("proposal")
+    packet_source = history_index.global_source("packet")
+    backtest_source = history_index.global_source("backtest")
+    verifier_source = history_index.global_source("verifier")
+    if proposal_source is None or packet_source is None or backtest_source is None or verifier_source is None:
+        raise StrategyPowerhouseDataError("strategy history source index is missing one or more required global sources")
+    if proposal_source.json_path is None or packet_source.md_path is None or backtest_source.json_path is None or verifier_source.json_path is None:
+        raise StrategyPowerhouseDataError("strategy history source index returned incomplete source paths")
+
+    proposal_plan_path = history_index.proposal_plan_path
+    active_plan_path = history_index.active_plan_path
+    source_packet_path = packet_source.md_path
     proposal_plan = _load_json(proposal_plan_path)
     active_plan = _load_optional_json(active_plan_path)
     morning_packet = _load_text(source_packet_path)
-    bounded_backtest = _load_json(bounded_backtest_json_path)
-    verifier_payload = _load_json(verifier_json_path)
+    bounded_backtest = _load_json(backtest_source.json_path)
+    verifier_payload = _load_json(verifier_source.json_path)
 
     packet_sections = _extract_sections(morning_packet)
     family_packet_sections = _extract_family_sections(morning_packet)
@@ -822,37 +759,19 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         if item.get("variant_id") and item.get("deck_path")
     }
 
-    vcp_blocker_payload = _load_json(vcp_blocker_json_path) if vcp_blocker_json_path.exists() else None
-    gap_param_estimate_payload = _load_json(gap_param_estimate_json_path) if gap_param_estimate_json_path.exists() else None
+    def _register_used_source(*, label: str, kind: str, path: str) -> None:
+        used_source_map.setdefault(path, {"label": label, "kind": kind, "path": path})
 
     cards: list[dict[str, Any]] = []
-    used_source_map: dict[str, dict[str, str]] = {
-        _safe_relpath(proposal_plan_path, workspace_root): {
-            "label": "proposal plan",
-            "kind": "proposal",
-            "path": _safe_relpath(proposal_plan_path, workspace_root),
-        },
-        _safe_relpath(active_plan_path, workspace_root): {
-            "label": "active plan",
-            "kind": "control",
-            "path": _safe_relpath(active_plan_path, workspace_root),
-        },
-        _safe_relpath(source_packet_path, workspace_root): {
-            "label": "morning packet",
-            "kind": "packet",
-            "path": _safe_relpath(source_packet_path, workspace_root),
-        },
-        _safe_relpath(verifier_path, workspace_root): {
-            "label": "synthetic verifier",
-            "kind": "verifier",
-            "path": _safe_relpath(verifier_path, workspace_root),
-        },
-        _safe_relpath(bounded_backtest_md_path, workspace_root): {
-            "label": "bounded backtest",
-            "kind": "backtest",
-            "path": _safe_relpath(bounded_backtest_md_path, workspace_root),
-        },
-    }
+    extra_payload_cache: dict[str, dict[str, Any]] = {}
+    used_source_map: dict[str, dict[str, str]] = {}
+    _register_used_source(label="active plan", kind="control", path=_safe_relpath(active_plan_path, workspace_root))
+    for artifact in (proposal_source, packet_source, verifier_source, backtest_source):
+        _register_used_source(
+            label=artifact.label,
+            kind=artifact.kind,
+            path=_artifact_relpath(artifact, workspace_root),
+        )
 
     for source in CARD_SOURCES:
         card_path = repo / source.card_relpath
@@ -864,6 +783,15 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             raise StrategyPowerhouseDataError(f"missing strategy card manifest: {card_path}")
         if not deck_path.exists():
             raise StrategyPowerhouseDataError(f"missing strategy deck manifest: {deck_path}")
+
+        family_artifacts = history_index.sources_for_family(source.family_id)
+        proposal_artifact = next((item for item in family_artifacts if item.kind == "proposal"), None)
+        packet_artifact = next((item for item in family_artifacts if item.kind == "packet"), None)
+        backtest_artifact = next((item for item in family_artifacts if item.kind == "backtest"), None)
+        verifier_artifact = next((item for item in family_artifacts if item.kind == "verifier"), None)
+        extra_artifacts = [item for item in family_artifacts if item.kind in {"gate-analysis", "parameter-estimate"}]
+        if proposal_artifact is None or packet_artifact is None or backtest_artifact is None:
+            raise StrategyPowerhouseDataError(f"missing indexed family history sources for {source.family_id}")
 
         card = _load_toml(card_path)
         deck = _load_toml(deck_path)
@@ -914,27 +842,18 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "kind": "deck",
                 "path": _safe_relpath(deck_path, workspace_root),
             },
-            {
-                "label": "morning packet",
-                "kind": "packet",
-                "path": _safe_relpath(source_packet_path, workspace_root),
-            },
-            {
-                "label": "synthetic verifier",
-                "kind": "verifier",
-                "path": _safe_relpath(verifier_path, workspace_root),
-            },
-            {
-                "label": "proposal plan",
-                "kind": "proposal",
-                "path": _safe_relpath(proposal_plan_path, workspace_root),
-            },
-            {
-                "label": "bounded backtest",
-                "kind": "backtest",
-                "path": _safe_relpath(bounded_backtest_md_path, workspace_root),
-            },
         ]
+        for artifact in (packet_artifact, verifier_artifact, proposal_artifact, backtest_artifact, *extra_artifacts):
+            if artifact is None:
+                continue
+            links.append(
+                {
+                    "label": artifact.label,
+                    "kind": artifact.kind,
+                    "path": _artifact_relpath(artifact, workspace_root),
+                }
+            )
+
         backtest_packet = metadata.get("backtest_packet")
         if isinstance(backtest_packet, str) and backtest_packet:
             links.append(
@@ -950,14 +869,14 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 family_id=source.family_id,
                 candidate_id=source.candidate_id,
                 proposal_plan=proposal_plan,
-                proposal_plan_path=proposal_plan_path,
+                proposal_source=proposal_artifact,
                 workspace_root=workspace_root,
             ),
             _packet_history_entry(
                 family_id=source.family_id,
                 packet_body=family_packet_sections.get(source.family_id, ""),
                 packet_status=packet_status,
-                packet_path=source_packet_path,
+                packet_source=packet_artifact,
                 workspace_root=workspace_root,
                 packet_recorded_at=packet_recorded_at,
                 handoff_readiness=handoff_readiness,
@@ -966,39 +885,46 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 family_id=source.family_id,
                 family_report=family_report,
                 bounded_backtest=bounded_backtest,
+                backtest_source=backtest_artifact,
                 workspace_root=workspace_root,
-            ),
-            _verifier_history_entry(
-                family_id=source.family_id,
-                verifier_payload=verifier_payload,
-                workspace_root=workspace_root,
-                positive_case_families=positive_case_families,
-                contract_only_families=contract_only_families,
             ),
         ]
+        if verifier_artifact is not None:
+            family_timeline.append(
+                _verifier_history_entry(
+                    family_id=source.family_id,
+                    verifier_payload=verifier_payload,
+                    verifier_source=verifier_artifact,
+                    workspace_root=workspace_root,
+                    positive_case_families=positive_case_families,
+                    contract_only_families=contract_only_families,
+                )
+            )
 
-        if source.family_id == "tw_vcp_dryup_reclaim" and vcp_blocker_payload is not None:
-            family_timeline.append(
-                _vcp_blocker_history_entry(blocker_payload=vcp_blocker_payload, workspace_root=workspace_root)
-            )
-            blocker_path = _safe_relpath(workspace_root / VCP_BLOCKER_SURGERY_MD_RELATIVE_PATH, workspace_root)
-            links.append({"label": "blocker surgery", "kind": "gate-analysis", "path": blocker_path})
-            used_source_map[blocker_path] = {
-                "label": "blocker surgery",
-                "kind": "gate-analysis",
-                "path": blocker_path,
-            }
-        if source.family_id == "tw_gap_reclaim_long" and gap_param_estimate_payload is not None:
-            family_timeline.append(
-                _gap_param_history_entry(gap_payload=gap_param_estimate_payload, workspace_root=workspace_root)
-            )
-            gap_path = _safe_relpath(workspace_root / GAP_PARAM_ESTIMATE_MD_RELATIVE_PATH, workspace_root)
-            links.append({"label": "parameter estimate", "kind": "backtest", "path": gap_path})
-            used_source_map[gap_path] = {
-                "label": "parameter estimate",
-                "kind": "backtest",
-                "path": gap_path,
-            }
+        for artifact in extra_artifacts:
+            if artifact.json_path is None:
+                continue
+            cache_key = str(artifact.json_path)
+            extra_payload = extra_payload_cache.get(cache_key)
+            if extra_payload is None:
+                extra_payload = _load_json(artifact.json_path)
+                extra_payload_cache[cache_key] = extra_payload
+            if artifact.kind == "gate-analysis":
+                family_timeline.append(
+                    _vcp_blocker_history_entry(
+                        blocker_payload=extra_payload,
+                        blocker_source=artifact,
+                        workspace_root=workspace_root,
+                    )
+                )
+            elif artifact.kind == "parameter-estimate":
+                family_timeline.append(
+                    _gap_param_history_entry(
+                        gap_payload=extra_payload,
+                        gap_source=artifact,
+                        workspace_root=workspace_root,
+                    )
+                )
 
         family_timeline.sort(
             key=lambda item: (_timestamp_sort_key(item.get("timestamp")), item.get("event_id", "")),
@@ -1011,7 +937,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         verifier_history = [item for item in family_timeline if item["kind"] == "verifier"]
 
         for link in links:
-            used_source_map.setdefault(link["path"], link)
+            _register_used_source(label=str(link["label"]), kind=str(link["kind"]), path=str(link["path"]))
 
         cards.append(
             {
@@ -1085,26 +1011,23 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         active_plan_targets=active_plan_targets,
         active_truth_state=active_truth_state,
         divergence=divergence,
+        history_index=history_index,
     )
     baton_source = breadcrumb.get("last_baton_source", {})
     if baton_source.get("path"):
-        used_source_map.setdefault(
-            str(baton_source["path"]),
-            {
-                "label": "last baton source",
-                "kind": "control",
-                "path": str(baton_source["path"]),
-            },
+        _register_used_source(
+            label="last baton source",
+            kind="control",
+            path=str(baton_source["path"]),
         )
     if baton_source.get("forcing_evidence"):
-        used_source_map.setdefault(
-            str(baton_source["forcing_evidence"]),
-            {
-                "label": "forcing evidence",
-                "kind": "backtest",
-                "path": str(baton_source["forcing_evidence"]),
-            },
+        _register_used_source(
+            label="forcing evidence",
+            kind="backtest",
+            path=str(baton_source["forcing_evidence"]),
         )
+
+    source_packet_relpath = _artifact_relpath(packet_source, workspace_root)
 
     return {
         "updated_at": proposal_plan.get("prepared_at"),
@@ -1153,7 +1076,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             "proposal": {
                 "family": proposal_plan.get("family"),
                 "prepared_at": proposal_plan.get("prepared_at"),
-                "source_packet": _safe_relpath(source_packet_path, workspace_root),
+                "source_packet": source_packet_relpath,
                 "targets": proposed_plan_targets,
                 "target_labels": _target_display_labels(proposed_plan_targets),
             },
@@ -1167,7 +1090,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             "proposal_family": proposal_plan.get("family"),
             "proposal_prepared_at": proposal_plan.get("prepared_at"),
             "proposal_state": "proposed-not-active",
-            "source_packet": _safe_relpath(source_packet_path, workspace_root),
+            "source_packet": source_packet_relpath,
             "truthful_boundary": proposal_plan.get("truthful_boundary"),
             "active_family": active_plan.get("family") if active_plan else None,
             "active_plan_source": _safe_relpath(

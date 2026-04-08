@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fixture_dates
 from steamer_card_engine.dashboard.fixtures import repo_root
+from steamer_card_engine.dashboard.history_source_index import build_strategy_history_source_index
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 
 
@@ -121,6 +122,45 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
     assert cards["tw_orb_reclaim_long_5m"]["verifier_history"][0]["status"] == "contract-only"
     assert any(event["kind"] == "plan" for event in cards["tw_gap_reclaim_long_3m"]["family_timeline"])
     assert any(link["kind"] == "verifier" for link in cards["tw_gap_reclaim_long_3m"]["related_links"])
+
+
+def test_strategy_history_source_index_indexes_current_three_families() -> None:
+    index = build_strategy_history_source_index(
+        repo=repo_root(),
+        family_ids=[
+            "tw_vcp_dryup_reclaim",
+            "tw_orb_reclaim_long",
+            "tw_gap_reclaim_long",
+        ],
+    )
+
+    assert index.proposal_day == "20260409"
+    assert index.global_source("packet").primary_path.name == "2026-04-09_distinct_families_morning_packet.md"
+    assert index.global_source("verifier").json_path.name == "2026-04-09_distinct_families_synthetic_verifier.json"
+    assert {item.kind for item in index.sources_for_family("tw_vcp_dryup_reclaim")} == {
+        "proposal",
+        "packet",
+        "backtest",
+        "verifier",
+        "gate-analysis",
+    }
+    assert {item.kind for item in index.sources_for_family("tw_orb_reclaim_long")} == {
+        "proposal",
+        "packet",
+        "backtest",
+        "verifier",
+    }
+    assert {item.kind for item in index.sources_for_family("tw_gap_reclaim_long")} == {
+        "proposal",
+        "packet",
+        "backtest",
+        "verifier",
+        "parameter-estimate",
+    }
+    assert index.latest_baton_change("tw_vcp_dryup_plus_reclaim").path.name.startswith(
+        "A08-governed-back-transition"
+    )
+
 
 
 def test_strategy_powerhouse_view_explicitly_flags_missing_active_plan_truth(tmp_path: Path) -> None:
