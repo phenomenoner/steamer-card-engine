@@ -1,0 +1,45 @@
+card_id = "tw-vcp-dryup-reclaim-s10-v1"
+name = "TW VCP Dryup+Reclaim S10"
+version = "0.1.0"
+strategy_family = "tw-vcp-dryup-plus-reclaim"
+instrument_scope = ["TW_EQUITY"]
+status = "replay-only"
+entry_module = "cards.tw_vcp_dryup_reclaim:build_card"
+
+symbol_pool = ["2330", "2317", "2454", "3017"]
+feature_requirements = [
+  "bars.1m",
+  "indicator.ema.5",
+  "indicator.vcp",
+]
+
+[parameters]
+candidate_id = "tw_vcp_dryup_plus_reclaim_s10"
+vcp_min_trend_slope = 10.0
+vcp_tightness_pct = 0.35
+vcp_breakout_vol_mult = 2.5
+vcp_vol_dryup_ratio = 0.8
+paired_thesis = "dryup_secondary_after_reclaim"
+
+[capital_controls]
+max_order_notional = 150000
+max_daily_notional = 500000
+max_open_positions = 2
+
+[risk_policy.stop_loss]
+mode = "percent_from_open"
+value = 1.8
+
+[risk_policy.take_profit]
+mode = "risk_reward_multiple"
+value = 1.5
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"
+
+[metadata]
+owner = "steamer-marshal"
+provenance = "2026-04-09 top3 morning paired lane prep"
+backtest_packet = "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/2026-04-09_tw_vcp_dryup_plus_reclaim_top3_latest10d.md"
+notes = "Strict reclaim anchor; preserves the existing high-slope comparator lane."

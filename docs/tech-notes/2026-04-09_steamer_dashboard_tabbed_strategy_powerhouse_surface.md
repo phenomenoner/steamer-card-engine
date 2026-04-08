@@ -54,6 +54,11 @@ The strategy tab now also opens with a thin read-only **active-family baton line
 
 - today’s active family from the current active paired-lane plan
 - the active plan source packet and attached deck manifests
+- a thin breadcrumb for the last indexed active-plan / baton change:
+  - active plan change timestamp from `active_deck_plan.json`
+  - last indexed baton source receipt when local campaign history can prove it
+  - family/deck change summary with explicit unknown / not indexed fallback when prior deck truth is unavailable
+  - fresh vs stale divergence based on the indexed active-plan vs newer diverging proposal gap (`<=24h` = fresh)
 - proposal handoff readiness summarized from the proposed distinct-family cards
 - explicit proposed-vs-active divergence when the proposal family/targets do not match the current active paired lane
 - explicit missing/empty active-plan truth when no active plan file is present
@@ -79,7 +84,9 @@ This slice is intentionally read-only.
   - `/api/strategy-powerhouse` baton line returns:
     - active family `tw_vcp_dryup_plus_reclaim`
     - active deck attachments `s2`, `s5`, `s10`
-    - proposal-vs-active divergence = `diverged`
+    - breadcrumb shows last active-plan change at `2026-04-09T00:45:00+08:00`
+    - breadcrumb resolves the prior indexed baton source to `A08-governed-back-transition-2026-04-05T15:20:49+08:00.md`
+    - proposal-vs-active divergence = `diverged`, freshness = `fresh`
     - handoff readiness summary remains proposal-only / read-only
 
 ## Remaining limit

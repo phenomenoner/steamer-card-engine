@@ -283,6 +283,29 @@ type StrategyPowerhouseView = {
   baton_line: {
     today: string | null;
     read_only_note: string;
+    breadcrumb: {
+      state: string;
+      note: string;
+      last_active_change_at: string | null;
+      last_active_change_source: string | null;
+      last_baton_source: {
+        state: string;
+        label: string;
+        path: string | null;
+        changed_at: string | null;
+        from_family: string | null;
+        to_family: string | null;
+        forcing_evidence: string | null;
+        summary: string | null;
+      };
+      change_summary: string;
+      divergence_freshness: {
+        state: string;
+        reference_at: string | null;
+        age_hours: number | null;
+        note: string;
+      };
+    };
     active: {
       truth_state: string;
       family: string | null;
@@ -364,6 +387,11 @@ function formatTimestamp(value: string | null | undefined) {
     hour12: false,
     timeZone: "Asia/Taipei",
   });
+}
+
+function formatHours(value: number | null | undefined) {
+  if (value === null || value === undefined) return "—";
+  return `${value.toFixed(2)}h`;
 }
 
 function stringifyValue(value: unknown): string {
@@ -504,6 +532,12 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
   ];
   const activeFamilyLabel = view.baton_line.active.family ?? "No active family truth present";
   const proposalFamilyLabel = view.baton_line.proposal.family ?? "No proposal family recorded";
+  const breadcrumb = view.baton_line.breadcrumb;
+  const lastBatonSource = breadcrumb.last_baton_source;
+  const previousFamilyLabel = lastBatonSource.from_family ?? "unknown / not indexed";
+  const freshnessMeta = breadcrumb.divergence_freshness.age_hours !== null
+    ? `${formatHours(breadcrumb.divergence_freshness.age_hours)} indexed gap`
+    : formatTimestamp(breadcrumb.divergence_freshness.reference_at);
 
   return (
     <main className="strategy-surface">
@@ -514,6 +548,39 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
         </div>
         <div className="panel-body">
           <p className="strategy-note strategy-boundary-note">{view.baton_line.read_only_note}</p>
+          <article className="baton-breadcrumb">
+            <div className="baton-breadcrumb-head">
+              <div>
+                <p className="mini-label">Last active-plan / baton change</p>
+                <strong>{formatTimestamp(breadcrumb.last_active_change_at)}</strong>
+              </div>
+              <div className="strategy-chip-row baton-breadcrumb-chips">
+                <StatusChip value={breadcrumb.state} />
+                <StatusChip value={breadcrumb.divergence_freshness.state} />
+              </div>
+            </div>
+            <div className="baton-breadcrumb-grid">
+              <div>
+                <p className="mini-label">Previous baton source</p>
+                <div className="card-meta">{previousFamilyLabel} → {lastBatonSource.to_family ?? activeFamilyLabel}</div>
+                <code>{lastBatonSource.path ?? lastBatonSource.label}</code>
+                <p className="card-meta">{formatTimestamp(lastBatonSource.changed_at)}</p>
+              </div>
+              <div>
+                <p className="mini-label">Current active source</p>
+                <code>{breadcrumb.last_active_change_source ?? "No active plan source packet recorded"}</code>
+                <p className="card-meta">{breadcrumb.change_summary}</p>
+              </div>
+              <div>
+                <p className="mini-label">Divergence freshness</p>
+                <div className="card-meta">{freshnessMeta}</div>
+                <p className="card-meta">{breadcrumb.divergence_freshness.note}</p>
+              </div>
+            </div>
+            {lastBatonSource.forcing_evidence ? <code>{lastBatonSource.forcing_evidence}</code> : null}
+            {lastBatonSource.summary ? <p className="strategy-note">{lastBatonSource.summary}</p> : null}
+            <p className="strategy-note">{breadcrumb.note}</p>
+          </article>
           <div className="baton-grid">
             <article className="baton-card">
               <div className="baton-head">

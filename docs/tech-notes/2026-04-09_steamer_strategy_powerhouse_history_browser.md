@@ -114,4 +114,4 @@ Next useful blade if we keep pushing this line:
 
 1. optionally dedupe/normalize family-history source discovery so future family packets can be added with less explicit path wiring
 2. if the strategy-powerhouse packet cadence broadens, separate `timeline` vs `verifier-only` discovery into a thin indexed backend helper rather than hand-curated family maps
-3. if operators want same-day change visibility, add a bounded “last active-plan change” breadcrumb while keeping strategy-powerhouse explicitly non-authoritative
+3. landed: bounded “last active-plan change” breadcrumb now rides above the baton line while keeping strategy-powerhouse explicitly non-authoritative; any richer history should stay on the same read-only contract

@@ -82,6 +82,9 @@ VCP_BLOCKER_SURGERY_JSON_RELATIVE_PATH = Path(
     "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests/"
     "2026-04-09_tw_vcp_dryup_reclaim_blocker_surgery.json"
 )
+CAMPAIGNS_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns"
+)
 
 SECTION_RE = re.compile(r"^## (?P<title>[^\n]+)\n(?P<body>.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
 FAMILY_SECTION_RE = re.compile(
@@ -256,6 +259,220 @@ def _timestamp_sort_key(raw_value: str | None) -> tuple[int, float, str]:
         return (1, parsed.timestamp(), value)
     except ValueError:
         return (0, float("-inf"), value)
+
+
+def _parse_timestamp(raw_value: str | None) -> datetime | None:
+    value = _normalize_timestamp(raw_value)
+    if value is None:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _extract_backtick_field(markdown: str, label: str) -> str | None:
+    match = re.search(rf"^- {re.escape(label)}:\s*`([^`]+)`", markdown, re.MULTILINE)
+    if match is None:
+        return None
+    return match.group(1).strip()
+
+
+def _find_last_active_candidate_change(*, workspace_root: Path, active_family: str | None) -> dict[str, Any] | None:
+    if not active_family:
+        return None
+
+    campaigns_root = workspace_root / CAMPAIGNS_RELATIVE_PATH
+    if not campaigns_root.exists():
+        return None
+
+    candidates: list[dict[str, Any]] = []
+    for state_path in campaigns_root.glob("*/STATE.json"):
+        state = _load_optional_json(state_path)
+        if not state:
+            continue
+        if str(state.get("activeCandidateId") or "").strip() != active_family:
+            continue
+
+        receipts_dir = state_path.parent / "receipts"
+        if not receipts_dir.exists():
+            continue
+
+        for receipt_path in receipts_dir.glob("*.md"):
+            markdown = _load_text(receipt_path)
+            if _extract_backtick_field(markdown, "new active candidate") != active_family:
+                continue
+
+            candidates.append(
+                {
+                    "campaign_id": str(state.get("campaignId") or state_path.parent.name),
+                    "changed_at": _extract_backtick_field(markdown, "timestamp"),
+                    "from_family": _extract_backtick_field(markdown, "parked candidate"),
+                    "to_family": _extract_backtick_field(markdown, "new active candidate"),
+                    "path": _safe_relpath(receipt_path, workspace_root),
+                    "summary": _extract_backtick_field(markdown, "summary"),
+                    "forcing_evidence": _extract_backtick_field(markdown, "forcing evidence"),
+                    "prior_receipt": _extract_backtick_field(markdown, "prior campaign receipt"),
+                }
+            )
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda item: (_timestamp_sort_key(item.get("changed_at")), item.get("path") or ""),
+        reverse=True,
+    )
+    return candidates[0]
+
+
+def _divergence_freshness(
+    *,
+    divergence_state: str,
+    active_prepared_at: str | None,
+    proposal_prepared_at: str | None,
+) -> dict[str, Any]:
+    if divergence_state == "aligned":
+        return {
+            "state": "aligned",
+            "reference_at": None,
+            "age_hours": None,
+            "note": "No active-vs-proposed divergence is currently indexed.",
+        }
+    if divergence_state != "diverged":
+        return {
+            "state": "unknown",
+            "reference_at": proposal_prepared_at or active_prepared_at,
+            "age_hours": None,
+            "note": "Fresh/stale cannot be classified because the divergence truth itself is incomplete.",
+        }
+
+    active_dt = _parse_timestamp(active_prepared_at)
+    proposal_dt = _parse_timestamp(proposal_prepared_at)
+    if active_dt is None or proposal_dt is None:
+        return {
+            "state": "unknown",
+            "reference_at": proposal_prepared_at or active_prepared_at,
+            "age_hours": None,
+            "note": (
+                "Fresh/stale needs both active-plan and proposal timestamps. At least one indexed timestamp is "
+                "missing or unparsable."
+            ),
+        }
+
+    if proposal_dt <= active_dt:
+        return {
+            "state": "stale",
+            "reference_at": active_prepared_at,
+            "age_hours": 0.0,
+            "note": (
+                "The proposed family diverges, but its indexed timestamp is not newer than the active plan. "
+                "Treat the current divergence as stale until a newer proposal lands."
+            ),
+        }
+
+    age_hours = round((proposal_dt - active_dt).total_seconds() / 3600, 2)
+    freshness_state = "fresh" if age_hours <= 24 else "stale"
+    return {
+        "state": freshness_state,
+        "reference_at": proposal_prepared_at,
+        "age_hours": age_hours,
+        "note": (
+            "Fresh/stale reflects the indexed active-vs-proposed baton gap: a newer diverging proposal within 24h of "
+            "the active plan is fresh; anything older is stale."
+        ),
+    }
+
+
+def _build_baton_breadcrumb(
+    *,
+    workspace_root: Path,
+    active_plan: dict[str, Any] | None,
+    proposal_plan: dict[str, Any],
+    active_plan_targets: list[dict[str, Any]],
+    active_truth_state: str,
+    divergence: dict[str, Any],
+) -> dict[str, Any]:
+    active_family = str(active_plan.get("family")) if active_plan and active_plan.get("family") else None
+    active_source_path = (
+        _safe_relpath(
+            _resolve_workspace_path(workspace_root, active_plan.get("source_packet", "")),
+            workspace_root,
+        )
+        if active_plan and active_plan.get("source_packet")
+        else None
+    )
+    previous_change = _find_last_active_candidate_change(workspace_root=workspace_root, active_family=active_family)
+    target_labels = _target_display_labels(active_plan_targets)
+    target_summary = ", ".join(target_labels) if target_labels else "no indexed active deck targets"
+    freshness = _divergence_freshness(
+        divergence_state=str(divergence.get("state") or "unknown"),
+        active_prepared_at=str(active_plan.get("prepared_at")) if active_plan and active_plan.get("prepared_at") else None,
+        proposal_prepared_at=str(proposal_plan.get("prepared_at")) if proposal_plan.get("prepared_at") else None,
+    )
+
+    if active_truth_state != "present":
+        return {
+            "state": "unknown",
+            "note": "Active plan truth is missing or empty, so the last active-plan breadcrumb cannot be fully indexed.",
+            "last_active_change_at": active_plan.get("prepared_at") if active_plan else None,
+            "last_active_change_source": active_source_path,
+            "last_baton_source": {
+                "state": "unknown",
+                "label": "unknown / not indexed",
+                "path": None,
+                "changed_at": None,
+                "from_family": None,
+                "to_family": active_family,
+                "forcing_evidence": None,
+                "summary": None,
+            },
+            "change_summary": "Current active family/deck change cannot be reconstructed because active plan truth is not present.",
+            "divergence_freshness": freshness,
+        }
+
+    if previous_change is not None:
+        from_family = previous_change.get("from_family") or "unknown"
+        change_summary = (
+            f"{from_family} → {active_family or 'unknown'}; current active plan carries {len(active_plan_targets)} deck(s): "
+            f"{target_summary}."
+        )
+        state = "indexed"
+        note = (
+            "Current active-plan timestamp/source come from the paired-lane active plan. Previous baton source comes from "
+            "an indexed autonomous-slow-cook activation receipt."
+        )
+        baton_label = "governed back-transition receipt"
+    else:
+        change_summary = (
+            f"{active_family or 'unknown'} active plan currently carries {len(active_plan_targets)} deck(s): {target_summary}. "
+            "Previous family/deck baton source is not indexed locally."
+        )
+        state = "partial"
+        note = (
+            "Current active-plan timestamp/source are indexed. Previous baton source could not be confirmed from local "
+            "campaign receipts, so the breadcrumb stays partial."
+        )
+        baton_label = "unknown / not indexed"
+
+    return {
+        "state": state,
+        "note": note,
+        "last_active_change_at": active_plan.get("prepared_at") if active_plan else None,
+        "last_active_change_source": active_source_path,
+        "last_baton_source": {
+            "state": "indexed" if previous_change is not None else "unknown",
+            "label": baton_label,
+            "path": previous_change.get("path") if previous_change else None,
+            "changed_at": previous_change.get("changed_at") if previous_change else None,
+            "from_family": previous_change.get("from_family") if previous_change else None,
+            "to_family": previous_change.get("to_family") if previous_change else active_family,
+            "forcing_evidence": previous_change.get("forcing_evidence") if previous_change else None,
+            "summary": previous_change.get("summary") if previous_change else None,
+        },
+        "change_summary": change_summary,
+        "divergence_freshness": freshness,
+    }
 
 
 def _format_bps(value: float | int | None) -> str:
@@ -861,6 +1078,33 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
         active_truth_state=active_truth_state,
         cards=cards,
     )
+    breadcrumb = _build_baton_breadcrumb(
+        workspace_root=workspace_root,
+        active_plan=active_plan,
+        proposal_plan=proposal_plan,
+        active_plan_targets=active_plan_targets,
+        active_truth_state=active_truth_state,
+        divergence=divergence,
+    )
+    baton_source = breadcrumb.get("last_baton_source", {})
+    if baton_source.get("path"):
+        used_source_map.setdefault(
+            str(baton_source["path"]),
+            {
+                "label": "last baton source",
+                "kind": "control",
+                "path": str(baton_source["path"]),
+            },
+        )
+    if baton_source.get("forcing_evidence"):
+        used_source_map.setdefault(
+            str(baton_source["forcing_evidence"]),
+            {
+                "label": "forcing evidence",
+                "kind": "backtest",
+                "path": str(baton_source["forcing_evidence"]),
+            },
+        )
 
     return {
         "updated_at": proposal_plan.get("prepared_at"),
@@ -881,6 +1125,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "Read-only support surface only. strategy-powerhouse does not own execution; "
                 "steamer-card-engine remains the execution surface."
             ),
+            "breadcrumb": breadcrumb,
             "active": {
                 "truth_state": active_truth_state,
                 "family": active_plan.get("family") if active_plan else None,

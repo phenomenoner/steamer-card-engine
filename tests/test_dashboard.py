@@ -90,6 +90,19 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
     assert surface["baton_line"]["divergence"]["state"] == "diverged"
     assert surface["baton_line"]["divergence"]["family_differs"] is True
     assert surface["baton_line"]["divergence"]["target_differs"] is True
+    assert surface["baton_line"]["breadcrumb"]["state"] == "indexed"
+    assert surface["baton_line"]["breadcrumb"]["last_active_change_at"] == "2026-04-09T00:45:00+08:00"
+    assert surface["baton_line"]["breadcrumb"]["last_active_change_source"].endswith(
+        "2026-04-09_tw_vcp_dryup_plus_reclaim_top3_latest10d.md"
+    )
+    assert surface["baton_line"]["breadcrumb"]["last_baton_source"]["from_family"] == "tw_vcp_trendgate_relief_pullback"
+    assert surface["baton_line"]["breadcrumb"]["last_baton_source"]["to_family"] == "tw_vcp_dryup_plus_reclaim"
+    assert surface["baton_line"]["breadcrumb"]["last_baton_source"]["path"].endswith(
+        "receipts/A08-governed-back-transition-2026-04-05T15-20-49+08-00.md"
+    )
+    assert surface["baton_line"]["breadcrumb"]["divergence_freshness"]["state"] == "fresh"
+    assert surface["baton_line"]["breadcrumb"]["divergence_freshness"]["age_hours"] == 2.04
+    assert "tw_vcp_trendgate_relief_pullback → tw_vcp_dryup_plus_reclaim" in surface["baton_line"]["breadcrumb"]["change_summary"]
     assert "priority-1 observation proposal" in surface["baton_line"]["handoff_readiness"]["summary"]
     assert "HOLD until a recorded trigger exists beyond synthetic proof" in surface["baton_line"]["handoff_readiness"]["summary"]
     assert surface["metrics"]["card_count"] == 3
@@ -140,6 +153,9 @@ def test_strategy_powerhouse_view_explicitly_flags_missing_active_plan_truth(tmp
     assert surface["baton_line"]["active"]["targets"] == []
     assert surface["baton_line"]["handoff_readiness"]["state"] == "active-truth-missing"
     assert surface["baton_line"]["divergence"]["state"] == "unknown"
+    assert surface["baton_line"]["breadcrumb"]["state"] == "unknown"
+    assert surface["baton_line"]["breadcrumb"]["last_baton_source"]["label"] == "unknown / not indexed"
+    assert surface["baton_line"]["breadcrumb"]["divergence_freshness"]["state"] == "unknown"
     assert "missing or empty" in surface["baton_line"]["divergence"]["note"]
     assert "do not replace the active paired lane" in surface["baton_line"]["handoff_readiness"]["summary"]
 
@@ -198,6 +214,11 @@ def test_dashboard_api_routes() -> None:
     assert strategy_payload["baton_line"]["active"]["family"] == "tw_vcp_dryup_plus_reclaim"
     assert strategy_payload["baton_line"]["active"]["targets"][0]["deck_id"] == "tw-cash-vcp-dryup-reclaim-s2"
     assert strategy_payload["baton_line"]["proposal"]["targets"][0]["deck_id"] == "tw-cash-vcp-dryup-reclaim-bounded"
+    assert strategy_payload["baton_line"]["breadcrumb"]["state"] == "indexed"
+    assert strategy_payload["baton_line"]["breadcrumb"]["last_baton_source"]["path"].endswith(
+        "receipts/A08-governed-back-transition-2026-04-05T15-20-49+08-00.md"
+    )
+    assert strategy_payload["baton_line"]["breadcrumb"]["divergence_freshness"]["state"] == "fresh"
     assert strategy_payload["baton_line"]["handoff_readiness"]["state"] == "proposed-read-only"
     assert strategy_payload["baton_line"]["divergence"]["state"] == "diverged"
 

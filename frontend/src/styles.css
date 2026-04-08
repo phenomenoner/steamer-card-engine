@@ -375,6 +375,38 @@ button {
   gap: 24px;
 }
 
+.baton-breadcrumb {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.baton-breadcrumb-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.baton-breadcrumb-chips {
+  justify-content: flex-start;
+}
+
+.baton-breadcrumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.baton-breadcrumb code {
+  display: block;
+  margin-top: 4px;
+}
+
 .baton-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
