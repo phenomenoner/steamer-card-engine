@@ -103,6 +103,17 @@ def test_dashboard_builds_recent_manual_live_bundle_truthfully() -> None:
     assert bundle["event_timeline"]
 
 
+def test_dashboard_surfaces_configured_cards_even_without_activity() -> None:
+    bundle = build_day_bundle("2026-04-09")
+    strategy_cards = bundle["deck_view"]["strategy"]["cards"]
+
+    assert strategy_cards
+    candidate_cards = [row for row in strategy_cards if row["lane"] == "steamer-card-engine"]
+    assert candidate_cards
+    assert any(row["activity_state"] == "configured-no-activity" for row in candidate_cards)
+    assert any(row["card_id"] == "legacy-baseline-card" for row in strategy_cards)
+
+
 def test_dashboard_flags_pre_open_execution_attempts_as_phase_violations() -> None:
     bundle = build_day_bundle("2026-03-12")
 

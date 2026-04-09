@@ -319,6 +319,10 @@ def normalize_baseline_bundle(
     emitter_version: str = "m1-normalizer/v0",
     determinism_note: str = "derived by baseline normalizer from legacy artifacts",
     config_snapshot_actor_key: str = "normalizer",
+    deck_id: str = "legacy-baseline-deck",
+    deck_version: str = "legacy/v0",
+    cards: list[dict[str, str]] | None = None,
+    global_config_version: str = "legacy/v0",
 ) -> dict[str, Any]:
     baseline_dir = baseline_dir.resolve()
     market_event_source_ref = market_event_source_ref or str(baseline_dir)
@@ -336,6 +340,8 @@ def normalize_baseline_bundle(
     anomalies: list[dict[str, Any]] = []
     session_phase_trace = []
     risk_emitted_ids: set[str] = set()
+    normalized_cards = cards or [{"card_id": "legacy-baseline-card", "card_version": deck_version}]
+    primary_card = normalized_cards[0]
     open_discovery_summary = {
         "saw_trial_match_event": False,
         "saw_official_open_signal": False,
@@ -543,9 +549,9 @@ def normalize_baseline_bundle(
                         "intent_id": intent_id,
                         "event_id": event_id,
                         "intent_time_utc": decision_ts,
-                        "card_id": "legacy-baseline-card",
-                        "card_version": "legacy/v0",
-                        "deck_id": "legacy-baseline-deck",
+                        "card_id": primary_card["card_id"],
+                        "card_version": primary_card.get("card_version", deck_version),
+                        "deck_id": deck_id,
                         "symbol": symbol,
                         "side": side,
                         "requested_qty": 0.0,
@@ -848,11 +854,11 @@ def normalize_baseline_bundle(
 
     config_snapshot = {
         "scenario_id": scenario_id,
-        "deck_id": "legacy-baseline-deck",
-        "deck_version": "legacy/v0",
-        "cards": [{"card_id": "legacy-baseline-card", "card_version": "legacy/v0"}],
-        "global_config_version": "legacy/v0",
-        "config_hash": _hash_text(f"{baseline_dir}:{session_date}"),
+        "deck_id": deck_id,
+        "deck_version": deck_version,
+        "cards": normalized_cards,
+        "global_config_version": global_config_version,
+        "config_hash": _hash_text(f"{baseline_dir}:{session_date}:{deck_id}:{normalized_cards}"),
         actor_key: {
             "name": emitter_name,
             "version": emitter_version,

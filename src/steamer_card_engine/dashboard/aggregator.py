@@ -282,7 +282,9 @@ def _lane_payload(
                 break
 
     cards = []
+    card_keys_present: set[tuple[str, str]] = set()
     for key, summary in card_rollups.items():
+        card_keys_present.add(key)
         cards.append(
             {
                 "id": f"{lane}:{summary['card_id']}",
@@ -302,6 +304,40 @@ def _lane_payload(
                 "reason_distribution": _top_counter(summary["intent_reasons"], limit=8),
                 "risk_reason_distribution": _top_counter(risk_reason_counts.get(key, Counter()), limit=8),
                 "anomaly_refs": [anomaly["anomaly_id"] for anomaly in anomalies],
+                "activity_state": "active",
+            }
+        )
+
+    for configured in deck["cards"]:
+        if not isinstance(configured, dict):
+            continue
+        card_id = str(configured.get("card_id") or "").strip()
+        if not card_id:
+            continue
+        card_version = str(configured.get("card_version") or "unknown")
+        key = (card_id, card_version)
+        if key in card_keys_present:
+            continue
+        cards.append(
+            {
+                "id": f"{lane}:{card_id}",
+                "card_id": card_id,
+                "card_version": card_version,
+                "deck_id": deck["deck_id"],
+                "lane": lane,
+                "intent_count": 0,
+                "signal_intent_count": 0,
+                "entry_intent_count": 0,
+                "allowed_risk_count": 0,
+                "blocked_risk_count": 0,
+                "execution_request_count": 0,
+                "feature_record_count": 0,
+                "top_symbols": [],
+                "sides": [],
+                "reason_distribution": [],
+                "risk_reason_distribution": [],
+                "anomaly_refs": [anomaly["anomaly_id"] for anomaly in anomalies],
+                "activity_state": "configured-no-activity",
             }
         )
 
@@ -785,13 +821,26 @@ def build_card_detail(
     features = _load_jsonl(bundle_dir / "feature-provenance.jsonl")
 
     card_intents = [row for row in intents if row.get("card_id") == card_id]
-    if not card_intents:
+    configured_cards = config_snapshot.get("cards") or []
+    configured_card = next(
+        (
+            row
+            for row in configured_cards
+            if isinstance(row, dict) and str(row.get("card_id") or "").strip() == card_id
+        ),
+        None,
+    )
+    if not card_intents and configured_card is None:
         raise DashboardDataError(f"unknown card_id for lane {lane}: {card_id}")
 
     card_intents.sort(key=lambda row: (row.get("intent_time_utc", ""), row.get("intent_id", "")))
 
-    deck_id = card_intents[0].get("deck_id") or config_snapshot.get("deck_id")
-    card_version = card_intents[0].get("card_version", "unknown")
+    deck_id = (card_intents[0].get("deck_id") if card_intents else None) or config_snapshot.get("deck_id")
+    card_version = (
+        card_intents[0].get("card_version", "unknown")
+        if card_intents
+        else str((configured_card or {}).get("card_version") or "unknown")
+    )
     deck_version = config_snapshot.get("deck_version")
 
     symbols = Counter(row.get("symbol", "unknown") for row in card_intents)
@@ -818,6 +867,10 @@ def build_card_detail(
     qty_exec = [row.get("qty") for row in card_exec if "qty" in row]
 
     truth_notes: list[str] = []
+    if not card_intents and configured_card is not None:
+        truth_notes.append(
+            "This card is configured in the committed deck snapshot, but the selected fixture emitted no intent rows for it."
+        )
     if qty_requested and all(float(qty) == 0.0 for qty in qty_requested if qty is not None):
         truth_notes.append(
             "All intent requested_qty values are 0.0 in this committed fixture bundle (placeholder shells)."

@@ -510,6 +510,8 @@ def _emit_live_sim_bundle(args: argparse.Namespace) -> dict:
         }
 
     market_source_id = f"live-sim-capture:{baseline_dir.resolve()}"
+    deck_manifest = load_deck_manifest(args.deck)
+    deck_cards = [{"card_id": card_id, "card_version": "manifest/v0"} for card_id in deck_manifest.cards]
 
     summary = normalize_baseline_bundle(
         baseline_dir=baseline_dir,
@@ -534,6 +536,10 @@ def _emit_live_sim_bundle(args: argparse.Namespace) -> dict:
             "(no broker submission semantics)"
         ),
         config_snapshot_actor_key="emitter",
+        deck_id=deck_manifest.deck_id,
+        deck_version="manifest/v0",
+        cards=deck_cards,
+        global_config_version="manifest/v0",
     )
     summary["mode"] = "live-sim"
     summary["baseline_dir"] = str(baseline_dir.resolve())

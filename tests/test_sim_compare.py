@@ -357,7 +357,14 @@ def test_sim_run_live_shares_phase_trace_with_replay_bundle(tmp_path: Path, caps
     live_payload = json.loads(capsys.readouterr().out)
 
     replay_manifest = _load_json(replay_output / "run-manifest.json")
-    live_manifest = _load_json(Path(live_payload["bundle_dir"]) / "run-manifest.json")
+    live_bundle = Path(live_payload["bundle_dir"])
+    live_manifest = _load_json(live_bundle / "run-manifest.json")
+    live_config = _load_json(live_bundle / "config-snapshot.json")
+    live_intents = [
+        json.loads(line)
+        for line in (live_bundle / "intent-log.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
     assert replay_code == 0
     assert live_code == 0
@@ -365,6 +372,10 @@ def test_sim_run_live_shares_phase_trace_with_replay_bundle(tmp_path: Path, caps
     assert live_payload["mode"] == "live-sim"
     assert replay_manifest["session_phase_trace"] == live_manifest["session_phase_trace"]
     assert live_manifest["capability_posture"]["trade_enabled"] is False
+    assert live_config["deck_id"] == "tw-cash-main"
+    assert live_config["cards"] == [{"card_id": "gap-reclaim-v1", "card_version": "manifest/v0"}]
+    assert {row["deck_id"] for row in live_intents} == {"tw-cash-main"}
+    assert {row["card_id"] for row in live_intents} == {"gap-reclaim-v1"}
 
 
 def test_sim_compare_hard_fails_execution_model_mismatch(tmp_path: Path, capsys) -> None:
