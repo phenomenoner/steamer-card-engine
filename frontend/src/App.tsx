@@ -306,6 +306,20 @@ type StrategyPowerhouseView = {
         note: string;
       };
     };
+    activation: {
+      plan_state: string;
+      plan_note: string;
+      latest_pointer_present: boolean;
+      latest: {
+        activation_state: string | null;
+        activated_at: string | null;
+        changed: boolean | null;
+        receipt: string | null;
+        effective_scope: string | null;
+        effective_run_day: string | null;
+        note: string | null;
+      } | null;
+    };
     active: {
       truth_state: string;
       family: string | null;
@@ -611,6 +625,37 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
               </div>
               <strong className="baton-value">{view.baton_line.today ?? "Current day"}</strong>
               <p className="strategy-note">{view.baton_line.handoff_readiness.summary}</p>
+            </article>
+
+            <article className="baton-card">
+              <div className="baton-head">
+                <span className="mini-label">Activation / Promotion</span>
+                <StatusChip value={view.baton_line.activation.plan_state} />
+              </div>
+              {view.baton_line.activation.latest?.activated_at ? (
+                <p className="card-meta">Activated at {formatTimestamp(view.baton_line.activation.latest.activated_at)}</p>
+              ) : (
+                <p className="card-meta">No activation timestamp recorded.</p>
+              )}
+              <p className="card-meta">
+                Effective scope: {view.baton_line.activation.latest?.effective_scope ?? "unknown"}
+              </p>
+              {view.baton_line.activation.latest?.effective_run_day ? (
+                <p className="card-meta">Effective run day: {view.baton_line.activation.latest.effective_run_day}</p>
+              ) : null}
+              <p className="strategy-note">{view.baton_line.activation.plan_note}</p>
+              {view.baton_line.activation.latest?.note ? (
+                <p className="strategy-note">{view.baton_line.activation.latest.note}</p>
+              ) : null}
+              {view.baton_line.activation.latest?.receipt ? (
+                <code>{view.baton_line.activation.latest.receipt}</code>
+              ) : (
+                <div className="baton-empty">
+                  {view.baton_line.activation.latest_pointer_present
+                    ? "Activation pointer exists but receipt path is missing."
+                    : "No activation receipt pointer found."}
+                </div>
+              )}
             </article>
 
             <article className="baton-card">

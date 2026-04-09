@@ -9,7 +9,7 @@ import tomllib
 from typing import Any
 
 from .fixtures import repo_root
-from .history_source_index import IndexedArtifact, build_strategy_history_source_index
+from .history_source_index import IndexedArtifact, STATE_RELATIVE_PATH, build_strategy_history_source_index
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,8 @@ CARD_SOURCES = (
         deck_relpath=Path("examples/decks/tw_cash_gap_reclaim_long_3m.toml"),
     ),
 )
+
+ACTIVATION_LATEST_RELATIVE_PATH = STATE_RELATIVE_PATH / "activation_latest.json"
 
 SECTION_RE = re.compile(r"^## (?P<title>[^\n]+)\n(?P<body>.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
 FAMILY_SECTION_RE = re.compile(
@@ -1027,6 +1029,63 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             path=str(baton_source["forcing_evidence"]),
         )
 
+    activation_latest_path = workspace_root / ACTIVATION_LATEST_RELATIVE_PATH
+    activation_latest = _load_optional_json(activation_latest_path)
+    if activation_latest is not None:
+        _register_used_source(
+            label="activation latest",
+            kind="control",
+            path=_safe_relpath(activation_latest_path, workspace_root),
+        )
+        receipt_path = activation_latest.get("receipt")
+        if receipt_path:
+            _register_used_source(
+                label="activation receipt",
+                kind="control",
+                path=_safe_relpath(_resolve_workspace_path(workspace_root, receipt_path), workspace_root),
+            )
+
+    plan_state = "unknown"
+    plan_note = "Activation/promotion state is unknown."
+    if active_truth_state != "present":
+        plan_state = "unknown"
+        plan_note = "Active plan truth is missing or empty, so promotion/activation cannot be fully classified."
+    elif divergence.get("state") == "aligned":
+        plan_state = "activated"
+        plan_note = "Active paired-lane plan currently matches the proposal plan; no prepared-only drift remains."
+    elif divergence.get("state") == "diverged":
+        plan_state = "prepared-only"
+        plan_note = (
+            "Proposal plan diverges from the current active paired-lane plan. Treat it as prepared-only until an explicit "
+            "governed activation receipt is recorded (no silent same-day drift)."
+        )
+
+    activation_surface = {
+        "plan_state": plan_state,
+        "plan_note": plan_note,
+        "latest_pointer_present": activation_latest is not None,
+        "latest": (
+            {
+                "activation_state": activation_latest.get("activation_state"),
+                "activated_at": activation_latest.get("activated_at"),
+                "changed": activation_latest.get("changed"),
+                "receipt": (
+                    _safe_relpath(
+                        _resolve_workspace_path(workspace_root, activation_latest.get("receipt")),
+                        workspace_root,
+                    )
+                    if activation_latest.get("receipt")
+                    else None
+                ),
+                "effective_scope": activation_latest.get("runtime_window", {}).get("effective_scope"),
+                "effective_run_day": activation_latest.get("runtime_window", {}).get("effective_run_day"),
+                "note": activation_latest.get("runtime_window", {}).get("note"),
+            }
+            if activation_latest is not None
+            else None
+        ),
+    }
+
     source_packet_relpath = _artifact_relpath(packet_source, workspace_root)
 
     return {
@@ -1049,6 +1108,7 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
                 "steamer-card-engine remains the execution surface."
             ),
             "breadcrumb": breadcrumb,
+            "activation": activation_surface,
             "active": {
                 "truth_state": active_truth_state,
                 "family": active_plan.get("family") if active_plan else None,
