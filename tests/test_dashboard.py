@@ -132,6 +132,12 @@ def test_strategy_powerhouse_view_surfaces_local_research_truth() -> None:
     assert surface["boundary"]["execution_authority"] == "none"
     assert surface["proposal"]["proposal_state"] == "proposed-not-active"
     assert surface["metrics"]["card_count"] == 3
+    assert surface["architecture_map"]["stages"]
+    assert any(stage["stage_id"] == "verifier-run" for stage in surface["architecture_map"]["stages"])
+    assert surface["focus_lines"]
+    assert any(line["line_id"] == "intraday_failed_auction_short" for line in surface["focus_lines"])
+    assert surface["glossary"]
+    assert any(item["zh"] == "驗證執行器" for item in surface["glossary"])
 
     root = repo_root()
     workspace_root = root.parent
@@ -325,6 +331,9 @@ def test_dashboard_api_routes() -> None:
     assert strategy_payload["metrics"]["card_count"] == 3
     assert strategy_payload["cards"][0]["family_timeline"]
     assert "activation" in strategy_payload["baton_line"]
+    assert strategy_payload["architecture_map"]["stages"]
+    assert strategy_payload["focus_lines"]
+    assert strategy_payload["glossary"]
 
     # Sanity: latest fixture date stays resolvable.
     latest_summary_response = client.get(f"/api/days/{latest_date}/summary")

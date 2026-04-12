@@ -245,6 +245,41 @@ type StrategyPlanTarget = {
   deck_manifest_present: boolean;
 };
 
+type StrategyPipelineStage = {
+  stage_id: string;
+  label: string;
+  role: string;
+  current_surface: string;
+  status: string;
+  summary: string;
+  latest_receipt: string | null;
+  blocking_note: string | null;
+};
+
+type StrategyGlossaryItem = {
+  term: string;
+  zh: string;
+  plain: string;
+  role: string;
+};
+
+type StrategyFocusLine = {
+  line_id: string;
+  title: string;
+  status: string;
+  family: string | null;
+  variant: string | null;
+  summary: string;
+  next_gate: string;
+  topology_changed: boolean;
+  receipts: Array<{
+    label: string;
+    kind: string;
+    path: string;
+    timestamp: string | null;
+  }>;
+};
+
 type StrategyPowerhouseCard = {
   candidate_id: string;
   family_id: string;
@@ -356,6 +391,12 @@ type StrategyPowerhouseView = {
     active_family: string | null;
     active_plan_source: string | null;
   };
+  architecture_map: {
+    note: string;
+    stages: StrategyPipelineStage[];
+  };
+  glossary: StrategyGlossaryItem[];
+  focus_lines: StrategyFocusLine[];
   metrics: {
     card_count: number;
     ready_count: number;
@@ -692,6 +733,93 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
               { label: "updated", value: formatTimestamp(view.updated_at) },
             ]}
           />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>架構對照表 / Canon Flow</h3>
+          <span className="pill">DYNAMIC STATUS</span>
+        </div>
+        <div className="panel-body">
+          <p className="strategy-note strategy-boundary-note">{view.architecture_map.note}</p>
+          <div className="history-list">
+            {view.architecture_map.stages.map((stage) => (
+              <article className="history-item" key={stage.stage_id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{stage.label}</div>
+                    <div className="card-meta">{stage.role} · {stage.current_surface}</div>
+                  </div>
+                  <StatusChip value={stage.status} />
+                </div>
+                <p className="card-meta">{stage.summary}</p>
+                {stage.blocking_note ? <p className="strategy-note">{stage.blocking_note}</p> : null}
+                {stage.latest_receipt ? <code>{stage.latest_receipt}</code> : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Current Focus Lines</h3>
+          <span className="pill">LATEST RECEIPTS</span>
+        </div>
+        <div className="panel-body">
+          <div className="history-list">
+            {view.focus_lines.map((line) => (
+              <article className="history-item" key={line.line_id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{line.title}</div>
+                    <div className="card-meta">
+                      {line.family ?? "no parent family"}
+                      {line.variant ? ` · ${line.variant}` : ""}
+                    </div>
+                  </div>
+                  <StatusChip value={line.status} />
+                </div>
+                <p className="card-meta">{line.summary}</p>
+                <p className="strategy-note">Next gate: {line.next_gate}</p>
+                <div className="baton-inline-list">topology changed: {String(line.topology_changed)}</div>
+                {line.receipts.length ? (
+                  <div className="sources-grid">
+                    {line.receipts.map((receipt) => (
+                      <div className="source-card" key={`${line.line_id}-${receipt.path}`}>
+                        <span className="mini-label">{receipt.kind}</span>
+                        <strong>{receipt.label}</strong>
+                        <div className="card-meta">{formatTimestamp(receipt.timestamp)}</div>
+                        <code>{receipt.path}</code>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="muted history-empty">No indexed receipts yet.</div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>中文對照 / Glossary</h3>
+          <span className="pill">PLAIN LANGUAGE</span>
+        </div>
+        <div className="panel-body">
+          <div className="sources-grid">
+            {view.glossary.map((item) => (
+              <div className="source-card" key={item.term}>
+                <span className="mini-label">{item.role}</span>
+                <strong>{item.zh}</strong>
+                <div className="card-meta">{item.term}</div>
+                <p className="strategy-note">{item.plain}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

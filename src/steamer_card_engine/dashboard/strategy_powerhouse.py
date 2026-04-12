@@ -54,6 +54,256 @@ class StrategyPowerhouseDataError(Exception):
     """Raised when the local strategy-powerhouse source surface cannot be built."""
 
 
+def _latest_matching_file(root: Path, pattern: str) -> Path | None:
+    matches = sorted(root.glob(pattern))
+    if not matches:
+        return None
+    return matches[-1]
+
+
+def _build_strategy_glossary() -> list[dict[str, str]]:
+    return [
+        {
+            "term": "intake lane",
+            "zh": "靈感入口",
+            "plain": "收外部靈感與研究想法的入口，先收件，不直接等於策略成立。",
+            "role": "source intake",
+        },
+        {
+            "term": "adapter",
+            "zh": "來源轉接頭",
+            "plain": "把 x_scout 或其他來源的原始筆記，轉成 Steamer 可治理的格式。",
+            "role": "source normalization",
+        },
+        {
+            "term": "family",
+            "zh": "母策略家族",
+            "plain": "同一個市場機制下的一組變體，不是每個 trigger 都要拆成新策略。",
+            "role": "research canon",
+        },
+        {
+            "term": "variant",
+            "zh": "具體切法",
+            "plain": "母家族中的第一刀，邊界比 family 更具體，適合先驗證。",
+            "role": "bounded slice",
+        },
+        {
+            "term": "verifier",
+            "zh": "驗證關卡",
+            "plain": "先回答這條切法有沒有活著，不等於已經證明能實盤上線。",
+            "role": "research gate",
+        },
+        {
+            "term": "driver",
+            "zh": "驗證執行器",
+            "plain": "把 verifier 問題真正跑成結果的小工具，屬於研究/回測階段，不是 live sim 引擎。",
+            "role": "execution helper",
+        },
+        {
+            "term": "steamer-card-engine",
+            "zh": "卡片／deck／live sim 執行面",
+            "plain": "當 research 線已經夠像樣，才進這個 execution/runtime surface 做 replay 與 live sim 觀察。",
+            "role": "execution surface",
+        },
+    ]
+
+
+def _build_pipeline_status_board(
+    *,
+    workspace_root: Path,
+    proposal_plan: dict[str, Any],
+    active_plan: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    handoffs_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/handoffs"
+    backtests_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests"
+    verifiers_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers"
+
+    intake_blade_map = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*blade-map.md")
+    intake_checkpoint = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*checkpoint.md")
+    family_selection = _latest_matching_file(backtests_root, "*_intraday_failed_auction_short_family_selection.md")
+    verifier_contract = _latest_matching_file(verifiers_root, "*_ifa_short_v1_orb_vwap_event_scan.md")
+    verifier_result_json = _latest_matching_file(backtests_root, "*_ifa_short_v1_orb_vwap_event_scan.json")
+    verifier_result_md = _latest_matching_file(backtests_root, "*_ifa_short_v1_orb_vwap_event_scan.md")
+
+    active_family = str(active_plan.get("family") or "") if active_plan else ""
+    proposal_family = str(proposal_plan.get("family") or "")
+    attached_now = active_family == "intraday_failed_auction_short" or proposal_family == "intraday_failed_auction_short"
+
+    stages = [
+        {
+            "stage_id": "intake-lane",
+            "label": "靈感入口 / intake lane",
+            "role": "source intake",
+            "current_surface": "generic ingest core + x_scout first adapter",
+            "status": "opened" if intake_checkpoint else "missing",
+            "summary": (
+                "來源入口已打開；保留 x_scout 相容，未來可接新來源。"
+                if intake_checkpoint
+                else "尚未找到 intake lane 開口的最新 checkpoint。"
+            ),
+            "latest_receipt": _safe_relpath(intake_checkpoint, workspace_root) if intake_checkpoint else None,
+            "blocking_note": None,
+        },
+        {
+            "stage_id": "family-selection",
+            "label": "家族收斂 / family selection",
+            "role": "research canon",
+            "current_surface": "strategy-powerhouse family packet",
+            "status": "selected" if family_selection else "missing",
+            "summary": (
+                "已選定『早盤上攻失敗回落家族』，並把 gap / squeeze 降回 variant 或 regime。"
+                if family_selection
+                else "尚未找到 failed-auction-short 的 family-selection packet。"
+            ),
+            "latest_receipt": _safe_relpath(family_selection, workspace_root) if family_selection else None,
+            "blocking_note": None,
+        },
+        {
+            "stage_id": "verifier-contract",
+            "label": "驗證包 / verifier contract",
+            "role": "research gate",
+            "current_surface": "ifa_short_v1_orb_vwap_event_scan",
+            "status": "prepared" if verifier_contract else "missing",
+            "summary": (
+                "Variant 1 已鎖定為『開盤上破失敗、站回 VWAP 失敗』。"
+                if verifier_contract
+                else "尚未找到 Variant 1 的 verifier contract。"
+            ),
+            "latest_receipt": _safe_relpath(verifier_contract, workspace_root) if verifier_contract else None,
+            "blocking_note": None,
+        },
+        {
+            "stage_id": "verifier-run",
+            "label": "真實資料掃描 / real-data verifier run",
+            "role": "bounded backtest",
+            "current_surface": "baseline full-session event scan",
+            "status": "completed" if verifier_result_json else "not-run",
+            "summary": (
+                "real-data event scan 已有結果，可直接收 honest verdict。"
+                if verifier_result_json
+                else "尚未跑出第一個 real-data event scan；目前只到 contract，不可冒稱有 verdict。"
+            ),
+            "latest_receipt": _safe_relpath(verifier_result_json or verifier_result_md, workspace_root)
+            if (verifier_result_json or verifier_result_md)
+            else None,
+            "blocking_note": (
+                None
+                if verifier_result_json
+                else "先補 full-session loader + short-event detector + thin driver，再談是否值得上 replay/live sim。"
+            ),
+        },
+        {
+            "stage_id": "live-sim-handoff",
+            "label": "live sim 交棒",
+            "role": "execution surface",
+            "current_surface": "steamer-card-engine",
+            "status": "attached" if attached_now else "not-attached",
+            "summary": (
+                "這條 family 已進 paired-lane active/proposal plan。"
+                if attached_now
+                else "目前還沒交棒到 steamer-card-engine 的 active/proposal plan；這是對的，因為 verifier 還沒跑完。"
+            ),
+            "latest_receipt": None,
+            "blocking_note": (
+                None
+                if attached_now
+                else "先完成 verifier，再決定要不要 card/deck 化進 replay 或 live sim observation。"
+            ),
+        },
+    ]
+
+    focus_lines = [
+        {
+            "line_id": "strategy-intake-lane",
+            "title": "策略靈感入口線",
+            "status": "opened" if intake_checkpoint else "missing",
+            "family": None,
+            "variant": None,
+            "summary": (
+                "已打開 intake lane：generic ingest core 在內，x_scout 保留為第一個 adapter。"
+                if intake_checkpoint
+                else "尚未找到 intake lane 的最新開口 receipt。"
+            ),
+            "next_gate": "保持 adapter-first；等第二個真來源出現再接，不要先造 registry。",
+            "topology_changed": False,
+            "receipts": [
+                {
+                    "label": "sakura blade map",
+                    "kind": "handoff",
+                    "path": _safe_relpath(intake_blade_map, workspace_root),
+                    "timestamp": intake_blade_map.name[:10] if intake_blade_map else None,
+                }
+                for _ in [0]
+                if intake_blade_map is not None
+            ]
+            + [
+                {
+                    "label": "checkpoint",
+                    "kind": "handoff",
+                    "path": _safe_relpath(intake_checkpoint, workspace_root),
+                    "timestamp": intake_checkpoint.name[:10] if intake_checkpoint else None,
+                }
+                for _ in [0]
+                if intake_checkpoint is not None
+            ],
+        },
+        {
+            "line_id": "intraday_failed_auction_short",
+            "title": "早盤上攻失敗回落家族",
+            "status": "verifier-prepared" if verifier_contract else ("family-selected" if family_selection else "missing"),
+            "family": "intraday_failed_auction_short",
+            "variant": "orb_up_fail_vwap_reclaim_fail",
+            "summary": (
+                "已選 family、已鎖定 Variant 1、已寫 verifier contract；現在差第一個 real-data event scan。"
+                if verifier_contract
+                else (
+                    "已選 family，但 verifier contract 尚未落齊。"
+                    if family_selection
+                    else "這條研究線尚未被 dashboard 索引到。"
+                )
+            ),
+            "next_gate": (
+                "用 baseline full-session data 跑 `ifa_short_v1_orb_vwap_event_scan`，收第一個 honest verdict。"
+                if verifier_contract
+                else "先完成 family-selection 與 verifier contract。"
+            ),
+            "topology_changed": False,
+            "receipts": [
+                {
+                    "label": "family selection",
+                    "kind": "backtest",
+                    "path": _safe_relpath(family_selection, workspace_root),
+                    "timestamp": family_selection.name[:10] if family_selection else None,
+                }
+                for _ in [0]
+                if family_selection is not None
+            ]
+            + [
+                {
+                    "label": "verifier contract",
+                    "kind": "verifier",
+                    "path": _safe_relpath(verifier_contract, workspace_root),
+                    "timestamp": verifier_contract.name[:10] if verifier_contract else None,
+                }
+                for _ in [0]
+                if verifier_contract is not None
+            ]
+            + [
+                {
+                    "label": "verifier result",
+                    "kind": "backtest",
+                    "path": _safe_relpath(verifier_result_json or verifier_result_md, workspace_root),
+                    "timestamp": (verifier_result_json or verifier_result_md).name[:10],
+                }
+                for _ in [0]
+                if (verifier_result_json or verifier_result_md) is not None
+            ],
+        },
+    ]
+
+    return stages, focus_lines
+
+
 def _workspace_root(repo: Path) -> Path:
     return repo.parent
 
@@ -1087,6 +1337,22 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
     }
 
     source_packet_relpath = _artifact_relpath(packet_source, workspace_root)
+    pipeline_stages, focus_lines = _build_pipeline_status_board(
+        workspace_root=workspace_root,
+        proposal_plan=proposal_plan,
+        active_plan=active_plan,
+    )
+    glossary = _build_strategy_glossary()
+
+    for line in focus_lines:
+        for receipt in line.get("receipts", []):
+            path = receipt.get("path")
+            if path:
+                _register_used_source(
+                    label=f"{line.get('title')} / {receipt.get('label')}",
+                    kind=str(receipt.get("kind") or "research"),
+                    path=str(path),
+                )
 
     return {
         "updated_at": proposal_plan.get("prepared_at"),
@@ -1160,6 +1426,12 @@ def build_strategy_powerhouse_view(root: Path | None = None) -> dict[str, Any]:
             if active_plan and active_plan.get("source_packet")
             else None,
         },
+        "architecture_map": {
+            "note": "Current canon flow: Powerhouse/backtest decides the cut, verifier driver runs the bounded scan, and steamer-card-engine only becomes the downstream replay/live-sim surface after the gate survives.",
+            "stages": pipeline_stages,
+        },
+        "glossary": glossary,
+        "focus_lines": focus_lines,
         "metrics": {
             "card_count": len(cards),
             "ready_count": ready_count,
