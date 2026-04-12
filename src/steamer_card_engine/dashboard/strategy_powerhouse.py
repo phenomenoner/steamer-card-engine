@@ -10,6 +10,7 @@ from typing import Any
 
 from .fixtures import repo_root
 from .history_source_index import IndexedArtifact, STATE_RELATIVE_PATH, build_strategy_history_source_index
+from .strategy_line_state import load_latest_line_state
 
 
 @dataclass(frozen=True)
@@ -116,188 +117,159 @@ def _build_pipeline_status_board(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     handoffs_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/handoffs"
     backtests_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests"
-    verifiers_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/verifiers"
-
     intake_blade_map = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*blade-map.md")
     intake_checkpoint = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*checkpoint.md")
-    family_selection = _latest_matching_file(backtests_root, "*_intraday_failed_auction_short_family_selection.md")
-    verifier_contract = _latest_matching_file(verifiers_root, "*_ifa_short_v1_orb_vwap_event_scan.md")
-    verifier_result_json = _latest_matching_file(backtests_root, "*_ifa_short_v1_orb_vwap_event_scan.json")
-    verifier_result_md = _latest_matching_file(backtests_root, "*_ifa_short_v1_orb_vwap_event_scan.md")
+
+    line_state = load_latest_line_state(
+        workspace_root=workspace_root,
+        line_id="intraday_failed_auction_short",
+    )
+    state_path = Path(str(line_state.get("_path"))) if line_state else None
 
     active_family = str(active_plan.get("family") or "") if active_plan else ""
     proposal_family = str(proposal_plan.get("family") or "")
-    attached_now = active_family == "intraday_failed_auction_short" or proposal_family == "intraday_failed_auction_short"
+
+    def _state_stage(stage_id: str) -> dict[str, Any] | None:
+        if not line_state:
+            return None
+        for item in list(line_state.get("stage_states") or []):
+            if str(item.get("stage_id") or "") == stage_id:
+                return dict(item)
+        return None
+
+    intake_stage = _state_stage("intake-lane")
+    family_stage = _state_stage("family-selection")
+    verifier_contract_stage = _state_stage("verifier-contract")
+    verifier_run_stage = _state_stage("verifier-run")
+    handoff_stage = _state_stage("live-sim-handoff")
+    handoff_gate = dict(line_state.get("handoff_gate") or {}) if line_state else {}
 
     stages = [
         {
             "stage_id": "intake-lane",
-            "label": "靈感入口 / intake lane",
+            "label": str((intake_stage or {}).get("label") or "靈感入口 / intake lane"),
             "role": "source intake",
             "current_surface": "generic ingest core + x_scout first adapter",
-            "status": "opened" if intake_checkpoint else "missing",
-            "summary": (
-                "來源入口已打開；保留 x_scout 相容，未來可接新來源。"
-                if intake_checkpoint
-                else "尚未找到 intake lane 開口的最新 checkpoint。"
-            ),
-            "latest_receipt": _safe_relpath(intake_checkpoint, workspace_root) if intake_checkpoint else None,
+            "status": str((intake_stage or {}).get("state") or ("opened" if intake_checkpoint else "missing")),
+            "summary": str((intake_stage or {}).get("summary") or ("來源入口已打開；保留 x_scout 相容，未來可接新來源。" if intake_checkpoint else "尚未找到 intake lane 開口的最新 checkpoint。")),
+            "latest_receipt": str((intake_stage or {}).get("receipt") or _safe_relpath(intake_checkpoint, workspace_root) or "") or None,
             "blocking_note": None,
         },
         {
             "stage_id": "family-selection",
-            "label": "家族收斂 / family selection",
+            "label": str((family_stage or {}).get("label") or "家族收斂 / family selection"),
             "role": "research canon",
-            "current_surface": "strategy-powerhouse family packet",
-            "status": "selected" if family_selection else "missing",
-            "summary": (
-                "已選定『早盤上攻失敗回落家族』，並把 gap / squeeze 降回 variant 或 regime。"
-                if family_selection
-                else "尚未找到 failed-auction-short 的 family-selection packet。"
-            ),
-            "latest_receipt": _safe_relpath(family_selection, workspace_root) if family_selection else None,
+            "current_surface": str(line_state.get("family_id") or "strategy-powerhouse family packet") if line_state else "strategy-powerhouse family packet",
+            "status": str((family_stage or {}).get("state") or "missing"),
+            "summary": str((family_stage or {}).get("summary") or "尚未找到 failed-auction-short 的 family-selection packet。"),
+            "latest_receipt": str((family_stage or {}).get("receipt") or "") or None,
             "blocking_note": None,
         },
         {
             "stage_id": "verifier-contract",
-            "label": "驗證包 / verifier contract",
+            "label": str((verifier_contract_stage or {}).get("label") or "驗證包 / verifier contract"),
             "role": "research gate",
-            "current_surface": "ifa_short_v1_orb_vwap_event_scan",
-            "status": "prepared" if verifier_contract else "missing",
-            "summary": (
-                "Variant 1 已鎖定為『開盤上破失敗、站回 VWAP 失敗』。"
-                if verifier_contract
-                else "尚未找到 Variant 1 的 verifier contract。"
-            ),
-            "latest_receipt": _safe_relpath(verifier_contract, workspace_root) if verifier_contract else None,
+            "current_surface": str(line_state.get("verifier_id") or "ifa_short_v1_orb_vwap_event_scan") if line_state else "ifa_short_v1_orb_vwap_event_scan",
+            "status": str((verifier_contract_stage or {}).get("state") or "missing"),
+            "summary": str((verifier_contract_stage or {}).get("summary") or "尚未找到 Variant 1 的 verifier contract。"),
+            "latest_receipt": str((verifier_contract_stage or {}).get("receipt") or "") or None,
             "blocking_note": None,
         },
         {
             "stage_id": "verifier-run",
-            "label": "真實資料掃描 / real-data verifier run",
+            "label": str((verifier_run_stage or {}).get("label") or "真實資料掃描 / real-data verifier run"),
             "role": "bounded backtest",
             "current_surface": "baseline full-session event scan",
-            "status": "completed" if verifier_result_json else "not-run",
-            "summary": (
-                "real-data event scan 已有結果，可直接收 honest verdict。"
-                if verifier_result_json
-                else "尚未跑出第一個 real-data event scan；目前只到 contract，不可冒稱有 verdict。"
-            ),
-            "latest_receipt": _safe_relpath(verifier_result_json or verifier_result_md, workspace_root)
-            if (verifier_result_json or verifier_result_md)
-            else None,
-            "blocking_note": (
-                None
-                if verifier_result_json
-                else "先補 full-session loader + short-event detector + thin driver，再談是否值得上 replay/live sim。"
-            ),
+            "status": str((verifier_run_stage or {}).get("state") or (line_state.get("run_state") if line_state else "not-run") or "not-run"),
+            "summary": str((verifier_run_stage or {}).get("summary") or (line_state.get("blocking_reason") if line_state else "尚未跑出第一個 real-data event scan；目前只到 contract，不可冒稱有 verdict。") or "尚未跑出第一個 real-data event scan；目前只到 contract，不可冒稱有 verdict。"),
+            "latest_receipt": str((verifier_run_stage or {}).get("receipt") or "") or None,
+            "blocking_note": str(line_state.get("blocking_reason") or "") if line_state and (line_state.get("run_state") or "") != "completed" else None,
         },
         {
             "stage_id": "live-sim-handoff",
-            "label": "live sim 交棒",
+            "label": str((handoff_stage or {}).get("label") or "live sim 交棒"),
             "role": "execution surface",
-            "current_surface": "steamer-card-engine",
-            "status": "attached" if attached_now else "not-attached",
-            "summary": (
-                "這條 family 已進 paired-lane active/proposal plan。"
-                if attached_now
-                else "目前還沒交棒到 steamer-card-engine 的 active/proposal plan；這是對的，因為 verifier 還沒跑完。"
-            ),
+            "current_surface": str(line_state.get("active_execution_surface") or "steamer-card-engine") if line_state else "steamer-card-engine",
+            "status": str((handoff_stage or {}).get("state") or (line_state.get("live_sim_attach_state") if line_state else "not-ready") or "not-ready"),
+            "summary": str((handoff_stage or {}).get("summary") or (handoff_gate.get("summary") or "先完成 verifier，再決定要不要 card/deck 化進 replay 或 live sim observation。")),
             "latest_receipt": None,
-            "blocking_note": (
-                None
-                if attached_now
-                else "先完成 verifier，再決定要不要 card/deck 化進 replay 或 live sim observation。"
-            ),
+            "blocking_note": None if bool(line_state and line_state.get("handoff_ready")) else str(handoff_gate.get("summary") or ""),
         },
     ]
+
+    line_receipts = []
+    if intake_blade_map is not None:
+        line_receipts.append({
+            "label": "sakura blade map",
+            "kind": "handoff",
+            "path": _safe_relpath(intake_blade_map, workspace_root),
+            "timestamp": intake_blade_map.name[:10],
+        })
+    if intake_checkpoint is not None:
+        line_receipts.append({
+            "label": "checkpoint",
+            "kind": "handoff",
+            "path": _safe_relpath(intake_checkpoint, workspace_root),
+            "timestamp": intake_checkpoint.name[:10],
+        })
+    if state_path is not None:
+        line_receipts.append({
+            "label": "line state",
+            "kind": "state",
+            "path": _safe_relpath(state_path, workspace_root),
+            "timestamp": state_path.name[:10],
+        })
+    for receipt in list(line_state.get("upstream_receipts") or []) if line_state else []:
+        if str(receipt) not in {str(item["path"]) for item in line_receipts}:
+            line_receipts.append({
+                "label": "upstream receipt",
+                "kind": "research",
+                "path": str(receipt),
+                "timestamp": str(receipt)[:10],
+            })
+
+    live_sim_attach_state = str(line_state.get("live_sim_attach_state") or "not-ready") if line_state else "not-ready"
+    if line_state is not None:
+        status = {
+            "prepared": "verifier-prepared",
+            "running": "verifier-running",
+            "completed": "verifier-completed",
+            "failed": "verifier-failed",
+            "blocked": "verifier-blocked",
+        }.get(str(line_state.get("run_state") or ""), "family-selected")
+        if bool(line_state.get("handoff_ready")):
+            status = "handoff-ready"
+        if live_sim_attach_state == "attached":
+            status = "attached"
+        summary = str(line_state.get("blocking_reason") or "") or "Line state present."
+        next_gate = str(handoff_gate.get("summary") or "Keep the handoff blocked until verifier truth is real.")
+    else:
+        status = "missing"
+        summary = "這條研究線尚未被 dashboard 索引到。"
+        next_gate = "先補 line state receipt。"
 
     focus_lines = [
         {
             "line_id": "strategy-intake-lane",
             "title": "策略靈感入口線",
-            "status": "opened" if intake_checkpoint else "missing",
+            "status": str((intake_stage or {}).get("state") or ("opened" if intake_checkpoint else "missing")),
             "family": None,
             "variant": None,
-            "summary": (
-                "已打開 intake lane：generic ingest core 在內，x_scout 保留為第一個 adapter。"
-                if intake_checkpoint
-                else "尚未找到 intake lane 的最新開口 receipt。"
-            ),
+            "summary": str((intake_stage or {}).get("summary") or ("已打開 intake lane：generic ingest core 在內，x_scout 保留為第一個 adapter。" if intake_checkpoint else "尚未找到 intake lane 的最新開口 receipt。")),
             "next_gate": "保持 adapter-first；等第二個真來源出現再接，不要先造 registry。",
             "topology_changed": False,
-            "receipts": [
-                {
-                    "label": "sakura blade map",
-                    "kind": "handoff",
-                    "path": _safe_relpath(intake_blade_map, workspace_root),
-                    "timestamp": intake_blade_map.name[:10] if intake_blade_map else None,
-                }
-                for _ in [0]
-                if intake_blade_map is not None
-            ]
-            + [
-                {
-                    "label": "checkpoint",
-                    "kind": "handoff",
-                    "path": _safe_relpath(intake_checkpoint, workspace_root),
-                    "timestamp": intake_checkpoint.name[:10] if intake_checkpoint else None,
-                }
-                for _ in [0]
-                if intake_checkpoint is not None
-            ],
+            "receipts": [item for item in line_receipts if item["kind"] == "handoff"],
         },
         {
             "line_id": "intraday_failed_auction_short",
-            "title": "早盤上攻失敗回落家族",
-            "status": "verifier-prepared" if verifier_contract else ("family-selected" if family_selection else "missing"),
-            "family": "intraday_failed_auction_short",
-            "variant": "orb_up_fail_vwap_reclaim_fail",
-            "summary": (
-                "已選 family、已鎖定 Variant 1、已寫 verifier contract；現在差第一個 real-data event scan。"
-                if verifier_contract
-                else (
-                    "已選 family，但 verifier contract 尚未落齊。"
-                    if family_selection
-                    else "這條研究線尚未被 dashboard 索引到。"
-                )
-            ),
-            "next_gate": (
-                "用 baseline full-session data 跑 `ifa_short_v1_orb_vwap_event_scan`，收第一個 honest verdict。"
-                if verifier_contract
-                else "先完成 family-selection 與 verifier contract。"
-            ),
+            "title": str(line_state.get("title") or "早盤上攻失敗回落家族") if line_state else "早盤上攻失敗回落家族",
+            "status": status,
+            "family": str(line_state.get("family_id") or "intraday_failed_auction_short") if line_state else "intraday_failed_auction_short",
+            "variant": str(line_state.get("variant_id") or "orb_up_fail_vwap_reclaim_fail") if line_state else "orb_up_fail_vwap_reclaim_fail",
+            "summary": summary,
+            "next_gate": next_gate,
             "topology_changed": False,
-            "receipts": [
-                {
-                    "label": "family selection",
-                    "kind": "backtest",
-                    "path": _safe_relpath(family_selection, workspace_root),
-                    "timestamp": family_selection.name[:10] if family_selection else None,
-                }
-                for _ in [0]
-                if family_selection is not None
-            ]
-            + [
-                {
-                    "label": "verifier contract",
-                    "kind": "verifier",
-                    "path": _safe_relpath(verifier_contract, workspace_root),
-                    "timestamp": verifier_contract.name[:10] if verifier_contract else None,
-                }
-                for _ in [0]
-                if verifier_contract is not None
-            ]
-            + [
-                {
-                    "label": "verifier result",
-                    "kind": "backtest",
-                    "path": _safe_relpath(verifier_result_json or verifier_result_md, workspace_root),
-                    "timestamp": (verifier_result_json or verifier_result_md).name[:10],
-                }
-                for _ in [0]
-                if (verifier_result_json or verifier_result_md) is not None
-            ],
+            "receipts": line_receipts,
         },
     ]
 

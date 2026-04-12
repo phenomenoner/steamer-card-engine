@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
+from .strategy_pipeline import StrategyPipelineDataError, build_strategy_pipeline_view
 from .strategy_powerhouse import StrategyPowerhouseDataError, build_strategy_powerhouse_view
 
 
@@ -75,6 +76,10 @@ def create_app() -> FastAPI:
     def strategy_powerhouse() -> dict:
         return build_strategy_powerhouse_view(root)
 
+    @app.get("/api/strategy-pipeline")
+    def strategy_pipeline() -> dict:
+        return build_strategy_pipeline_view(root)
+
     @app.exception_handler(DashboardDataError)
     async def dashboard_data_error_handler(_request, error: DashboardDataError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(error)})
@@ -83,6 +88,13 @@ def create_app() -> FastAPI:
     async def strategy_powerhouse_data_error_handler(
         _request,
         error: StrategyPowerhouseDataError,
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(error)})
+
+    @app.exception_handler(StrategyPipelineDataError)
+    async def strategy_pipeline_data_error_handler(
+        _request,
+        error: StrategyPipelineDataError,
     ) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(error)})
 

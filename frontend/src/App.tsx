@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 
-type DashboardTab = "live-sim" | "strategy-powerhouse";
+type DashboardTab = "live-sim" | "strategy-powerhouse" | "strategy-pipeline";
 
 type DateItem = {
   date: string;
@@ -407,6 +407,75 @@ type StrategyPowerhouseView = {
   };
   sources: StrategyLink[];
   cards: StrategyPowerhouseCard[];
+};
+
+type StrategyPipelineView = {
+  updated_at: string | null;
+  topology_changed: boolean;
+  summary: {
+    headline: string;
+    current_state: string;
+    verdict: string;
+    note: string;
+  };
+  line_state: {
+    line_id: string;
+    title: string;
+    family_id: string;
+    variant_id: string;
+    verifier_id: string;
+    run_state: string;
+    verdict: string | null;
+    blocking_reason: string | null;
+    handoff_ready: boolean;
+    live_sim_attach_state: string;
+    state_path: string | null;
+  };
+  canon_flow: Array<{
+    stage_id: string;
+    label: string;
+    state: string;
+    summary: string;
+    receipt: string | null;
+  }>;
+  components: Array<{
+    component_id: string;
+    label: string;
+    role: string;
+    current_surface: string;
+    status: string;
+    source_paths: Array<string | null>;
+    note: string;
+  }>;
+  autonomous_drivers: Array<{
+    driver_id: string;
+    label: string;
+    role: string;
+    state: string;
+    schedule_or_trigger: string;
+    source_path: string | null;
+    break_risk: string;
+  }>;
+  handoff_gate: {
+    state?: string;
+    summary?: string;
+    requirements?: Array<{
+      id: string;
+      label: string;
+      state: string;
+      note: string;
+    }>;
+  };
+  control_plane: {
+    proposal_family: string | null;
+    active_family: string | null;
+    proposal_plan_path: string | null;
+    active_plan_path: string | null;
+    activation_latest_path: string | null;
+    nightly_state_path: string | null;
+    line_state_root: string | null;
+  };
+  sources: string[];
 };
 
 type EvidenceRow = Record<string, unknown>;
@@ -991,6 +1060,145 @@ function StrategySurface({ view }: { view: StrategyPowerhouseView }) {
   );
 }
 
+function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
+  return (
+    <main className="strategy-surface">
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Pipeline Verdict</h3>
+          <span className="pill">READ ONLY / DYNAMIC</span>
+        </div>
+        <div className="panel-body">
+          <p className="strategy-note strategy-boundary-note">{view.summary.headline}</p>
+          <KeyValueGrid
+            items={[
+              { label: "current state", value: view.summary.current_state },
+              { label: "verdict", value: view.summary.verdict },
+              { label: "line", value: view.line_state.title },
+              { label: "run state", value: view.line_state.run_state },
+              { label: "handoff ready", value: String(view.line_state.handoff_ready) },
+              { label: "live sim attach", value: view.line_state.live_sim_attach_state },
+            ]}
+          />
+          <p className="strategy-note">{view.summary.note}</p>
+          {view.line_state.state_path ? <code>{view.line_state.state_path}</code> : null}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Canon Flow</h3>
+          <span className="pill">STAGE STATE</span>
+        </div>
+        <div className="panel-body">
+          <div className="history-list">
+            {view.canon_flow.map((stage) => (
+              <article className="history-item" key={stage.stage_id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{stage.label}</div>
+                    <div className="card-meta">{stage.stage_id}</div>
+                  </div>
+                  <StatusChip value={stage.state} />
+                </div>
+                <p className="card-meta">{stage.summary}</p>
+                {stage.receipt ? <code>{stage.receipt}</code> : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Pipeline Components</h3>
+          <span className="pill">WHO DOES WHAT</span>
+        </div>
+        <div className="panel-body">
+          <div className="history-list">
+            {view.components.map((component) => (
+              <article className="history-item" key={component.component_id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{component.label}</div>
+                    <div className="card-meta">{component.role} · {component.current_surface}</div>
+                  </div>
+                  <StatusChip value={component.status} />
+                </div>
+                <p className="strategy-note">{component.note}</p>
+                <div className="sources-grid">
+                  {component.source_paths.filter(Boolean).map((path) => (
+                    <div className="source-card" key={`${component.component_id}-${path}`}>
+                      <span className="mini-label">source</span>
+                      <code>{path}</code>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Autonomous Drivers</h3>
+          <span className="pill">LOOPS / CONTROLLERS</span>
+        </div>
+        <div className="panel-body">
+          <div className="history-list">
+            {view.autonomous_drivers.map((driver) => (
+              <article className="history-item" key={driver.driver_id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{driver.label}</div>
+                    <div className="card-meta">{driver.role} · {driver.schedule_or_trigger}</div>
+                  </div>
+                  <StatusChip value={driver.state} />
+                </div>
+                <p className="strategy-note">{driver.break_risk}</p>
+                {driver.source_path ? <code>{driver.source_path}</code> : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Handoff Gate</h3>
+          <span className="pill">LIVE SIM BLOCKER</span>
+        </div>
+        <div className="panel-body">
+          <KeyValueGrid
+            items={[
+              { label: "state", value: view.handoff_gate.state ?? "unknown" },
+              { label: "proposal family", value: view.control_plane.proposal_family },
+              { label: "active family", value: view.control_plane.active_family },
+              { label: "activation latest", value: view.control_plane.activation_latest_path },
+            ]}
+          />
+          {view.handoff_gate.summary ? <p className="strategy-note">{view.handoff_gate.summary}</p> : null}
+          <div className="history-list">
+            {(view.handoff_gate.requirements ?? []).map((requirement) => (
+              <article className="history-item" key={requirement.id}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{requirement.label}</div>
+                    <div className="card-meta">{requirement.id}</div>
+                  </div>
+                  <StatusChip value={requirement.state} />
+                </div>
+                <p className="card-meta">{requirement.note}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function App() {
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("live-sim");
   const [dates, setDates] = useState<DateItem[]>([]);
@@ -1000,9 +1208,11 @@ function App() {
   const [activeEventKey, setActiveEventKey] = useState<string | null>(null);
   const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
   const [strategyPowerhouse, setStrategyPowerhouse] = useState<StrategyPowerhouseView | null>(null);
+  const [strategyPipeline, setStrategyPipeline] = useState<StrategyPipelineView | null>(null);
   const [deckLoading, setDeckLoading] = useState(true);
   const [cardLoading, setCardLoading] = useState(false);
   const [strategyLoading, setStrategyLoading] = useState(true);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1017,6 +1227,11 @@ function App() {
       .then((payload) => setStrategyPowerhouse(payload))
       .catch((reason) => setError(String(reason)))
       .finally(() => setStrategyLoading(false));
+
+    getJson<StrategyPipelineView>("/api/strategy-pipeline")
+      .then((payload) => setStrategyPipeline(payload))
+      .catch((reason) => setError(String(reason)))
+      .finally(() => setPipelineLoading(false));
   }, []);
 
   useEffect(() => {
@@ -1099,7 +1314,9 @@ function App() {
             <p>
               {dashboardTab === "live-sim"
                 ? liveSimSubtitle
-                : "Research/control truth from local strategy-powerhouse artifacts. Read-only; no execution authority."}
+                : dashboardTab === "strategy-powerhouse"
+                  ? "Research/control truth from local strategy-powerhouse artifacts. Read-only; no execution authority."
+                  : "Whole-pipeline design, components, autonomous drivers, and handoff gates from local state/receipts. Read-only."}
             </p>
           </div>
           <nav className="dashboard-tabs">
@@ -1116,6 +1333,13 @@ function App() {
               type="button"
             >
               Strategy Powerhouse / Strategy Cards
+            </button>
+            <button
+              className={`dashboard-tab ${dashboardTab === "strategy-pipeline" ? "dashboard-tab-active" : ""}`}
+              onClick={() => setDashboardTab("strategy-pipeline")}
+              type="button"
+            >
+              Strategy Pipeline / Autonomous Drivers
             </button>
           </nav>
         </div>
@@ -1285,12 +1509,20 @@ function App() {
         ) : (
           <div className="state-block">Select a deck to begin.</div>
         )
-      ) : strategyLoading ? (
-        <div className="state-block">Loading strategy-powerhouse surface…</div>
-      ) : strategyPowerhouse ? (
-        <StrategySurface view={strategyPowerhouse} />
+      ) : dashboardTab === "strategy-powerhouse" ? (
+        strategyLoading ? (
+          <div className="state-block">Loading strategy-powerhouse surface…</div>
+        ) : strategyPowerhouse ? (
+          <StrategySurface view={strategyPowerhouse} />
+        ) : (
+          <div className="state-block">Strategy-powerhouse artifacts are unavailable.</div>
+        )
+      ) : pipelineLoading ? (
+        <div className="state-block">Loading strategy-pipeline surface…</div>
+      ) : strategyPipeline ? (
+        <StrategyPipelineSurface view={strategyPipeline} />
       ) : (
-        <div className="state-block">Strategy-powerhouse artifacts are unavailable.</div>
+        <div className="state-block">Strategy-pipeline artifacts are unavailable.</div>
       )}
 
       {error ? <div className="state-block text-alert">ERROR: {error}</div> : null}

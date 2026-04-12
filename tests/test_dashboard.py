@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fixture_dates
 from steamer_card_engine.dashboard.fixtures import repo_root
 from steamer_card_engine.dashboard.history_source_index import STATE_RELATIVE_PATH, build_strategy_history_source_index
+from steamer_card_engine.dashboard.strategy_pipeline import build_strategy_pipeline_view
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 
 
@@ -242,6 +243,21 @@ def test_strategy_history_source_index_indexes_current_three_families() -> None:
     assert {"proposal", "packet", "backtest"}.issubset(kinds)
 
 
+def test_strategy_pipeline_view_surfaces_line_state_and_handoff_gate() -> None:
+    surface = build_strategy_pipeline_view()
+
+    assert surface["summary"]["verdict"] == "not-yet"
+    assert surface["line_state"]["line_id"] == "intraday_failed_auction_short"
+    assert surface["canon_flow"]
+    assert any(stage["stage_id"] == "verifier-run" for stage in surface["canon_flow"])
+    assert surface["components"]
+    assert any(component["component_id"] == "live-sim-execution" for component in surface["components"])
+    assert surface["autonomous_drivers"]
+    assert any(driver["driver_id"] == "runtime-activation" for driver in surface["autonomous_drivers"])
+    assert surface["handoff_gate"]["state"] == "blocked"
+    assert surface["sources"]
+
+
 def test_strategy_powerhouse_view_explicitly_flags_missing_active_plan_truth(tmp_path: Path) -> None:
     real_repo = repo_root()
     workspace_root = tmp_path
@@ -334,6 +350,14 @@ def test_dashboard_api_routes() -> None:
     assert strategy_payload["architecture_map"]["stages"]
     assert strategy_payload["focus_lines"]
     assert strategy_payload["glossary"]
+
+    strategy_pipeline_response = client.get("/api/strategy-pipeline")
+    assert strategy_pipeline_response.status_code == 200
+    pipeline_payload = strategy_pipeline_response.json()
+    assert pipeline_payload["line_state"]["line_id"] == "intraday_failed_auction_short"
+    assert pipeline_payload["components"]
+    assert pipeline_payload["autonomous_drivers"]
+    assert pipeline_payload["handoff_gate"]["state"] == "blocked"
 
     # Sanity: latest fixture date stays resolvable.
     latest_summary_response = client.get(f"/api/days/{latest_date}/summary")
