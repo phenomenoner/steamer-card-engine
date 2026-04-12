@@ -246,7 +246,7 @@ def test_strategy_history_source_index_indexes_current_three_families() -> None:
 def test_strategy_pipeline_view_surfaces_line_state_and_handoff_gate() -> None:
     surface = build_strategy_pipeline_view()
 
-    assert surface["summary"]["verdict"] == "not-yet"
+    assert surface["summary"]["verdict"] == "research-autonomous-yes / attach-autonomous-no"
     assert surface["line_state"]["line_id"] == "intraday_failed_auction_short"
     assert surface["canon_flow"]
     assert any(stage["stage_id"] == "verifier-run" for stage in surface["canon_flow"])

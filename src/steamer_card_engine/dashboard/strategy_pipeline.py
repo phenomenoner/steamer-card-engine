@@ -69,6 +69,7 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
     campaign_state = _load_optional_json(campaign_state_path) or {}
     campaign_next_action = _load_optional_json(campaign_next_action_path) or {}
     campaign_index = _load_optional_json(campaign_index_path) or {"campaigns": []}
+    autonomy_readiness = dict(campaign_state.get("autonomyReadiness") or {})
 
     components = [
         {
@@ -178,10 +179,10 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
         "updated_at": line_state.get("updated_at"),
         "topology_changed": False,
         "summary": {
-            "headline": "Current canon flow: intake -> family selection -> verifier bridge -> dashboard observability -> steamer-card-engine handoff / live sim.",
-            "current_state": "autonomous-with-guardrails target; not autonomous-safe yet",
-            "verdict": "not-yet",
-            "note": "The line is opened and visible, but the verifier bridge and machine-readable handoff gate are not complete enough for autonomous non-stop execution.",
+            "headline": "Current canon flow: intake -> family selection -> verifier bridge -> campaign controller -> bounded autonomous research dispatch -> steamer-card-engine handoff / live sim.",
+            "current_state": "dispatch-ready for bounded research slices under guardrails",
+            "verdict": "research-autonomous-yes / attach-autonomous-no",
+            "note": "This line is now research-autonomous ready from campaign artifacts and bounded dispatch contracts, while attach/live-sim authority remains explicitly human-gated.",
         },
         "line_state": {
             "line_id": line_state.get("line_id"),
@@ -222,10 +223,10 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
             "next_worker_type": campaign_next_action.get("workerType"),
             "next_candidate_id": campaign_next_action.get("candidateId"),
             "retry_remaining_for_active": ((campaign_state.get("retryBudget") or {}).get("remainingForActive")),
-            "stale_after_active": "72h",
-            "stale_after_parked": "7d",
-            "research_autonomous": True,
-            "attach_autonomous": False,
+            "stale_after_active": autonomy_readiness.get("staleAfterActive"),
+            "stale_after_parked": autonomy_readiness.get("staleAfterParked"),
+            "research_autonomous": bool(autonomy_readiness.get("researchAutonomous", False)),
+            "attach_autonomous": bool(autonomy_readiness.get("attachAutonomous", False)),
             "campaign_path": _safe_relpath(campaign_root, workspace_root),
             "state_path": _safe_relpath(campaign_state_path if campaign_state_path.exists() else None, workspace_root),
             "next_action_path": _safe_relpath(campaign_next_action_path if campaign_next_action_path.exists() else None, workspace_root),
