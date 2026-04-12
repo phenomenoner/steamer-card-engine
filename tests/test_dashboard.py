@@ -255,6 +255,10 @@ def test_strategy_pipeline_view_surfaces_line_state_and_handoff_gate() -> None:
     assert surface["autonomous_drivers"]
     assert any(driver["driver_id"] == "runtime-activation" for driver in surface["autonomous_drivers"])
     assert surface["handoff_gate"]["state"] == "blocked"
+    assert surface["campaign_state"]["campaign_id"] == "2026-04-failed-auction-short-cluster-slow-cook"
+    assert surface["campaign_state"]["dispatchable"] is True
+    assert surface["campaign_state"]["research_autonomous"] is True
+    assert surface["campaign_state"]["attach_autonomous"] is False
     assert surface["sources"]
 
 

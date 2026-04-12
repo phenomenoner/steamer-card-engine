@@ -60,6 +60,16 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
 
     line_state_path = Path(str(line_state.get("_path")))
 
+    campaign_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns/2026-04-failed-auction-short-cluster-slow-cook"
+    campaign_state_path = campaign_root / "STATE.json"
+    campaign_next_action_path = campaign_root / "NEXT_ACTION.json"
+    campaign_status_path = campaign_root / "STATUS.md"
+    campaign_gates_path = campaign_root / "GATES.md"
+    campaign_index_path = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns/INDEX.json"
+    campaign_state = _load_optional_json(campaign_state_path) or {}
+    campaign_next_action = _load_optional_json(campaign_next_action_path) or {}
+    campaign_index = _load_optional_json(campaign_index_path) or {"campaigns": []}
+
     components = [
         {
             "component_id": "intake-adapters",
@@ -199,6 +209,29 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
             "nightly_state_path": _safe_relpath(nightly_state_path if nightly_state_path.exists() else None, workspace_root),
             "line_state_root": _safe_relpath(workspace_root / LINE_STATE_RELATIVE_PATH, workspace_root),
         },
+        "campaign_state": {
+            "campaign_id": campaign_state.get("campaignId"),
+            "status": campaign_state.get("status"),
+            "phase": campaign_state.get("phase"),
+            "active_candidate_id": campaign_state.get("activeCandidateId"),
+            "dispatchable": any(c.get("campaignId") == campaign_state.get("campaignId") and c.get("dispatchable") for c in campaign_index.get("campaigns", [])),
+            "cluster_mode": (campaign_state.get("clusterCadence") or {}).get("mode"),
+            "cluster_window": (campaign_state.get("clusterCadence") or {}).get("clusterWindow"),
+            "max_bounded_slices_per_cluster": (campaign_state.get("clusterCadence") or {}).get("maxBoundedSlicesPerCluster"),
+            "next_action_id": campaign_next_action.get("actionId"),
+            "next_worker_type": campaign_next_action.get("workerType"),
+            "next_candidate_id": campaign_next_action.get("candidateId"),
+            "retry_remaining_for_active": ((campaign_state.get("retryBudget") or {}).get("remainingForActive")),
+            "stale_after_active": "72h",
+            "stale_after_parked": "7d",
+            "research_autonomous": True,
+            "attach_autonomous": False,
+            "campaign_path": _safe_relpath(campaign_root, workspace_root),
+            "state_path": _safe_relpath(campaign_state_path if campaign_state_path.exists() else None, workspace_root),
+            "next_action_path": _safe_relpath(campaign_next_action_path if campaign_next_action_path.exists() else None, workspace_root),
+            "status_path": _safe_relpath(campaign_status_path if campaign_status_path.exists() else None, workspace_root),
+            "gates_path": _safe_relpath(campaign_gates_path if campaign_gates_path.exists() else None, workspace_root),
+        },
         "sources": [
             path
             for path in [
@@ -208,6 +241,10 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
                 _safe_relpath(activation_latest_path if activation_latest_path.exists() else None, workspace_root),
                 _safe_relpath(nightly_state_path if nightly_state_path.exists() else None, workspace_root),
                 _safe_relpath(pipeline_eod_latest_path if pipeline_eod_latest_path.exists() else None, workspace_root),
+                _safe_relpath(campaign_state_path if campaign_state_path.exists() else None, workspace_root),
+                _safe_relpath(campaign_next_action_path if campaign_next_action_path.exists() else None, workspace_root),
+                _safe_relpath(campaign_status_path if campaign_status_path.exists() else None, workspace_root),
+                _safe_relpath(campaign_gates_path if campaign_gates_path.exists() else None, workspace_root),
             ]
             if path
         ],

@@ -475,6 +475,29 @@ type StrategyPipelineView = {
     nightly_state_path: string | null;
     line_state_root: string | null;
   };
+  campaign_state: {
+    campaign_id: string | null;
+    status: string | null;
+    phase: string | null;
+    active_candidate_id: string | null;
+    dispatchable: boolean;
+    cluster_mode: string | null;
+    cluster_window: string | null;
+    max_bounded_slices_per_cluster: number | null;
+    next_action_id: string | null;
+    next_worker_type: string | null;
+    next_candidate_id: string | null;
+    retry_remaining_for_active: number | null;
+    stale_after_active: string | null;
+    stale_after_parked: string | null;
+    research_autonomous: boolean;
+    attach_autonomous: boolean;
+    campaign_path: string | null;
+    state_path: string | null;
+    next_action_path: string | null;
+    status_path: string | null;
+    gates_path: string | null;
+  };
   sources: string[];
 };
 
@@ -1164,7 +1187,45 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
         </div>
       </section>
 
-      <section className="panel">
+            <section className="panel">
+        <div className="panel-header">
+          <h3>Campaign Controller</h3>
+          <span className="pill">AUTONOMOUS READINESS</span>
+        </div>
+        <div className="panel-body">
+          <KeyValueGrid
+            items={[
+              { label: "campaign", value: view.campaign_state.campaign_id },
+              { label: "status", value: view.campaign_state.status },
+              { label: "phase", value: view.campaign_state.phase },
+              { label: "dispatchable", value: String(view.campaign_state.dispatchable) },
+              { label: "active candidate", value: view.campaign_state.active_candidate_id },
+              { label: "next action", value: view.campaign_state.next_action_id },
+              { label: "next worker", value: view.campaign_state.next_worker_type },
+              { label: "cluster mode", value: view.campaign_state.cluster_mode },
+              { label: "cluster window", value: view.campaign_state.cluster_window },
+              { label: "max slices / cluster", value: view.campaign_state.max_bounded_slices_per_cluster },
+              { label: "retry remaining", value: view.campaign_state.retry_remaining_for_active },
+              { label: "stale_after(active)", value: view.campaign_state.stale_after_active },
+              { label: "stale_after(parked)", value: view.campaign_state.stale_after_parked },
+              { label: "research-autonomous", value: String(view.campaign_state.research_autonomous) },
+              { label: "attach-autonomous", value: String(view.campaign_state.attach_autonomous) },
+            ]}
+          />
+          <div className="sources-grid">
+            {[view.campaign_state.campaign_path, view.campaign_state.state_path, view.campaign_state.next_action_path, view.campaign_state.status_path, view.campaign_state.gates_path]
+              .filter(Boolean)
+              .map((path) => (
+                <div className="source-card" key={`campaign-${path}`}>
+                  <span className="mini-label">campaign</span>
+                  <code>{path}</code>
+                </div>
+              ))}
+          </div>
+        </div>
+      </section>
+
+<section className="panel">
         <div className="panel-header">
           <h3>Handoff Gate</h3>
           <span className="pill">LIVE SIM BLOCKER</span>
