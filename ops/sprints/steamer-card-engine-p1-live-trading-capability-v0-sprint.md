@@ -172,3 +172,5 @@ Current sprint read:
 - 2026-04-09 — progress pass: surfaced Sprint A morning paired-lane activation/promotion truth in docs/TOPOLOGY.md + dashboard strategy tab (commit b4609a9); verifiers passed (uv run pytest -q tests/test_dashboard.py, frontend npm run build). Topology unchanged.
 
 - 2026-04-10 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-12 — dashboard strategy pipeline: surfaced runtime dispatch truth + campaign selection policy metadata for read-only visibility; added receipt at `/root/.openclaw/workspace/steamer-card-engine/docs/receipts/2026-04-12_dashboard_strategy-pipeline-runtime-dispatch-observability.md`; verifiers passed (`uv run pytest tests/test_dashboard.py -q`, `frontend npm run build`). (Topology unchanged.)
+- 2026-04-13 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).

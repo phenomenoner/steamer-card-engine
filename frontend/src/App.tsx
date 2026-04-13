@@ -244,6 +244,14 @@ type StrategyPlanTarget = {
   deck_path: string | null;
   deck_manifest_present: boolean;
 };
+type RuntimeSelectionCandidate = {
+  campaignId: string;
+  priority?: number | null;
+  phase?: string | null;
+  status?: string | null;
+  dispatchable?: boolean;
+};
+
 
 type StrategyPipelineStage = {
   stage_id: string;
@@ -474,6 +482,40 @@ type StrategyPipelineView = {
     activation_latest_path: string | null;
     nightly_state_path: string | null;
     line_state_root: string | null;
+    campaign_index_path: string | null;
+    runtime_shadow_path: string | null;
+    runtime_activation?: {
+      path: string | null;
+      enabled: boolean;
+      campaign_id: string | null;
+      updated_at: string | null;
+      raw_state_path: string | null;
+    };
+    runtime_dispatch?: {
+      state: string | null;
+      campaign_id: string | null;
+      requested_campaign_id: string | null;
+      suggested_campaign_id: string | null;
+      attempted: boolean;
+      fallback_used: boolean;
+      activation_mismatch: boolean;
+      returncode: number | null;
+      reason: string | null;
+      reason_compact: string;
+    };
+    runtime_campaign_selection?: {
+      policy: string;
+      policy_id: string | null;
+      selected_campaign_id: string | null;
+      requested_campaign_id: string | null;
+      selected_entry_present: boolean;
+      selection_reason: string;
+      selection_notes: string;
+      candidate_set?: RuntimeSelectionCandidate[];
+      candidate_count?: number;
+    };
+    selected_campaign_id: string | null;
+    selection_hint: string;
   };
   campaign_state: {
     campaign_id: string | null;
@@ -497,6 +539,29 @@ type StrategyPipelineView = {
     next_action_path: string | null;
     status_path: string | null;
     gates_path: string | null;
+    runtime_dispatch?: {
+      state: string | null;
+      campaign_id: string | null;
+      requested_campaign_id: string | null;
+      suggested_campaign_id: string | null;
+      attempted: boolean;
+      fallback_used: boolean;
+      activation_mismatch: boolean;
+      returncode: number | null;
+      reason: string | null;
+      reason_compact: string;
+    };
+    selection?: {
+      policy: string;
+      policy_id: string | null;
+      selected_campaign_id: string | null;
+      requested_campaign_id: string | null;
+      selected_entry_present: boolean;
+      selection_reason: string;
+      selection_notes: string;
+      candidate_set?: RuntimeSelectionCandidate[];
+      candidate_count?: number;
+    };
   };
   sources: string[];
 };
@@ -534,6 +599,14 @@ function formatTimestamp(value: string | null | undefined) {
     hour12: false,
     timeZone: "Asia/Taipei",
   });
+}
+
+function summarizeCampaignSelectionCandidates(candidates?: RuntimeSelectionCandidate[]): string {
+  if (!candidates || candidates.length === 0) return "—";
+  return candidates
+    .slice(0, 6)
+    .map((item) => `${item.campaignId || "-"}(p=${item.priority ?? "-"},r=${item.phase || "-"})`)
+    .join(", ");
 }
 
 function formatHours(value: number | null | undefined) {
@@ -1187,7 +1260,7 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
         </div>
       </section>
 
-            <section className="panel">
+      <section className="panel">
         <div className="panel-header">
           <h3>Campaign Controller</h3>
           <span className="pill">AUTONOMOUS READINESS</span>
@@ -1208,10 +1281,28 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
               { label: "retry remaining", value: view.campaign_state.retry_remaining_for_active },
               { label: "stale_after(active)", value: view.campaign_state.stale_after_active },
               { label: "stale_after(parked)", value: view.campaign_state.stale_after_parked },
-              { label: "research-autonomous", value: String(view.campaign_state.research_autonomous) },
-              { label: "attach-autonomous", value: String(view.campaign_state.attach_autonomous) },
             ]}
           />
+          <KeyValueGrid
+            items={[
+              { label: "research-autonomous", value: String(view.campaign_state.research_autonomous) },
+              { label: "attach-autonomous", value: String(view.campaign_state.attach_autonomous) },
+              { label: "runtime dispatch state", value: view.campaign_state.runtime_dispatch?.state },
+              { label: "runtime requested campaign", value: view.campaign_state.selection?.requested_campaign_id },
+              { label: "runtime selected campaign", value: view.campaign_state.selection?.selected_campaign_id },
+              { label: "runtime suggested campaign", value: view.campaign_state.runtime_dispatch?.suggested_campaign_id },
+              { label: "runtime fallback used", value: String(Boolean(view.campaign_state.runtime_dispatch?.fallback_used)) },
+              { label: "activation mismatch", value: String(Boolean(view.campaign_state.runtime_dispatch?.activation_mismatch)) },
+              { label: "runtime selector", value: view.campaign_state.selection?.policy },
+              { label: "runtime selector reason", value: view.campaign_state.selection?.selection_reason },
+              { label: "runtime policy id", value: view.campaign_state.selection?.policy_id ?? "—" },
+              {
+                label: "runtime candidate set",
+                value: summarizeCampaignSelectionCandidates(view.campaign_state.selection?.candidate_set),
+              },
+            ]}
+          />
+          {view.campaign_state.runtime_dispatch?.reason ? <p className="strategy-note">{view.campaign_state.runtime_dispatch?.reason}</p> : null}
           <div className="sources-grid">
             {[view.campaign_state.campaign_path, view.campaign_state.state_path, view.campaign_state.next_action_path, view.campaign_state.status_path, view.campaign_state.gates_path]
               .filter(Boolean)
@@ -1221,11 +1312,19 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
                   <code>{path}</code>
                 </div>
               ))}
+            {[view.control_plane.runtime_shadow_path, view.control_plane.runtime_activation?.path]
+              .filter(Boolean)
+              .map((path) => (
+                <div className="source-card" key={`runtime-${path}`}>
+                  <span className="mini-label">runtime</span>
+                  <code>{path}</code>
+                </div>
+              ))}
           </div>
         </div>
       </section>
 
-<section className="panel">
+      <section className="panel">
         <div className="panel-header">
           <h3>Handoff Gate</h3>
           <span className="pill">LIVE SIM BLOCKER</span>
@@ -1237,6 +1336,10 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
               { label: "proposal family", value: view.control_plane.proposal_family },
               { label: "active family", value: view.control_plane.active_family },
               { label: "activation latest", value: view.control_plane.activation_latest_path },
+              { label: "runtime dispatch", value: view.control_plane.runtime_dispatch?.state },
+              { label: "runtime selected campaign", value: view.control_plane.selected_campaign_id },
+              { label: "runtime selector policy", value: view.control_plane.runtime_campaign_selection?.policy },
+              { label: "runtime selector policy id", value: view.control_plane.runtime_campaign_selection?.policy_id ?? "—" },
             ]}
           />
           {view.handoff_gate.summary ? <p className="strategy-note">{view.handoff_gate.summary}</p> : null}

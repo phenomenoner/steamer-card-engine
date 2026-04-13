@@ -12,6 +12,18 @@ class StrategyPipelineDataError(Exception):
     """Raised when the local strategy-pipeline surface cannot be built."""
 
 
+DEFAULT_CAMPAIGN_ID = "2026-04-failed-auction-short-cluster-slow-cook"
+DEFAULT_CAMPAIGN_ROOT = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns"
+)
+CAMPAIGN_INDEX_RELATIVE_PATH = Path(
+    "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns/INDEX.json"
+)
+RUNTIME_SHADOW_RELATIVE_PATH = Path(".state/steamer/autonomous_slow_cook_handoff_shadow.v1.json")
+RUNTIME_ACTIVATION_FALLBACK = Path(".state/steamer/autonomous_slow_cook_runtime/activation.v1.json")
+RUNTIME_CONTROL_HINT = "runtime activation dispatch selection"
+
+
 def _workspace_root(repo: Path) -> Path:
     return repo.parent
 
@@ -32,6 +44,183 @@ def _load_optional_json(path: Path) -> dict[str, Any] | None:
         return json.load(file)
 
 
+def _truthy_text(value: Any) -> str:
+    value_text = str(value or "").strip()
+    return value_text
+
+
+def _campaign_priority(item: dict[str, Any]) -> int:
+    try:
+        return int(item.get("priority"))
+    except (TypeError, ValueError):
+        return 99_999
+
+
+def _campaign_entry_lookup(campaign_index: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    campaigns = campaign_index.get("campaigns")
+    if not isinstance(campaigns, list):
+        return [], {}
+
+    ordered = [item for item in campaigns if isinstance(item, dict)]
+    ordered.sort(key=_campaign_priority)
+
+    lookup: dict[str, dict[str, Any]] = {}
+    for item in ordered:
+        campaign_id = _truthy_text(item.get("campaignId"))
+        if campaign_id:
+            lookup[campaign_id] = item
+    return ordered, lookup
+
+
+def _first_dispatchable(ordered_campaigns: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for item in ordered_campaigns:
+        phase = _truthy_text(item.get("phase"))
+        if bool(item.get("dispatchable") is True) and phase != "closed":
+            return item
+    return None
+
+
+def _first_entry(ordered_campaigns: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return ordered_campaigns[0] if ordered_campaigns else None
+
+
+def _resolve_path(path_value: str, workspace_root: Path) -> Path | None:
+    path_text = _truthy_text(path_value)
+    if not path_text:
+        return None
+    path = Path(path_text)
+    if not path.is_absolute():
+        path = workspace_root / path
+    return path
+
+
+def _build_runtime_profile(
+    *,
+    workspace_root: Path,
+    campaign_index_ordered: list[dict[str, Any]],
+    campaign_index_lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    runtime_shadow_path = workspace_root / RUNTIME_SHADOW_RELATIVE_PATH
+    runtime_shadow = _load_optional_json(runtime_shadow_path) or {}
+
+    runtime_activation = dict(runtime_shadow.get("runtime_activation") or {})
+    runtime_dispatch = dict(runtime_shadow.get("runtime_dispatch") or {})
+    runtime_selection = dict(runtime_dispatch.get("selection") or {})
+
+    activation_state_path = _resolve_path(
+        _truthy_text(runtime_activation.get("state_path"))
+        or _truthy_text(runtime_shadow.get("runtime_activation_path", "")),
+        workspace_root,
+    )
+    activation_state = _load_optional_json(activation_state_path or (workspace_root / RUNTIME_ACTIVATION_FALLBACK)) or {}
+
+    requested_campaign = _truthy_text(runtime_activation.get("campaign_id")) or _truthy_text(activation_state.get("campaignId"))
+    dispatch_campaign = _truthy_text(runtime_dispatch.get("campaign_id"))
+    fallback_campaign = _truthy_text(runtime_dispatch.get("suggested_campaign_id"))
+
+    runtime_state = _truthy_text(runtime_dispatch.get("state")) or "unavailable"
+    runtime_dispatch_reason = _truthy_text(runtime_dispatch.get("reason"))
+    runtime_selection_policy = RUNTIME_CONTROL_HINT
+
+    policy_hint = _truthy_text(runtime_selection.get("policy"))
+    policy_id = _truthy_text(runtime_selection.get("policy_id"))
+    selection_reason = _truthy_text(runtime_selection.get("selection_reason"))
+    selection_notes = _truthy_text(runtime_selection.get("selection_notes")) or runtime_selection_policy
+    runtime_candidate_set = runtime_selection.get("candidate_set") if isinstance(runtime_selection.get("candidate_set"), list) else []
+    runtime_selected_campaign_id = _truthy_text(runtime_selection.get("selected_campaign_id"))
+
+    selected_campaign_id = runtime_selected_campaign_id or dispatch_campaign or requested_campaign
+    selected_entry: dict[str, Any] | None = None
+
+    if not selected_campaign_id and fallback_campaign:
+        selected_campaign_id = fallback_campaign
+
+    if selected_campaign_id and selected_campaign_id in campaign_index_lookup:
+        selected_entry = campaign_index_lookup[selected_campaign_id]
+
+    # Fallback when the runtime shadow is older and does not include explicit selection metadata.
+    if not policy_hint:
+        if runtime_state == "applied":
+            policy_hint = "runtime_dispatch"
+            selection_reason = "runtime dispatch campaign selected"
+        elif runtime_state == "runtime_fallback" or runtime_state == "campaign_missing":
+            policy_hint = "runtime_fallback"
+            selection_reason = "runtime dispatch suggests fallback campaign"
+        elif runtime_state == "index_default":
+            policy_hint = "index_default"
+            selection_reason = "no runtime campaign target; using index order"
+        elif runtime_state == "index_fallback":
+            policy_hint = "index_fallback"
+            selection_reason = "runtime target missing; fallback to index selection"
+        else:
+            policy_hint = "runtime_target_missing"
+            selection_reason = "requested runtime campaign not found in INDEX.json"
+
+    if not runtime_candidate_set:
+        ordered_dispatchable = [_campaign for _campaign in campaign_index_ordered if bool(_campaign.get("dispatchable") is True) and _truthy_text(_campaign.get("phase")) not in {"closed", "operator-gate"}]
+        runtime_candidate_set = [
+            {
+                "campaignId": str(item.get("campaignId") or ""),
+                "priority": int(item.get("priority") or 0) if str(item.get("priority") or "").strip() else 0,
+                "phase": _truthy_text(item.get("phase")),
+                "dispatchable": bool(item.get("dispatchable") is True),
+                "status": _truthy_text(item.get("status")),
+            }
+            for item in ordered_dispatchable[:10]
+        ]
+
+    if not policy_id:
+        policy_id = f"runtime_selector_v1/{policy_hint}"
+
+    if not selection_reason:
+        selection_reason = "runtime shadow dispatch campaign selected"
+    if not selected_entry and selected_campaign_id and selected_campaign_id in campaign_index_lookup:
+        selected_entry = campaign_index_lookup[selected_campaign_id]
+
+    if not selected_entry and runtime_selected_campaign_id and runtime_state in {"campaign_missing", "misconfigured_activation"}:
+        if fallback_campaign and fallback_campaign in campaign_index_lookup:
+            selected_entry = campaign_index_lookup[fallback_campaign]
+
+    if selected_entry and not selected_campaign_id:
+        selected_campaign_id = _truthy_text(selected_entry.get("campaignId") or "")
+
+    return {
+        "activation_profile": {
+            "path": _safe_relpath(
+                activation_state_path if activation_state_path else workspace_root / RUNTIME_ACTIVATION_FALLBACK,
+                workspace_root,
+            ),
+            "enabled": bool(runtime_activation.get("enabled") if "enabled" in runtime_activation else activation_state.get("enabled")),
+            "campaign_id": _truthy_text(runtime_activation.get("campaign_id")) or _truthy_text(activation_state.get("campaignId")),
+            "updated_at": _truthy_text(runtime_activation.get("updated_at")) or _truthy_text(activation_state.get("updated_at")),
+            "raw_state_path": _truthy_text(runtime_activation.get("state_path")) or None,
+        },
+        "dispatch": {
+            "state": runtime_state,
+            "campaign_id": dispatch_campaign,
+            "requested_campaign_id": requested_campaign or None,
+            "suggested_campaign_id": fallback_campaign or None,
+            "attempted": bool(runtime_dispatch.get("attempted") is True),
+            "fallback_used": bool(runtime_dispatch.get("fallback_used") is True),
+            "activation_mismatch": bool(runtime_dispatch.get("activation_mismatch") is True),
+            "returncode": runtime_dispatch.get("returncode"),
+            "reason": runtime_dispatch_reason or None,
+            "reason_compact": runtime_dispatch_reason[:280] if len(runtime_dispatch_reason) > 280 else runtime_dispatch_reason,
+        },
+        "selection": {
+            "policy": policy_hint,
+            "policy_id": policy_id,
+            "selected_campaign_id": selected_campaign_id or None,
+            "requested_campaign_id": requested_campaign or None,
+            "selected_entry_present": selected_entry is not None,
+            "selection_reason": selection_reason,
+            "selection_notes": selection_notes,
+            "candidate_set": runtime_candidate_set,
+            "candidate_count": len(runtime_candidate_set),
+        },
+        "selected_entry": selected_entry,
+        "shadow_path": _safe_relpath(runtime_shadow_path, workspace_root),
+    }
 def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
     repo = root or repo_root()
     workspace_root = _workspace_root(repo)
@@ -58,18 +247,66 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
     activation_latest = _load_optional_json(activation_latest_path)
     nightly_state = _load_optional_json(nightly_state_path)
 
-    line_state_path = Path(str(line_state.get("_path")))
+    line_state_path = Path(str(line_state.get("_path")) if line_state.get("_path") else "")
 
-    campaign_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns/2026-04-failed-auction-short-cluster-slow-cook"
-    campaign_state_path = campaign_root / "STATE.json"
-    campaign_next_action_path = campaign_root / "NEXT_ACTION.json"
-    campaign_status_path = campaign_root / "STATUS.md"
-    campaign_gates_path = campaign_root / "GATES.md"
-    campaign_index_path = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/lanes/autonomous-slow-cook/campaigns/INDEX.json"
-    campaign_state = _load_optional_json(campaign_state_path) or {}
-    campaign_next_action = _load_optional_json(campaign_next_action_path) or {}
+    campaign_index_path = workspace_root / CAMPAIGN_INDEX_RELATIVE_PATH
     campaign_index = _load_optional_json(campaign_index_path) or {"campaigns": []}
+    ordered_campaigns, campaign_lookup = _campaign_entry_lookup(campaign_index)
+
+    runtime_profile = _build_runtime_profile(
+        workspace_root=workspace_root,
+        campaign_index_ordered=ordered_campaigns,
+        campaign_index_lookup=campaign_lookup,
+    )
+
+    selected_campaign_id = runtime_profile["selection"].get("selected_campaign_id")
+    selected_entry = runtime_profile["selected_entry"]
+    if selected_entry is None and selected_campaign_id:
+        selected_entry = campaign_lookup.get(selected_campaign_id)
+
+    selected_campaign_root = _resolve_path(
+        _truthy_text(selected_entry.get("campaignPath") if selected_entry else "")
+        if selected_entry
+        else str(DEFAULT_CAMPAIGN_ROOT / selected_campaign_id),
+        workspace_root,
+    )
+    if selected_campaign_root is None:
+        selected_campaign_root = workspace_root / DEFAULT_CAMPAIGN_ROOT / DEFAULT_CAMPAIGN_ID
+
+    campaign_state_path = selected_campaign_root / "STATE.json"
+    campaign_next_action_path = selected_campaign_root / "NEXT_ACTION.json"
+    campaign_status_path = selected_campaign_root / "STATUS.md"
+    campaign_gates_path = selected_campaign_root / "GATES.md"
+
+    campaign_state = _load_optional_json(campaign_state_path) if campaign_state_path.exists() else {}
+    campaign_next_action = _load_optional_json(campaign_next_action_path) if campaign_next_action_path.exists() else {}
     autonomy_readiness = dict(campaign_state.get("autonomyReadiness") or {})
+
+    runtime_dispatch = runtime_profile["dispatch"]
+    runtime_dispatch_state = runtime_dispatch["state"]
+    runtime_dispatch_applied = (
+        runtime_dispatch_state == "applied"
+        and runtime_dispatch.get("attempted") is True
+        and (runtime_dispatch.get("returncode") is None or runtime_dispatch.get("returncode") == 0)
+    )
+    runtime_blocked = runtime_dispatch_state in {
+        "unavailable",
+        "inactive",
+        "campaign_missing",
+        "dispatcher_missing",
+        "misconfigured_activation",
+        "skipped_not_dispatchable",
+        "blocked",
+    }
+    campaign_dispatchable = bool(selected_entry.get("dispatchable") is True) if selected_entry else False
+    if runtime_blocked:
+        campaign_dispatchable = False
+    research_autonomous = bool(autonomy_readiness.get("researchAutonomous", False)) and runtime_dispatch_applied and not runtime_blocked
+    attach_autonomous = bool(autonomy_readiness.get("attachAutonomous", False)) and runtime_dispatch_applied and not runtime_blocked
+
+    current_state = f"runtime dispatch {runtime_dispatch_state}"
+
+    summary_note = runtime_dispatch.get("reason") or "No runtime dispatch note is available from the handoff state shadow document."
 
     components = [
         {
@@ -180,9 +417,9 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
         "topology_changed": False,
         "summary": {
             "headline": "Current canon flow: intake -> family selection -> verifier bridge -> campaign controller -> bounded autonomous research dispatch -> steamer-card-engine handoff / live sim.",
-            "current_state": "dispatch-ready for bounded research slices under guardrails",
-            "verdict": "research-autonomous-yes / attach-autonomous-no",
-            "note": "This line is now research-autonomous ready from campaign artifacts and bounded dispatch contracts, while attach/live-sim authority remains explicitly human-gated.",
+            "current_state": current_state,
+            "verdict": f"research-autonomous-{ 'yes' if research_autonomous else 'no' } / attach-autonomous-{ 'yes' if attach_autonomous else 'no' }",
+            "note": str(summary_note),
         },
         "line_state": {
             "line_id": line_state.get("line_id"),
@@ -209,13 +446,20 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
             "activation_latest_path": _safe_relpath(activation_latest_path if activation_latest_path.exists() else None, workspace_root),
             "nightly_state_path": _safe_relpath(nightly_state_path if nightly_state_path.exists() else None, workspace_root),
             "line_state_root": _safe_relpath(workspace_root / LINE_STATE_RELATIVE_PATH, workspace_root),
+            "campaign_index_path": _safe_relpath(campaign_index_path, workspace_root),
+            "runtime_shadow_path": runtime_profile.get("shadow_path"),
+            "runtime_activation": runtime_profile.get("activation_profile"),
+            "runtime_dispatch": runtime_profile.get("dispatch"),
+            "runtime_campaign_selection": runtime_profile.get("selection"),
+            "selected_campaign_id": selected_campaign_id,
+            "selection_hint": RUNTIME_CONTROL_HINT,
         },
         "campaign_state": {
-            "campaign_id": campaign_state.get("campaignId"),
+            "campaign_id": _truthy_text(campaign_state.get("campaignId") or selected_campaign_id),
             "status": campaign_state.get("status"),
             "phase": campaign_state.get("phase"),
             "active_candidate_id": campaign_state.get("activeCandidateId"),
-            "dispatchable": any(c.get("campaignId") == campaign_state.get("campaignId") and c.get("dispatchable") for c in campaign_index.get("campaigns", [])),
+            "dispatchable": campaign_dispatchable,
             "cluster_mode": (campaign_state.get("clusterCadence") or {}).get("mode"),
             "cluster_window": (campaign_state.get("clusterCadence") or {}).get("clusterWindow"),
             "max_bounded_slices_per_cluster": (campaign_state.get("clusterCadence") or {}).get("maxBoundedSlicesPerCluster"),
@@ -225,13 +469,15 @@ def build_strategy_pipeline_view(root: Path | None = None) -> dict[str, Any]:
             "retry_remaining_for_active": ((campaign_state.get("retryBudget") or {}).get("remainingForActive")),
             "stale_after_active": autonomy_readiness.get("staleAfterActive"),
             "stale_after_parked": autonomy_readiness.get("staleAfterParked"),
-            "research_autonomous": bool(autonomy_readiness.get("researchAutonomous", False)),
-            "attach_autonomous": bool(autonomy_readiness.get("attachAutonomous", False)),
-            "campaign_path": _safe_relpath(campaign_root, workspace_root),
+            "research_autonomous": research_autonomous,
+            "attach_autonomous": attach_autonomous,
+            "campaign_path": _safe_relpath(selected_campaign_root, workspace_root),
             "state_path": _safe_relpath(campaign_state_path if campaign_state_path.exists() else None, workspace_root),
             "next_action_path": _safe_relpath(campaign_next_action_path if campaign_next_action_path.exists() else None, workspace_root),
             "status_path": _safe_relpath(campaign_status_path if campaign_status_path.exists() else None, workspace_root),
             "gates_path": _safe_relpath(campaign_gates_path if campaign_gates_path.exists() else None, workspace_root),
+            "runtime_dispatch": runtime_profile.get("dispatch"),
+            "selection": runtime_profile.get("selection"),
         },
         "sources": [
             path
