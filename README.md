@@ -271,6 +271,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ `operator live-smoke-readiness` now emits a truthful pass/fail smoke bundle for the bounded live-capability path
 - ✅ `auth inspect-session` now exposes a seed logical session / capability / trading-day-gate surface without pretending broker connectivity
 - ✅ `operator preflight-smoke` now exposes the next broker-preflight gate truthfully, and currently blocks on seed-runtime not-connected health instead of faking readiness
+- ✅ session / preflight health now align to a reusable `session_status + connections` contract so later broker-connected work can replace the source without breaking the CLI surface
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Broker-connected controlled live-sim / operator workflow

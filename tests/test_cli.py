@@ -63,6 +63,8 @@ def test_cli_inspect_session_json_reports_seed_logical_session(capsys) -> None:
     assert payload["auth_profile"] == "examples/profiles/tw_cash_password_auth.toml"
     assert payload["capabilities"]["trade_enabled"] is True
     assert payload["health_status"]["broker_connection"] == "not-connected"
+    assert payload["session_status"]["connections"]["marketdata"]["state"] == "not-connected"
+    assert payload["session_status"]["session_state"] == "logical-profile-only"
     assert payload["trading_day_gate"]["status"] == "closed"
     assert payload["trading_day_gate"]["live_allowed"] is False
     assert payload["boundary"]["activation"] == "prepared-only"
@@ -626,4 +628,5 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert "marketdata-not-connected" in blocker_codes
     assert "broker-not-connected" in blocker_codes
     assert payload["logical_session"]["trading_day_gate"]["status"] == "open"
+    assert payload["replacement_contract"]["expected_connected_surfaces"] == ["marketdata", "broker"]
     assert payload["operator_status"]["armed_live"] is False

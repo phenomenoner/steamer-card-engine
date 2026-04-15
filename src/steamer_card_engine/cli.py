@@ -327,6 +327,39 @@ def _print_auth_summary(summary: dict) -> None:
     print(f"  safety_boundary: {summary['safety_boundary']}")
 
 
+def _seed_session_status(*, trading_day_status: str) -> dict:
+    return {
+        "session_state": "logical-profile-only",
+        "renewal_state": "not-attached",
+        "connected_surfaces": (),
+        "degraded_surfaces": (),
+        "connections": {
+            "marketdata": {
+                "state": "not-connected",
+                "detail": "seed-runtime: marketdata transport not attached",
+                "last_heartbeat_at": None,
+                "last_error": None,
+            },
+            "broker": {
+                "state": "not-connected",
+                "detail": "seed-runtime: broker transport not attached",
+                "last_heartbeat_at": None,
+                "last_error": None,
+            },
+            "account": {
+                "state": "not-connected",
+                "detail": (
+                    "seed-runtime: account-query surface not attached"
+                    if trading_day_status != "unknown"
+                    else "seed-runtime: account-query surface not attached; trading-day unresolved"
+                ),
+                "last_heartbeat_at": None,
+                "last_error": None,
+            },
+        },
+    }
+
+
 def _inspect_logical_session(
     *,
     auth_profile_path: str,
@@ -336,6 +369,7 @@ def _inspect_logical_session(
     profile = load_auth_profile(auth_profile_path)
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     live_allowed = trading_day_status == "open"
+    session_status = _seed_session_status(trading_day_status=trading_day_status)
     return {
         "session_id": session_id or "seed-logical-session",
         "account_no": profile.account,
@@ -344,6 +378,7 @@ def _inspect_logical_session(
         "session_started_at": now,
         "expires_at": None,
         "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+        "session_status": session_status,
         "capabilities": {
             "marketdata_enabled": profile.marketdata_enabled,
             "account_query_enabled": profile.account_query_enabled,
@@ -351,9 +386,9 @@ def _inspect_logical_session(
         },
         "health_status": {
             "runtime": "seed-ok",
-            "session": "logical-profile-only",
-            "marketdata_connection": "not-connected",
-            "broker_connection": "not-connected",
+            "session": session_status["session_state"],
+            "marketdata_connection": session_status["connections"]["marketdata"]["state"],
+            "broker_connection": session_status["connections"]["broker"]["state"],
         },
         "trading_day_gate": {
             "status": trading_day_status,
@@ -379,6 +414,7 @@ def _print_auth_session_summary(summary: dict) -> None:
     capabilities = summary["capabilities"]
     gate = summary["trading_day_gate"]
     health = summary["health_status"]
+    session_status = summary["session_status"]
     print("Logical Session")
     print(
         "  session: "
@@ -393,6 +429,10 @@ def _print_auth_session_summary(summary: dict) -> None:
         "  health: "
         f"runtime={health['runtime']} session={health['session']} "
         f"marketdata={health['marketdata_connection']} broker={health['broker_connection']}"
+    )
+    print(
+        "  session_status: "
+        f"state={session_status['session_state']} renewal={session_status['renewal_state']}"
     )
     print(
         "  trading_day_gate: "
@@ -542,6 +582,7 @@ def _operator_preflight_smoke(
     blockers: list[dict[str, str]] = []
     capabilities = logical_session["capabilities"]
     health = logical_session["health_status"]
+    session_status = logical_session["session_status"]
     gate = logical_session["trading_day_gate"]
     operator_payload = operator_result.payload
 
@@ -551,10 +592,12 @@ def _operator_preflight_smoke(
         blockers.append({"code": "capability-marketdata-disabled", "detail": "marketdata_enabled=false"})
     if not capabilities["trade_enabled"]:
         blockers.append({"code": "capability-trade-disabled", "detail": "trade_enabled=false"})
-    if health["marketdata_connection"] != "connected":
-        blockers.append({"code": "marketdata-not-connected", "detail": health["marketdata_connection"]})
-    if health["broker_connection"] != "connected":
-        blockers.append({"code": "broker-not-connected", "detail": health["broker_connection"]})
+    marketdata_state = session_status["connections"]["marketdata"]["state"]
+    broker_state = session_status["connections"]["broker"]["state"]
+    if marketdata_state != "connected":
+        blockers.append({"code": "marketdata-not-connected", "detail": marketdata_state})
+    if broker_state != "connected":
+        blockers.append({"code": "broker-not-connected", "detail": broker_state})
     if operator_payload["armed_live"]:
         blockers.append({"code": "operator-posture-armed", "detail": "preflight requires disarmed baseline"})
     if operator_payload["order_submission_gate"]["reason"] != "disarmed-posture":
@@ -585,6 +628,10 @@ def _operator_preflight_smoke(
                 f"steamer-card-engine operator live-smoke-readiness --deck {deck_ref} "
                 f"--auth-profile {auth_profile_path} --json"
             ),
+        },
+        "replacement_contract": {
+            "expected_connected_surfaces": ["marketdata", "broker"],
+            "session_status_source": "replace seed placeholders with adapter/session-manager health snapshots",
         },
         "boundary": "seed preflight gate only; no broker/session attach is performed here",
     }

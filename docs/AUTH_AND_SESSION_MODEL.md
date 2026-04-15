@@ -113,6 +113,19 @@ The session layer should classify at least:
 
 These should surface as structured states, not only log text.
 
+## Broker-preflight contract skeleton (new seed alignment)
+
+Before a future trading-day smoke cron is allowed to move past preflight, the session surface should expose a stable shape for:
+
+- `session_status.session_state`
+- `session_status.renewal_state`
+- `session_status.connections.marketdata.state`
+- `session_status.connections.broker.state`
+- `session_status.connections.account.state`
+
+Seed-runtime truth may still report `not-connected`, but the shape itself should already be stable.
+That way, later broker-connected work can replace the source of truth without rewriting the CLI/operator contract.
+
 ## Operator posture
 
 Before live trading is even considered, an operator should be able to answer:

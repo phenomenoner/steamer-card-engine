@@ -2,7 +2,38 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Iterable, Literal
+
+
+ConnectionState = Literal["connected", "connecting", "disconnected", "not-connected", "degraded", "error"]
+
+
+@dataclass(slots=True)
+class ConnectionHealth:
+    surface: Literal["marketdata", "broker", "account"]
+    state: ConnectionState
+    detail: str
+    last_heartbeat_at: datetime | None = None
+    last_error: str | None = None
+
+
+@dataclass(slots=True)
+class SessionStatus:
+    session_state: str
+    renewal_state: str
+    connected_surfaces: tuple[str, ...] = ()
+    degraded_surfaces: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
+class AdapterHealthSnapshot:
+    adapter_id: str
+    vendor: str
+    version: str
+    capabilities: dict[str, bool]
+    session_status: SessionStatus
+    connections: tuple[ConnectionHealth, ...]
 
 
 @dataclass(slots=True)

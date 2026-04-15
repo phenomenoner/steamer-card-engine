@@ -177,6 +177,18 @@ Each adapter should expose:
 - `connection_limits`
 - `rate_limit_policy`
 
+For the broker-preflight lane, the adapter/session boundary should also be able to populate a stable health snapshot shape such as:
+
+- `session_status.session_state`
+- `session_status.renewal_state`
+- `connections[].surface`
+- `connections[].state`
+- `connections[].detail`
+- `connections[].last_heartbeat_at`
+- `connections[].last_error`
+
+Seed runtime may publish placeholder `not-connected` values, but later broker-connected work should fill the same shape rather than inventing a new one.
+
 ## Failure semantics
 
 Adapters must classify failures into at least:

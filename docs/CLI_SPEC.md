@@ -27,6 +27,7 @@ Responsibilities:
 - inspect current logical session and health status
 - help operators confirm the intended safety boundary before live expansion
 - in seed runtime, `inspect-session` is a logical profile/session surface, not a broker-connected session attach
+- the session/preflight lane should stabilize around a reusable `session_status + connections` health shape so later broker-connected work swaps data sources, not command contracts
 
 ### 2. Authoring commands
 
