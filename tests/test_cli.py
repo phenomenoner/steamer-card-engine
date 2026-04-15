@@ -592,3 +592,38 @@ def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_fai
 
     final_state = json.loads(state_file.read_text(encoding="utf-8"))
     assert final_state["armed_live"] is False
+
+
+def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connected(
+    capsys, tmp_path: Path
+) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    code = main(
+        [
+            "operator",
+            "preflight-smoke",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert payload["ok"] is False
+    assert payload["preflight_status"] == "blocked"
+    blocker_codes = {row["code"] for row in payload["blockers"]}
+    assert "marketdata-not-connected" in blocker_codes
+    assert "broker-not-connected" in blocker_codes
+    assert payload["logical_session"]["trading_day_gate"]["status"] == "open"
+    assert payload["operator_status"]["armed_live"] is False

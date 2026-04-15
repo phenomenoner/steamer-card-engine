@@ -284,6 +284,22 @@ def build_parser() -> argparse.ArgumentParser:
     live_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
     live_smoke.add_argument("--json", action="store_true", dest="as_json")
 
+    preflight_smoke = operator_sub.add_parser(
+        "preflight-smoke",
+        help="Run the broker-preflight readiness gate and report whether the next live-preflight step is blocked or ready",
+    )
+    preflight_smoke.add_argument("--auth-profile", required=True)
+    preflight_smoke.add_argument("--deck", required=True)
+    preflight_smoke.add_argument(
+        "--trading-day-status",
+        choices=("open", "closed", "unknown"),
+        default="unknown",
+    )
+    preflight_smoke.add_argument("--session-id")
+    preflight_smoke.add_argument("--state-file", default=".state/operator_posture.json")
+    preflight_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
+    preflight_smoke.add_argument("--json", action="store_true", dest="as_json")
+
     inspect = operator_sub.add_parser("inspect", help="Inspect a runtime target")
     inspect.add_argument("target", nargs="?", default="default")
 
@@ -500,6 +516,79 @@ def _print_operator_action_summary(payload: dict) -> None:
     ):
         if key in payload:
             print(f"  {key}: {payload[key]}")
+
+
+def _operator_preflight_smoke(
+    *,
+    auth_profile_path: str,
+    deck_ref: str,
+    trading_day_status: str,
+    state_file: Path,
+    receipt_dir: Path,
+    session_id: str | None,
+) -> tuple[dict, int]:
+    logical_session = _inspect_logical_session(
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+        trading_day_status=trading_day_status,
+    )
+    operator_result = operator_status(
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+    )
+
+    blockers: list[dict[str, str]] = []
+    capabilities = logical_session["capabilities"]
+    health = logical_session["health_status"]
+    gate = logical_session["trading_day_gate"]
+    operator_payload = operator_result.payload
+
+    if not gate["live_allowed"]:
+        blockers.append({"code": "trading-day-gate", "detail": gate["reason"]})
+    if not capabilities["marketdata_enabled"]:
+        blockers.append({"code": "capability-marketdata-disabled", "detail": "marketdata_enabled=false"})
+    if not capabilities["trade_enabled"]:
+        blockers.append({"code": "capability-trade-disabled", "detail": "trade_enabled=false"})
+    if health["marketdata_connection"] != "connected":
+        blockers.append({"code": "marketdata-not-connected", "detail": health["marketdata_connection"]})
+    if health["broker_connection"] != "connected":
+        blockers.append({"code": "broker-not-connected", "detail": health["broker_connection"]})
+    if operator_payload["armed_live"]:
+        blockers.append({"code": "operator-posture-armed", "detail": "preflight requires disarmed baseline"})
+    if operator_payload["order_submission_gate"]["reason"] != "disarmed-posture":
+        blockers.append({
+            "code": "unexpected-order-gate",
+            "detail": operator_payload["order_submission_gate"]["reason"],
+        })
+
+    ready = not blockers
+    payload = {
+        "ok": ready,
+        "preflight_status": "ready" if ready else "blocked",
+        "activation": "prepared-only",
+        "deck": deck_ref,
+        "auth_profile": auth_profile_path,
+        "logical_session": logical_session,
+        "operator_status": operator_payload,
+        "blockers": blockers,
+        "next_command_map": {
+            "inspect_session": (
+                f"steamer-card-engine auth inspect-session --auth-profile {auth_profile_path} "
+                f"--trading-day-status {trading_day_status} --json"
+            ),
+            "operator_status": (
+                f"steamer-card-engine operator status --auth-profile {auth_profile_path} --json"
+            ),
+            "bounded_live_smoke": (
+                f"steamer-card-engine operator live-smoke-readiness --deck {deck_ref} "
+                f"--auth-profile {auth_profile_path} --json"
+            ),
+        },
+        "boundary": "seed preflight gate only; no broker/session attach is performed here",
+    }
+    return payload, 0 if ready else 4
 
 
 def _handle_catalog_error(error: StrategyCatalogValidationError) -> int:
@@ -956,6 +1045,21 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 _print_operator_action_summary(result.payload)
             return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "preflight-smoke":
+            payload, exit_code = _operator_preflight_smoke(
+                auth_profile_path=args.auth_profile,
+                deck_ref=args.deck,
+                trading_day_status=args.trading_day_status,
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                session_id=args.session_id,
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                _print_operator_action_summary(payload)
+            return exit_code
 
     except StrategyCatalogValidationError as error:
         return _handle_catalog_error(error)
