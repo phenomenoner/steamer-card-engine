@@ -308,6 +308,27 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
     preflight_smoke.add_argument("--json", action="store_true", dest="as_json")
 
+    probe_session = operator_sub.add_parser(
+        "probe-session",
+        help="Emit a canonical session health snapshot for preflight/cron consumption",
+    )
+    probe_session.add_argument("--auth-profile", required=True)
+    probe_session.add_argument(
+        "--trading-day-status",
+        choices=("open", "closed", "unknown"),
+        default="unknown",
+    )
+    probe_session.add_argument("--session-id")
+    probe_session.add_argument(
+        "--probe-json",
+        help="Optional external JSON snapshot to pass through the canonical probe-session surface",
+    )
+    probe_session.add_argument(
+        "--output",
+        help="Optional path to write the emitted snapshot JSON for downstream cron/preflight use",
+    )
+    probe_session.add_argument("--json", action="store_true", dest="as_json")
+
     inspect = operator_sub.add_parser("inspect", help="Inspect a runtime target")
     inspect.add_argument("target", nargs="?", default="default")
 
@@ -488,6 +509,59 @@ def _print_auth_session_summary(summary: dict) -> None:
     print(f"  activation: {summary['boundary']['activation']}")
 
 
+def _probe_session_snapshot(*, logical_session: dict) -> dict:
+    boundary = logical_session.get("boundary", {})
+    return {
+        "probe_source": boundary.get("probe_source", "operator-probe-session:seed"),
+        "captured_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "auth_profile": logical_session["auth_profile"],
+        "session_id": logical_session["session_id"],
+        "account_no": logical_session["account_no"],
+        "auth_mode": logical_session["auth_mode"],
+        "capabilities": logical_session["capabilities"],
+        "health_status": logical_session["health_status"],
+        "session_status": logical_session["session_status"],
+        "trading_day_gate": logical_session["trading_day_gate"],
+        "boundary": {
+            "activation": boundary.get("activation", "prepared-only"),
+            "broker_connected": boundary.get("broker_connected", False),
+            "notes": "canonical probe snapshot for operator preflight consumers",
+        },
+    }
+
+
+def _write_probe_snapshot(path: str | None, snapshot: dict) -> str | None:
+    if not path:
+        return None
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return str(output_path)
+
+
+def _print_probe_session_summary(snapshot: dict, output_path: str | None) -> None:
+    session_status = snapshot["session_status"]
+    connections = session_status["connections"]
+    gate = snapshot["trading_day_gate"]
+    print("Operator Probe Session")
+    print(
+        "  session: "
+        f"id={snapshot['session_id']} account={snapshot['account_no']} auth_mode={snapshot['auth_mode']}"
+    )
+    print(f"  probe_source: {snapshot['probe_source']}")
+    print(
+        "  connections: "
+        f"marketdata={connections['marketdata']['state']} "
+        f"broker={connections['broker']['state']} account={connections['account']['state']}"
+    )
+    print(
+        "  trading_day_gate: "
+        f"status={gate['status']} live_allowed={gate['live_allowed']}"
+    )
+    if output_path:
+        print(f"  output: {output_path}")
+
+
 def _print_card_summary(summary: dict) -> None:
     print("Card Manifest")
     print(f"  id: {summary['card_id']}  version: {summary['version']}  status: {summary['status']}")
@@ -666,6 +740,10 @@ def _operator_preflight_smoke(
         "operator_status": operator_payload,
         "blockers": blockers,
         "next_command_map": {
+            "probe_session": (
+                f"steamer-card-engine operator probe-session --auth-profile {auth_profile_path} "
+                f"--trading-day-status {trading_day_status} --json"
+            ),
             "inspect_session": (
                 f"steamer-card-engine auth inspect-session --auth-profile {auth_profile_path} "
                 f"--trading-day-status {trading_day_status} --json"
@@ -1158,6 +1236,24 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 _print_operator_action_summary(payload)
             return exit_code
+
+        if args.command == "operator" and args.operator_command == "probe-session":
+            logical_session = _inspect_logical_session(
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                trading_day_status=args.trading_day_status,
+                probe_json_path=args.probe_json,
+            )
+            snapshot = _probe_session_snapshot(logical_session=logical_session)
+            output_path = _write_probe_snapshot(args.output, snapshot)
+            if args.as_json:
+                payload = dict(snapshot)
+                if output_path:
+                    payload["output_path"] = output_path
+                _print_json(payload)
+            else:
+                _print_probe_session_summary(snapshot, output_path)
+            return 0
 
     except StrategyCatalogValidationError as error:
         return _handle_catalog_error(error)

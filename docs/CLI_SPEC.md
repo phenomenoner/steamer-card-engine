@@ -116,6 +116,8 @@ steamer-card-engine operator disarm-live
 steamer-card-engine operator flatten --mode final-auction
 steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quantity 1
 steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json
+steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
+steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --output ./.state/session_probe.json --json
 steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
 ```
@@ -128,6 +130,7 @@ Responsibilities:
 - enforce submission gate against non-active arm windows with explicit disarmed refusal for seed order-smoke checks
 - write action receipts for arm/disarm/flatten/refusals
 - run one bounded live-capability smoke sequence that proves disarmed refusal -> bounded arming -> armed acceptance receipt -> flatten/disarm closure without broker submission
+- emit a canonical session-health snapshot for downstream cron/preflight consumers
 - report whether the next broker-preflight step is blocked or ready, using logical session posture + operator baseline posture as the seed gate
 
 ## Governance rules

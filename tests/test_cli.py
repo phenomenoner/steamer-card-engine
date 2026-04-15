@@ -113,6 +113,53 @@ def test_cli_inspect_session_accepts_probe_snapshot_override(capsys, tmp_path: P
     assert payload["boundary"]["probe_source"] == "fixture-probe"
 
 
+def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
+    code = main(
+        [
+            "operator",
+            "probe-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["probe_source"] == "operator-probe-session:seed"
+    assert payload["session_status"]["connections"]["broker"]["state"] == "not-connected"
+    assert payload["capabilities"]["trade_enabled"] is True
+
+
+def test_operator_probe_session_writes_snapshot_file(capsys, tmp_path: Path) -> None:
+    output_path = tmp_path / "probe" / "session_probe.json"
+
+    code = main(
+        [
+            "operator",
+            "probe-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            "examples/probes/session_health.connected.json",
+            "--output",
+            str(output_path),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    assert code == 0
+    assert payload["output_path"] == str(output_path)
+    assert written["probe_source"] == "example-probe"
+    assert written["session_status"]["session_state"] == "healthy"
+
+
 def test_cli_validate_strategy_catalog_success(capsys) -> None:
     code = main(
         [
