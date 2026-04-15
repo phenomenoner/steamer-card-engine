@@ -56,3 +56,20 @@ Why disabled:
 - the repo-side chain is real
 - but there is still no real broker/session probe source wired in
 - enabling it now would create guaranteed daily blocked noise instead of truthful live signal
+
+## Test scheduler lane receipt
+
+To validate scheduler wiring before real probe enablement, one bounded fixture-backed test row is now live:
+
+- job id: `37d89e3b-4dab-4bbb-ba38-b9f7719e9ff8`
+- name: `steamer: card-engine trading-day preflight TEST oneshot`
+- schedule: one-shot (`at`) + `deleteAfterRun=true`
+- target: isolated `steamer-cron`
+
+Purpose:
+- validate scheduler -> isolated agent -> repo wrapper path on a green fixture-backed lane
+- avoid misusing the real sentinel as a fake-ready scheduler test
+
+Boundary:
+- this is test-only
+- the real preflight sentinel remains disabled until a real probe source exists
