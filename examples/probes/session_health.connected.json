@@ -1,0 +1,29 @@
+{
+  "probe_source": "example-probe",
+  "session_status": {
+    "session_state": "healthy",
+    "renewal_state": "fresh",
+    "connected_surfaces": ["marketdata", "broker", "account"],
+    "degraded_surfaces": [],
+    "connections": {
+      "marketdata": {
+        "state": "connected",
+        "detail": "example marketdata probe snapshot",
+        "last_heartbeat_at": null,
+        "last_error": null
+      },
+      "broker": {
+        "state": "connected",
+        "detail": "example broker probe snapshot",
+        "last_heartbeat_at": null,
+        "last_error": null
+      },
+      "account": {
+        "state": "connected",
+        "detail": "example account probe snapshot",
+        "last_heartbeat_at": null,
+        "last_error": null
+      }
+    }
+  }
+}

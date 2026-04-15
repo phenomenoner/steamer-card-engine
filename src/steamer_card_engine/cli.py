@@ -65,6 +65,10 @@ def build_parser() -> argparse.ArgumentParser:
     auth_inspect_session.add_argument("--auth-profile", required=True)
     auth_inspect_session.add_argument("--session-id")
     auth_inspect_session.add_argument(
+        "--probe-json",
+        help="Optional JSON snapshot overriding the seed session_status/health fields",
+    )
+    auth_inspect_session.add_argument(
         "--trading-day-status",
         choices=("open", "closed", "unknown"),
         default="unknown",
@@ -291,6 +295,10 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_smoke.add_argument("--auth-profile", required=True)
     preflight_smoke.add_argument("--deck", required=True)
     preflight_smoke.add_argument(
+        "--probe-json",
+        help="Optional JSON health snapshot to replace seed not-connected session/probe fields",
+    )
+    preflight_smoke.add_argument(
         "--trading-day-status",
         choices=("open", "closed", "unknown"),
         default="unknown",
@@ -360,17 +368,55 @@ def _seed_session_status(*, trading_day_status: str) -> dict:
     }
 
 
+def _load_probe_snapshot(path: str | None) -> dict | None:
+    if not path:
+        return None
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"probe snapshot must be a JSON object: {path}")
+    return payload
+
+
+def _merge_probe_snapshot(*, summary: dict, probe_snapshot: dict | None) -> dict:
+    if not probe_snapshot:
+        return summary
+
+    merged = json.loads(json.dumps(summary))
+    session_status = probe_snapshot.get("session_status")
+    if isinstance(session_status, dict):
+        merged["session_status"] = session_status
+        connections = session_status.get("connections") if isinstance(session_status.get("connections"), dict) else {}
+        merged["health_status"]["session"] = session_status.get("session_state", merged["health_status"]["session"])
+        if isinstance(connections.get("marketdata"), dict):
+            merged["health_status"]["marketdata_connection"] = connections["marketdata"].get(
+                "state", merged["health_status"]["marketdata_connection"]
+            )
+        if isinstance(connections.get("broker"), dict):
+            merged["health_status"]["broker_connection"] = connections["broker"].get(
+                "state", merged["health_status"]["broker_connection"]
+            )
+
+    capabilities = probe_snapshot.get("capabilities")
+    if isinstance(capabilities, dict):
+        merged["capabilities"].update(capabilities)
+
+    boundary = merged.setdefault("boundary", {})
+    boundary["probe_source"] = probe_snapshot.get("probe_source", "external-json")
+    return merged
+
+
 def _inspect_logical_session(
     *,
     auth_profile_path: str,
     session_id: str | None,
     trading_day_status: str,
+    probe_json_path: str | None = None,
 ) -> dict:
     profile = load_auth_profile(auth_profile_path)
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     live_allowed = trading_day_status == "open"
     session_status = _seed_session_status(trading_day_status=trading_day_status)
-    return {
+    summary = {
         "session_id": session_id or "seed-logical-session",
         "account_no": profile.account,
         "auth_mode": profile.mode,
@@ -408,6 +454,7 @@ def _inspect_logical_session(
             "notes": "logical session inspection only; does not establish a live broker/runtime session",
         },
     }
+    return _merge_probe_snapshot(summary=summary, probe_snapshot=_load_probe_snapshot(probe_json_path))
 
 
 def _print_auth_session_summary(summary: dict) -> None:
@@ -566,11 +613,13 @@ def _operator_preflight_smoke(
     state_file: Path,
     receipt_dir: Path,
     session_id: str | None,
+    probe_json_path: str | None,
 ) -> tuple[dict, int]:
     logical_session = _inspect_logical_session(
         auth_profile_path=auth_profile_path,
         session_id=session_id,
         trading_day_status=trading_day_status,
+        probe_json_path=probe_json_path,
     )
     operator_result = operator_status(
         state_file=state_file,
@@ -816,6 +865,7 @@ def main(argv: list[str] | None = None) -> int:
                 auth_profile_path=args.auth_profile,
                 session_id=args.session_id,
                 trading_day_status=args.trading_day_status,
+                probe_json_path=args.probe_json,
             )
             if args.as_json:
                 _print_json(summary)
@@ -1101,6 +1151,7 @@ def main(argv: list[str] | None = None) -> int:
                 state_file=Path(args.state_file),
                 receipt_dir=Path(args.receipt_dir),
                 session_id=args.session_id,
+                probe_json_path=args.probe_json,
             )
             if args.as_json:
                 _print_json(payload)

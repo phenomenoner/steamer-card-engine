@@ -18,6 +18,7 @@ Examples:
 steamer-card-engine auth validate-profile ./profiles/fubon.paper.toml
 steamer-card-engine auth inspect-profile ./profiles/fubon.paper.toml
 steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --json
+steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --probe-json ./examples/probes/session_health.connected.json --json
 ```
 
 Responsibilities:
@@ -28,6 +29,7 @@ Responsibilities:
 - help operators confirm the intended safety boundary before live expansion
 - in seed runtime, `inspect-session` is a logical profile/session surface, not a broker-connected session attach
 - the session/preflight lane should stabilize around a reusable `session_status + connections` health shape so later broker-connected work swaps data sources, not command contracts
+- `--probe-json` is the first external inlet for real or fixture health snapshots, so broker/session probing can live outside the CLI while still feeding the canonical contract shape
 
 ### 2. Authoring commands
 
@@ -115,6 +117,7 @@ steamer-card-engine operator flatten --mode final-auction
 steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quantity 1
 steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json
 steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
+steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
 ```
 
 Responsibilities:

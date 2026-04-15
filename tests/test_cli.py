@@ -70,6 +70,49 @@ def test_cli_inspect_session_json_reports_seed_logical_session(capsys) -> None:
     assert payload["boundary"]["activation"] == "prepared-only"
 
 
+def test_cli_inspect_session_accepts_probe_snapshot_override(capsys, tmp_path: Path) -> None:
+    probe = tmp_path / "probe.json"
+    probe.write_text(
+        json.dumps(
+            {
+                "probe_source": "fixture-probe",
+                "session_status": {
+                    "session_state": "healthy",
+                    "renewal_state": "fresh",
+                    "connected_surfaces": ["marketdata", "broker", "account"],
+                    "degraded_surfaces": [],
+                    "connections": {
+                        "marketdata": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                        "broker": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                        "account": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = main(
+        [
+            "auth",
+            "inspect-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            str(probe),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["session_status"]["session_state"] == "healthy"
+    assert payload["health_status"]["broker_connection"] == "connected"
+    assert payload["boundary"]["probe_source"] == "fixture-probe"
+
+
 def test_cli_validate_strategy_catalog_success(capsys) -> None:
     code = main(
         [
@@ -630,3 +673,56 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert payload["logical_session"]["trading_day_gate"]["status"] == "open"
     assert payload["replacement_contract"]["expected_connected_surfaces"] == ["marketdata", "broker"]
     assert payload["operator_status"]["armed_live"] is False
+
+
+def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(
+    capsys, tmp_path: Path
+) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+    probe = tmp_path / "probe.json"
+    probe.write_text(
+        json.dumps(
+            {
+                "probe_source": "fixture-probe",
+                "session_status": {
+                    "session_state": "healthy",
+                    "renewal_state": "fresh",
+                    "connected_surfaces": ["marketdata", "broker", "account"],
+                    "degraded_surfaces": [],
+                    "connections": {
+                        "marketdata": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                        "broker": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                        "account": {"state": "connected", "detail": "fixture", "last_heartbeat_at": None, "last_error": None},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = main(
+        [
+            "operator",
+            "preflight-smoke",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            str(probe),
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["preflight_status"] == "ready"
+    assert payload["logical_session"]["boundary"]["probe_source"] == "fixture-probe"
