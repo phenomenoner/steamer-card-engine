@@ -227,7 +227,8 @@ uv run steamer-card-engine sim compare \
 以及 M1 基礎實作：`sim normalize-baseline` / `sim compare` / `replay run`（候選 bundle 發射路徑）。
 其中 `sim compare` 會落地 `compare-manifest.json`、`diff.json`、`summary.md` 這組 decision-grade 比對輸出。
 `operator` 現在有 seed 級控制面：`status` / `arm-live` / `disarm-live` / `flatten`，含 TTL policy、
-expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-smoke` 來驗證 disarmed posture 的顯式拒單。
+expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-smoke` 來驗證 disarmed posture 的顯式拒單，
+以及 `live-smoke-readiness` 一鍵跑完整個 bounded live-capability smoke sequence。
 這仍不是 broker-connected runtime。
 
 ## 文件導覽
@@ -265,6 +266,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
 - ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy
 - ✅ Seed operator control slice landed (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with TTL/auto-disarm + receipt trails
+- ✅ `operator live-smoke-readiness` now emits a truthful pass/fail smoke bundle for the bounded live-capability path
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Broker-connected controlled live-sim / operator workflow

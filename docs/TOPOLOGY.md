@@ -115,7 +115,7 @@ steamer-card-engine/
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
-  - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with local state/receipt trails
+  - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke|live-smoke-readiness`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
   - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
@@ -131,6 +131,7 @@ steamer-card-engine/
   - **names** the future components, but does not implement conflict resolution / risk / execution
 - operator commands now maintain a seed local posture/receipt state machine (`.state/operator_posture.json` + `.state/operator_receipts/`)
   - this is a bounded smoke/control surface, not a broker-connected production control plane
+  - `live-smoke-readiness` is the first repeatable pass/fail bundle for the bounded live-capability sequence, but remains prepared-only
 
 ## Sharp edges / known deltas
 

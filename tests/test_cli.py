@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from steamer_card_engine.cli import main
+from steamer_card_engine import operator_control
 
 
 def test_cli_validate_card_success(capsys) -> None:
@@ -94,6 +95,29 @@ def test_operator_status_json_disarmed_gate(capsys, tmp_path: Path) -> None:
     assert code == 0
     assert payload["armed_live"] is False
     assert payload["order_submission_gate"]["allowed"] is False
+    assert payload["order_submission_gate"]["reason"] == "disarmed-posture"
+
+
+def test_operator_status_empty_state_file_treated_as_default(capsys, tmp_path: Path) -> None:
+    state_file = tmp_path / "operator_state.json"
+    state_file.write_text("", encoding="utf-8")
+    receipt_dir = tmp_path / "receipts"
+
+    code = main(
+        [
+            "operator",
+            "status",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["armed_live"] is False
     assert payload["order_submission_gate"]["reason"] == "disarmed-posture"
 
 
@@ -425,3 +449,123 @@ def test_operator_flatten_implicitly_disarms(capsys, tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["implicit_disarm"] is True
     assert payload["armed_live"] is False
+
+
+def test_operator_live_smoke_readiness_runs_bounded_sequence(capsys, tmp_path: Path) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    code = main(
+        [
+            "operator",
+            "live-smoke-readiness",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["smoke_status"] == "pass"
+    assert payload["activation"] == "prepared-only"
+    assert [step["step"] for step in payload["steps"]] == [
+        "status-disarmed-baseline",
+        "submit-refused-while-disarmed",
+        "arm-live-bounded-scope",
+        "submit-accepted-while-armed",
+        "flatten-and-close-armed-window",
+        "status-disarmed-after-flatten",
+    ]
+    assert all(step["ok"] for step in payload["steps"])
+    assert len(payload["receipt_paths"]) == 4
+
+    final_state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert final_state["armed_live"] is False
+
+
+def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tmp_path: Path) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    code = main(
+        [
+            "operator",
+            "live-smoke-readiness",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_agent_assist.toml",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert payload["ok"] is False
+    assert payload["smoke_status"] == "fail"
+    assert payload["failed_step"]["step"] == "arm-live-bounded-scope"
+    assert payload["failed_step"]["payload"]["error"] == (
+        "operator arm-live refused: auth capability trade_enabled=false"
+    )
+
+
+def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_failure(
+    capsys, tmp_path: Path, monkeypatch
+) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+
+    original_submit = operator_control.operator_submit_order_smoke
+    call_count = {"value": 0}
+
+    def fail_on_armed_submit(**kwargs):
+        call_count["value"] += 1
+        if call_count["value"] == 2:
+            return operator_control.OperatorResult(
+                payload={
+                    "ok": False,
+                    "error": "synthetic armed submit failure",
+                },
+                exit_code=1,
+            )
+        return original_submit(**kwargs)
+
+    monkeypatch.setattr(operator_control, "operator_submit_order_smoke", fail_on_armed_submit)
+
+    code = main(
+        [
+            "operator",
+            "live-smoke-readiness",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert payload["ok"] is False
+    assert payload["failed_step"]["step"] == "submit-accepted-while-armed"
+    assert payload["steps"][-1]["step"] == "cleanup-disarm-after-failure"
+    assert payload["steps"][-1]["ok"] is True
+
+    final_state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert final_state["armed_live"] is False

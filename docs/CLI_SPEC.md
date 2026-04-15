@@ -111,6 +111,7 @@ steamer-card-engine operator arm-live --deck examples/decks/tw_cash_intraday.tom
 steamer-card-engine operator disarm-live
 steamer-card-engine operator flatten --mode final-auction
 steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quantity 1
+steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json
 ```
 
 Responsibilities:
@@ -120,6 +121,7 @@ Responsibilities:
 - auto-disarm on TTL expiry (and invalid arm scope) when operator state is inspected/used
 - enforce submission gate against non-active arm windows with explicit disarmed refusal for seed order-smoke checks
 - write action receipts for arm/disarm/flatten/refusals
+- run one bounded live-capability smoke sequence that proves disarmed refusal -> bounded arming -> armed acceptance receipt -> flatten/disarm closure without broker submission
 
 ## Governance rules
 
@@ -202,6 +204,7 @@ Current implementation status:
 - ✅ `replay run` emits candidate v1 bundles (legacy-bridge emitter for M1, with explicit provenance)
 - ✅ seed operator posture controls: `operator status|arm-live|disarm-live|flatten` + TTL policy + action receipts
 - ✅ `operator submit-order-smoke` explicit refusal while disarmed (seed smoke surface; no broker submission)
+- ✅ `operator live-smoke-readiness` pass/fail smoke bundle for the bounded live-capability sequence (still prepared-only; no broker submission)
 - ✅ operator auto-disarm now closes invalid arm-scope TTL metadata (missing/malformed `expires_at`) in addition to normal TTL expiry
 
 Next evolution order remains:

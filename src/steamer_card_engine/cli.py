@@ -22,6 +22,7 @@ from steamer_card_engine.operator_control import (
     operator_arm_live,
     operator_disarm_live,
     operator_flatten,
+    operator_live_smoke_readiness,
     operator_status,
     operator_submit_order_smoke,
 )
@@ -247,6 +248,28 @@ def build_parser() -> argparse.ArgumentParser:
     submit_order_smoke.add_argument("--state-file", default=".state/operator_posture.json")
     submit_order_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
     submit_order_smoke.add_argument("--json", action="store_true", dest="as_json")
+
+    live_smoke = operator_sub.add_parser(
+        "live-smoke-readiness",
+        help="Run the bounded live-capability smoke sequence and emit a pass/fail receipt bundle",
+    )
+    live_smoke.add_argument("--deck", required=True)
+    live_smoke.add_argument("--auth-profile", required=True)
+    live_smoke.add_argument("--ttl-seconds", type=int, default=300)
+    live_smoke.add_argument("--symbol", default="2330")
+    live_smoke.add_argument("--side", choices=("buy", "sell"), default="buy")
+    live_smoke.add_argument("--quantity", type=int, default=1)
+    live_smoke.add_argument(
+        "--flatten-mode",
+        choices=("emergency", "forced-exit", "final-auction"),
+        default="forced-exit",
+    )
+    live_smoke.add_argument("--session-id")
+    live_smoke.add_argument("--operator-id")
+    live_smoke.add_argument("--operator-note")
+    live_smoke.add_argument("--state-file", default=".state/operator_posture.json")
+    live_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
+    live_smoke.add_argument("--json", action="store_true", dest="as_json")
 
     inspect = operator_sub.add_parser("inspect", help="Inspect a runtime target")
     inspect.add_argument("target", nargs="?", default="default")
@@ -805,6 +828,27 @@ def main(argv: list[str] | None = None) -> int:
                 symbol=args.symbol,
                 side=args.side,
                 quantity=args.quantity,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "live-smoke-readiness":
+            result = operator_live_smoke_readiness(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                deck_ref=args.deck,
+                ttl_seconds=args.ttl_seconds,
+                symbol=args.symbol,
+                side=args.side,
+                quantity=args.quantity,
+                flatten_mode=args.flatten_mode,
                 operator_id=args.operator_id,
                 operator_note=args.operator_note,
             )

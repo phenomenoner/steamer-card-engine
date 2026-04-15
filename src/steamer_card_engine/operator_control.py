@@ -93,7 +93,11 @@ def load_operator_state(state_file: Path) -> dict[str, Any]:
     if not state_file.exists():
         return _default_state()
 
-    payload = json.loads(state_file.read_text(encoding="utf-8"))
+    raw = state_file.read_text(encoding="utf-8").strip()
+    if not raw:
+        return _default_state()
+
+    payload = json.loads(raw)
     if not isinstance(payload, dict):
         raise ValueError(f"operator state file must contain a JSON object: {state_file}")
     return _ensure_state_shape(payload)
@@ -695,6 +699,209 @@ def operator_submit_order_smoke(
             "request": request,
             "dispatch": "stub-only; no broker submission executed",
             "receipt_path": receipt["receipt_path"],
+        },
+        exit_code=0,
+    )
+
+
+def operator_live_smoke_readiness(
+    *,
+    state_file: Path,
+    receipt_dir: Path,
+    auth_profile_path: str,
+    session_id: str | None,
+    deck_ref: str,
+    ttl_seconds: int,
+    symbol: str,
+    side: str,
+    quantity: int,
+    flatten_mode: str,
+    operator_id: str | None,
+    operator_note: str | None,
+) -> OperatorResult:
+    steps: list[dict[str, Any]] = []
+    armed_window_open = False
+
+    def _fail(error: str, failed_step: dict[str, Any]) -> OperatorResult:
+        return OperatorResult(
+            payload={
+                "ok": False,
+                "smoke_status": "fail",
+                "activation": "prepared-only",
+                "error": error,
+                "failed_step": failed_step,
+                "steps": steps,
+            },
+            exit_code=1,
+        )
+
+    def _record_step(name: str, result: OperatorResult, *, expect_exit: int, predicate: Any) -> tuple[bool, dict[str, Any]]:
+        payload = result.payload
+        ok = result.exit_code == expect_exit and bool(predicate(payload))
+        step = {
+            "step": name,
+            "ok": ok,
+            "exit_code": result.exit_code,
+            "expected_exit_code": expect_exit,
+            "payload": payload,
+        }
+        steps.append(step)
+        return ok, step
+
+    status_before = operator_status(
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+    )
+    ok, failed_step = _record_step(
+        "status-disarmed-baseline",
+        status_before,
+        expect_exit=0,
+        predicate=lambda payload: payload["armed_live"] is False
+        and payload["order_submission_gate"]["allowed"] is False
+        and payload["order_submission_gate"]["reason"] == "disarmed-posture",
+    )
+    if not ok:
+        return _fail("baseline disarmed posture did not match contract", failed_step)
+
+    refusal = operator_submit_order_smoke(
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+        symbol=symbol,
+        side=side,
+        quantity=quantity,
+        operator_id=operator_id,
+        operator_note=operator_note,
+    )
+    ok, failed_step = _record_step(
+        "submit-refused-while-disarmed",
+        refusal,
+        expect_exit=OPERATOR_REFUSED_EXIT,
+        predicate=lambda payload: payload["ok"] is False and payload.get("gate_reason") == "disarmed-posture",
+    )
+    if not ok:
+        return _fail("disarmed refusal smoke did not match contract", failed_step)
+
+    arm = operator_arm_live(
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+        deck_ref=deck_ref,
+        ttl_seconds=ttl_seconds,
+        operator_id=operator_id,
+        operator_note=operator_note,
+        confirm_live=True,
+    )
+    ok, failed_step = _record_step(
+        "arm-live-bounded-scope",
+        arm,
+        expect_exit=0,
+        predicate=lambda payload: payload["ok"] is True and payload["armed_live"] is True,
+    )
+    if not ok:
+        return _fail("arm-live step did not produce bounded armed posture", failed_step)
+
+    armed_window_open = True
+    try:
+        acceptance = operator_submit_order_smoke(
+            state_file=state_file,
+            receipt_dir=receipt_dir,
+            auth_profile_path=auth_profile_path,
+            session_id=session_id,
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            operator_id=operator_id,
+            operator_note=operator_note,
+        )
+        ok, failed_step = _record_step(
+            "submit-accepted-while-armed",
+            acceptance,
+            expect_exit=0,
+            predicate=lambda payload: payload["ok"] is True and "stub-only" in payload.get("dispatch", ""),
+        )
+        if not ok:
+            return _fail("armed smoke dispatch did not produce acceptance receipt", failed_step)
+
+        flatten = operator_flatten(
+            state_file=state_file,
+            receipt_dir=receipt_dir,
+            auth_profile_path=auth_profile_path,
+            session_id=session_id,
+            mode=flatten_mode,
+            operator_id=operator_id,
+            operator_note=operator_note,
+        )
+        ok, failed_step = _record_step(
+            "flatten-and-close-armed-window",
+            flatten,
+            expect_exit=0,
+            predicate=lambda payload: payload["ok"] is True and payload["armed_live"] is False,
+        )
+        if not ok:
+            return _fail("flatten step did not close armed posture", failed_step)
+
+        armed_window_open = False
+    finally:
+        if armed_window_open:
+            cleanup = operator_disarm_live(
+                state_file=state_file,
+                receipt_dir=receipt_dir,
+                auth_profile_path=auth_profile_path,
+                session_id=session_id,
+                operator_id=operator_id,
+                operator_note="live-smoke-readiness cleanup disarm after failure",
+            )
+            _record_step(
+                "cleanup-disarm-after-failure",
+                cleanup,
+                expect_exit=0,
+                predicate=lambda payload: payload["ok"] is True and payload["armed_live"] is False,
+            )
+
+    status_after = operator_status(
+        state_file=state_file,
+        receipt_dir=receipt_dir,
+        auth_profile_path=auth_profile_path,
+        session_id=session_id,
+    )
+    ok, failed_step = _record_step(
+        "status-disarmed-after-flatten",
+        status_after,
+        expect_exit=0,
+        predicate=lambda payload: payload["armed_live"] is False
+        and payload["order_submission_gate"]["allowed"] is False
+        and payload["order_submission_gate"]["reason"] == "disarmed-posture",
+    )
+    if not ok:
+        return _fail("final disarmed posture did not match contract", failed_step)
+
+    receipt_paths = [
+        step["payload"].get("receipt_path")
+        for step in steps
+        if isinstance(step.get("payload"), dict) and step["payload"].get("receipt_path")
+    ]
+
+    return OperatorResult(
+        payload={
+            "ok": True,
+            "smoke_status": "pass",
+            "activation": "prepared-only",
+            "boundary": "seed smoke/control surface only; no broker submission executed",
+            "deck": deck_ref,
+            "auth_profile": auth_profile_path,
+            "request": {
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+            },
+            "flatten_mode": flatten_mode,
+            "receipt_paths": receipt_paths,
+            "steps": steps,
         },
         exit_code=0,
     )
