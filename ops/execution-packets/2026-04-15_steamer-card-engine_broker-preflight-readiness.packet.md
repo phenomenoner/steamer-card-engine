@@ -28,3 +28,16 @@ Add a seed `operator preflight-smoke` surface that:
 ## Activation truth
 
 Prepared-only. This slice defines the cron entry gate; it does not activate a trading-day cron and does not remove broker-not-connected blockers.
+
+## Follow-on seed runner
+
+The repo now has a formal seed runner at `ops/scripts/trading_day_preflight_seed.sh`.
+
+Purpose:
+- generate the canonical session probe snapshot via `operator probe-session`
+- feed that snapshot into `operator preflight-smoke`
+- give a future trading-day cron one stable repo-side entrypoint to bind
+
+Boundary:
+- still no cron activation in this packet
+- still no broker/session attach inside the runner

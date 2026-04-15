@@ -204,6 +204,7 @@ uv run steamer-card-engine auth inspect-session --auth-profile examples/profiles
 uv run steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --output .state/session_probe.json --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
+./ops/scripts/trading_day_preflight_seed.sh examples/decks/tw_cash_intraday.toml examples/profiles/tw_cash_password_auth.toml open examples/probes/session_health.connected.json
 uv run steamer-card-engine author validate-card examples/cards/gap_reclaim.toml
 uv run steamer-card-engine author validate-deck examples/decks/tw_cash_intraday.toml
 uv run steamer-card-engine author validate-global examples/config/global.toml
@@ -276,6 +277,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ session / preflight health now align to a reusable `session_status + connections` contract so later broker-connected work can replace the source without breaking the CLI surface
 - ✅ `--probe-json` is now wired into `inspect-session` / `preflight-smoke`, so an external real probe can feed the canonical health contract without embedding vendor SDK logic into the CLI
 - ✅ `operator probe-session` now emits the canonical snapshot shape directly, and can write it to disk for cron/preflight chaining
+- ✅ `ops/scripts/trading_day_preflight_seed.sh` now provides a single repo-side seed runner for the chain `probe-session -> preflight-smoke`
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Broker-connected controlled live-sim / operator workflow

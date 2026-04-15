@@ -133,6 +133,18 @@ Responsibilities:
 - emit a canonical session-health snapshot for downstream cron/preflight consumers
 - report whether the next broker-preflight step is blocked or ready, using logical session posture + operator baseline posture as the seed gate
 
+Repo-side seed runner:
+
+```bash
+./ops/scripts/trading_day_preflight_seed.sh \
+  examples/decks/tw_cash_intraday.toml \
+  examples/profiles/tw_cash_password_auth.toml \
+  open \
+  examples/probes/session_health.connected.json
+```
+
+This runner exists so future trading-day cron wiring can bind one formal entrypoint instead of manually reconstructing the probe/preflight chain.
+
 ## Governance rules
 
 - Authoring commands can be widely available.

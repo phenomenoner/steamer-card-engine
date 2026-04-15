@@ -116,6 +116,8 @@ steamer-card-engine/
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
   - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure, reusable `session_status + connections` shape, and optional external probe JSON inlet
   - operator session probing (`operator probe-session`) that emits the canonical snapshot for downstream preflight/cron consumers
+- `ops/scripts/trading_day_preflight_seed.sh`
+  - repo-side seed runner for the chain `operator probe-session -> operator preflight-smoke`
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
   - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke|live-smoke-readiness|preflight-smoke`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
