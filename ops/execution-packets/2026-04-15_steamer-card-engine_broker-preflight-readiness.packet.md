@@ -41,3 +41,18 @@ Purpose:
 Boundary:
 - still no cron activation in this packet
 - still no broker/session attach inside the runner
+
+## Live scheduler staging receipt
+
+A bounded scheduler row now exists as a **disabled staged job**:
+
+- job id: `26d37fdc-5475-4a50-9d10-4cecb970f230`
+- name: `steamer: card-engine trading-day preflight sentinel (08:55)`
+- schedule: `55 8 * * 1-5` (`Asia/Taipei`)
+- target: isolated `steamer-cron`
+
+Why disabled:
+- the cron-safe wrapper is real
+- the repo-side chain is real
+- but there is still no real broker/session probe source wired in
+- enabling it now would create guaranteed daily blocked noise instead of truthful live signal
