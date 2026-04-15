@@ -45,6 +45,29 @@ def test_cli_validate_auth_failure(capsys) -> None:
     assert "Validation failed for auth_profile manifest" in captured.out
 
 
+def test_cli_inspect_session_json_reports_seed_logical_session(capsys) -> None:
+    code = main(
+        [
+            "auth",
+            "inspect-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "closed",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["auth_profile"] == "examples/profiles/tw_cash_password_auth.toml"
+    assert payload["capabilities"]["trade_enabled"] is True
+    assert payload["health_status"]["broker_connection"] == "not-connected"
+    assert payload["trading_day_gate"]["status"] == "closed"
+    assert payload["trading_day_gate"]["live_allowed"] is False
+    assert payload["boundary"]["activation"] == "prepared-only"
+
+
 def test_cli_validate_strategy_catalog_success(capsys) -> None:
     code = main(
         [

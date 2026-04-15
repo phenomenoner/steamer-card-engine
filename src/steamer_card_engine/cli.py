@@ -58,6 +58,19 @@ def build_parser() -> argparse.ArgumentParser:
     auth_inspect.add_argument("path")
     auth_inspect.add_argument("--json", action="store_true", dest="as_json")
 
+    auth_inspect_session = auth_sub.add_parser(
+        "inspect-session",
+        help="Inspect the logical session and capability posture for a chosen auth profile",
+    )
+    auth_inspect_session.add_argument("--auth-profile", required=True)
+    auth_inspect_session.add_argument("--session-id")
+    auth_inspect_session.add_argument(
+        "--trading-day-status",
+        choices=("open", "closed", "unknown"),
+        default="unknown",
+    )
+    auth_inspect_session.add_argument("--json", action="store_true", dest="as_json")
+
     author = subparsers.add_parser("author", help="Authoring and validation commands")
     author_sub = author.add_subparsers(dest="author_command", required=True)
 
@@ -296,6 +309,80 @@ def _print_auth_summary(summary: dict) -> None:
         f"trade={summary['trade_enabled']}"
     )
     print(f"  safety_boundary: {summary['safety_boundary']}")
+
+
+def _inspect_logical_session(
+    *,
+    auth_profile_path: str,
+    session_id: str | None,
+    trading_day_status: str,
+) -> dict:
+    profile = load_auth_profile(auth_profile_path)
+    now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    live_allowed = trading_day_status == "open"
+    return {
+        "session_id": session_id or "seed-logical-session",
+        "account_no": profile.account,
+        "auth_mode": profile.mode,
+        "auth_profile": auth_profile_path,
+        "session_started_at": now,
+        "expires_at": None,
+        "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+        "capabilities": {
+            "marketdata_enabled": profile.marketdata_enabled,
+            "account_query_enabled": profile.account_query_enabled,
+            "trade_enabled": profile.trade_enabled,
+        },
+        "health_status": {
+            "runtime": "seed-ok",
+            "session": "logical-profile-only",
+            "marketdata_connection": "not-connected",
+            "broker_connection": "not-connected",
+        },
+        "trading_day_gate": {
+            "status": trading_day_status,
+            "live_allowed": live_allowed,
+            "reason": (
+                "trading-day-open"
+                if trading_day_status == "open"
+                else "trading-day-closed"
+                if trading_day_status == "closed"
+                else "trading-day-unknown"
+            ),
+            "source": "seed-operator-input",
+        },
+        "boundary": {
+            "activation": "prepared-only",
+            "broker_connected": False,
+            "notes": "logical session inspection only; does not establish a live broker/runtime session",
+        },
+    }
+
+
+def _print_auth_session_summary(summary: dict) -> None:
+    capabilities = summary["capabilities"]
+    gate = summary["trading_day_gate"]
+    health = summary["health_status"]
+    print("Logical Session")
+    print(
+        "  session: "
+        f"id={summary['session_id']} account={summary['account_no']} auth_mode={summary['auth_mode']}"
+    )
+    print(
+        "  capabilities: "
+        f"marketdata={capabilities['marketdata_enabled']} "
+        f"account_query={capabilities['account_query_enabled']} trade={capabilities['trade_enabled']}"
+    )
+    print(
+        "  health: "
+        f"runtime={health['runtime']} session={health['session']} "
+        f"marketdata={health['marketdata_connection']} broker={health['broker_connection']}"
+    )
+    print(
+        "  trading_day_gate: "
+        f"status={gate['status']} live_allowed={gate['live_allowed']} reason={gate['reason']}"
+    )
+    print(f"  activation: {summary['boundary']['activation']}")
 
 
 def _print_card_summary(summary: dict) -> None:
@@ -586,6 +673,18 @@ def main(argv: list[str] | None = None) -> int:
                 _print_json(summary)
             else:
                 _print_auth_summary(summary)
+            return 0
+
+        if args.command == "auth" and args.auth_command == "inspect-session":
+            summary = _inspect_logical_session(
+                auth_profile_path=args.auth_profile,
+                session_id=args.session_id,
+                trading_day_status=args.trading_day_status,
+            )
+            if args.as_json:
+                _print_json(summary)
+            else:
+                _print_auth_session_summary(summary)
             return 0
 
         if args.command == "author" and args.author_command == "init-card":

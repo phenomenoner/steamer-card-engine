@@ -200,6 +200,7 @@ uv run python -m steamer_card_engine --help
 
 # Validate example manifests
 uv run steamer-card-engine auth validate-profile examples/profiles/tw_cash_agent_assist.toml
+uv run steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status unknown --json
 uv run steamer-card-engine author validate-card examples/cards/gap_reclaim.toml
 uv run steamer-card-engine author validate-deck examples/decks/tw_cash_intraday.toml
 uv run steamer-card-engine author validate-global examples/config/global.toml
@@ -267,6 +268,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy
 - ✅ Seed operator control slice landed (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with TTL/auto-disarm + receipt trails
 - ✅ `operator live-smoke-readiness` now emits a truthful pass/fail smoke bundle for the bounded live-capability path
+- ✅ `auth inspect-session` now exposes a seed logical session / capability / trading-day-gate surface without pretending broker connectivity
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
 - ⏳ Shared adapter shims from current TW cash stack
 - ⏳ Broker-connected controlled live-sim / operator workflow

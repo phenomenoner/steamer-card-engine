@@ -17,7 +17,7 @@ Examples:
 ```bash
 steamer-card-engine auth validate-profile ./profiles/fubon.paper.toml
 steamer-card-engine auth inspect-profile ./profiles/fubon.paper.toml
-steamer-card-engine auth inspect-session --json
+steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --json
 ```
 
 Responsibilities:
@@ -26,6 +26,7 @@ Responsibilities:
 - show capability expectations (market data only, trade enabled, etc.)
 - inspect current logical session and health status
 - help operators confirm the intended safety boundary before live expansion
+- in seed runtime, `inspect-session` is a logical profile/session surface, not a broker-connected session attach
 
 ### 2. Authoring commands
 

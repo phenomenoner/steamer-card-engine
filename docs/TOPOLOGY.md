@@ -114,6 +114,7 @@ steamer-card-engine/
     - comparator (`sim compare`) with hard gates + decision-grade report outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
+  - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
   - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke|live-smoke-readiness`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
