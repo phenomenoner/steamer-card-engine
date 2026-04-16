@@ -206,6 +206,7 @@ uv run steamer-card-engine operator probe-session --auth-profile examples/profil
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
+uv run steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 ./ops/scripts/trading_day_preflight_seed.sh examples/decks/tw_cash_intraday.toml examples/profiles/tw_cash_password_auth.toml open examples/probes/session_health.connected.json
 python3 tools/steamer_card_engine_trading_day_preflight_cron.py
 uv run steamer-card-engine author validate-card examples/cards/gap_reclaim.toml
@@ -274,7 +275,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ M1 evidence-pack acceptance contract is frozen with explicit anti-gaming rules
 - ✅ Option B hygiene pass landed: duplicate `event-log.jsonl` payloads are symlink-deduped with footprint receipts and packaging policy
 - ✅ Seed operator control slice landed (`status|arm-live|disarm-live|flatten|submit-order-smoke`) with TTL/auto-disarm + receipt trails
-- ✅ `operator live-smoke-readiness` now emits a truthful pass/fail smoke bundle for the bounded live-capability path
+- ✅ `operator live-smoke-readiness` now consumes the same truthful preflight posture (`probe-json` / `probe-source`) and only runs the bounded live-capability smoke sequence when that gate is ready
 - ✅ `auth inspect-session` now exposes a seed logical session / capability / trading-day-gate surface without pretending broker connectivity
 - ✅ `operator preflight-smoke` now exposes the next broker-preflight gate truthfully, and currently blocks on seed-runtime not-connected health instead of faking readiness
 - ✅ session / preflight health now align to a reusable `session_status + connections` contract so later broker-connected work can replace the source without breaking the CLI surface

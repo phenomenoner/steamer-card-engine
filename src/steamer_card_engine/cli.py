@@ -303,6 +303,24 @@ def build_parser() -> argparse.ArgumentParser:
         default="forced-exit",
     )
     live_smoke.add_argument("--session-id")
+    live_smoke.add_argument(
+        "--trading-day-status",
+        choices=("open", "closed", "unknown"),
+        default="unknown",
+    )
+    live_smoke.add_argument(
+        "--probe-json",
+        help="Optional JSON health snapshot to gate live-smoke readiness using the canonical preflight contract",
+    )
+    live_smoke.add_argument(
+        "--probe-source",
+        choices=("seed", "steamer-cron-health"),
+        help="Optional named probe source when no explicit --probe-json snapshot is supplied",
+    )
+    live_smoke.add_argument(
+        "--probe-date",
+        help="Optional Asia/Taipei probe date (YYYYMMDD) for named probe sources",
+    )
     live_smoke.add_argument("--operator-id")
     live_smoke.add_argument("--operator-note")
     live_smoke.add_argument("--state-file", default=".state/operator_posture.json")
@@ -1058,7 +1076,6 @@ def _operator_preflight_smoke(
 
     blockers: list[dict[str, str]] = []
     capabilities = logical_session["capabilities"]
-    health = logical_session["health_status"]
     session_status = logical_session["session_status"]
     gate = logical_session["trading_day_gate"]
     operator_payload = operator_result.payload
@@ -1117,6 +1134,33 @@ def _operator_preflight_smoke(
         "boundary": "seed preflight gate only; no broker/session attach is performed here",
     }
     return payload, 0 if ready else 4
+
+
+def _live_smoke_preflight_step(*, payload: dict, exit_code: int) -> dict:
+    return {
+        "step": "preflight-smoke-gate",
+        "ok": exit_code == 0 and bool(payload.get("ok")),
+        "exit_code": exit_code,
+        "expected_exit_code": 0,
+        "payload": payload,
+    }
+
+
+def _blocked_live_smoke_payload(*, preflight_payload: dict, preflight_exit_code: int) -> dict:
+    preflight_step = _live_smoke_preflight_step(payload=preflight_payload, exit_code=preflight_exit_code)
+    return {
+        "ok": False,
+        "smoke_status": "blocked",
+        "activation": "prepared-only",
+        "error": "live smoke readiness blocked by preflight gate",
+        "failed_step": preflight_step,
+        "steps": [preflight_step],
+        "preflight": preflight_payload,
+        "boundary": (
+            "prepared-only smoke sequence; broker-preflight gate must be ready before "
+            "bounded arm/submit/flatten checks"
+        ),
+    }
 
 
 def _handle_catalog_error(error: StrategyCatalogValidationError) -> int:
@@ -1557,6 +1601,28 @@ def main(argv: list[str] | None = None) -> int:
             return result.exit_code
 
         if args.command == "operator" and args.operator_command == "live-smoke-readiness":
+            preflight_payload, preflight_exit = _operator_preflight_smoke(
+                auth_profile_path=args.auth_profile,
+                deck_ref=args.deck,
+                trading_day_status=args.trading_day_status,
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                session_id=args.session_id,
+                probe_json_path=args.probe_json,
+                probe_source=args.probe_source,
+                probe_date=args.probe_date,
+            )
+            if preflight_exit != 0:
+                payload = _blocked_live_smoke_payload(
+                    preflight_payload=preflight_payload,
+                    preflight_exit_code=preflight_exit,
+                )
+                if args.as_json:
+                    _print_json(payload)
+                else:
+                    _print_operator_action_summary(payload)
+                return preflight_exit
+
             result = operator_live_smoke_readiness(
                 state_file=Path(args.state_file),
                 receipt_dir=Path(args.receipt_dir),
@@ -1571,6 +1637,13 @@ def main(argv: list[str] | None = None) -> int:
                 operator_id=args.operator_id,
                 operator_note=args.operator_note,
             )
+            preflight_step = _live_smoke_preflight_step(payload=preflight_payload, exit_code=preflight_exit)
+            existing_steps = result.payload.get("steps")
+            if isinstance(existing_steps, list):
+                result.payload["steps"] = [preflight_step, *existing_steps]
+            else:
+                result.payload["steps"] = [preflight_step]
+            result.payload["preflight"] = preflight_payload
             if args.as_json:
                 _print_json(result.payload)
             else:

@@ -706,6 +706,10 @@ def test_operator_live_smoke_readiness_runs_bounded_sequence(capsys, tmp_path: P
             "examples/decks/tw_cash_intraday.toml",
             "--auth-profile",
             "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            "examples/probes/session_health.connected.json",
             "--state-file",
             str(state_file),
             "--receipt-dir",
@@ -719,7 +723,9 @@ def test_operator_live_smoke_readiness_runs_bounded_sequence(capsys, tmp_path: P
     assert payload["ok"] is True
     assert payload["smoke_status"] == "pass"
     assert payload["activation"] == "prepared-only"
+    assert payload["preflight"]["preflight_status"] == "ready"
     assert [step["step"] for step in payload["steps"]] == [
+        "preflight-smoke-gate",
         "status-disarmed-baseline",
         "submit-refused-while-disarmed",
         "arm-live-bounded-scope",
@@ -746,6 +752,10 @@ def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tm
             "examples/decks/tw_cash_intraday.toml",
             "--auth-profile",
             "examples/profiles/tw_cash_agent_assist.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            "examples/probes/session_health.connected.json",
             "--state-file",
             str(state_file),
             "--receipt-dir",
@@ -755,13 +765,14 @@ def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tm
     )
 
     payload = json.loads(capsys.readouterr().out)
-    assert code == 1
+    assert code == 4
     assert payload["ok"] is False
-    assert payload["smoke_status"] == "fail"
-    assert payload["failed_step"]["step"] == "arm-live-bounded-scope"
-    assert payload["failed_step"]["payload"]["error"] == (
-        "operator arm-live refused: auth capability trade_enabled=false"
-    )
+    assert payload["smoke_status"] == "blocked"
+    assert payload["failed_step"]["step"] == "preflight-smoke-gate"
+    blocker_codes = {row["code"] for row in payload["preflight"]["blockers"]}
+    assert "capability-trade-disabled" in blocker_codes
+    assert state_file.exists()
+    assert not receipt_dir.exists()
 
 
 def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_failure(
@@ -795,6 +806,10 @@ def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_fai
             "examples/decks/tw_cash_intraday.toml",
             "--auth-profile",
             "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            "examples/probes/session_health.connected.json",
             "--state-file",
             str(state_file),
             "--receipt-dir",
@@ -812,6 +827,70 @@ def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_fai
 
     final_state = json.loads(state_file.read_text(encoding="utf-8"))
     assert final_state["armed_live"] is False
+
+
+def test_operator_live_smoke_readiness_consumes_steamer_cron_health_probe_source(
+    capsys, tmp_path: Path, monkeypatch
+) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+    probe_date = "20260416"
+    stage_root = tmp_path / "cron-health"
+    monkeypatch.setattr(cli_module, "STEAMER_CRON_HEALTH_ROOT", stage_root)
+    _write_stage(
+        stage_root,
+        probe_date,
+        "aws_auth",
+        {
+            "status": "success",
+            "detail": "aws_sts_ok",
+            "updated_at": "2026-04-16T00:25:14Z",
+        },
+    )
+    _write_stage(
+        stage_root,
+        probe_date,
+        "ec2_verify",
+        {
+            "status": "success",
+            "detail": "verify_green",
+            "updated_at": "2026-04-16T00:45:17Z",
+        },
+    )
+
+    code = main(
+        [
+            "operator",
+            "live-smoke-readiness",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-source",
+            "steamer-cron-health",
+            "--probe-date",
+            probe_date,
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["steps"][0]["step"] == "preflight-smoke-gate"
+    assert payload["steps"][0]["ok"] is True
+    assert payload["preflight"]["logical_session"]["boundary"]["probe_source"] == (
+        f"steamer-cron-health:{probe_date}"
+    )
+    assert (
+        payload["preflight"]["logical_session"]["session_status"]["connections"]["account"]["state"]
+        == "not-connected"
+    )
 
 
 def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connected(

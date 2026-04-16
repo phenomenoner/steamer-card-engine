@@ -141,7 +141,7 @@ steamer-card-engine/
   - **names** the future components, but does not implement conflict resolution / risk / execution
 - operator commands now maintain a seed local posture/receipt state machine (`.state/operator_posture.json` + `.state/operator_receipts/`)
   - this is a bounded smoke/control surface, not a broker-connected production control plane
-  - `live-smoke-readiness` is the first repeatable pass/fail bundle for the bounded live-capability sequence, but remains prepared-only
+  - `live-smoke-readiness` now consumes the same probe/preflight posture contract as `probe-session -> preflight-smoke -> cron`, and only runs the bounded live-capability sequence when that gate is ready
   - `preflight-smoke` can now consume truthful upstream Steamer cron-health receipts through the canonical probe contract, while keeping the same prepared-only boundary
 
 ## Sharp edges / known deltas

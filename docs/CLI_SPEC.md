@@ -118,6 +118,7 @@ steamer-card-engine operator disarm-live
 steamer-card-engine operator flatten --mode final-auction
 steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quantity 1
 steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json
+steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --output ./.state/session_probe.json --json
 steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
@@ -133,7 +134,8 @@ Responsibilities:
 - auto-disarm on TTL expiry (and invalid arm scope) when operator state is inspected/used
 - enforce submission gate against non-active arm windows with explicit disarmed refusal for seed order-smoke checks
 - write action receipts for arm/disarm/flatten/refusals
-- run one bounded live-capability smoke sequence that proves disarmed refusal -> bounded arming -> armed acceptance receipt -> flatten/disarm closure without broker submission
+- run one bounded live-capability smoke sequence that first enforces the same truthful preflight posture (`--probe-json` / `--probe-source`) and then proves disarmed refusal -> bounded arming -> armed acceptance receipt -> flatten/disarm closure without broker submission
+- when that preflight gate is blocked, `live-smoke-readiness` exits with code `4` and returns a blocked smoke payload instead of entering the smoke sequence
 - emit a canonical session-health snapshot for downstream cron/preflight consumers
 - support both fixture/manual snapshots (`--probe-json`) and named upstream truth adapters (`--probe-source`)
 - classify preflight blockers cleanly by failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of collapsing every miss into a generic not-connected state
@@ -173,7 +175,7 @@ The CLI should support:
 - `1`: CLI usage error / unhandled command / general failure
 - `2`: validation/normalization failure (manifest or sim command input/schema errors)
 - `3`: comparison completed but failed hard gates (`sim compare` status=`fail`)
-- `4`: operator action refused due to posture/capability mismatch
+- `4`: operator action refused due to posture/capability mismatch (also used when `live-smoke-readiness` is blocked by the preflight gate)
 - `5`: operator action refused due to missing explicit confirmation
 
 (Tests already assert `2` for validation errors; keep this stable.)
