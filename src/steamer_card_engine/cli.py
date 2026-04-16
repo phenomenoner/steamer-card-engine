@@ -456,7 +456,28 @@ def _load_probe_snapshot(path: str | None) -> dict | None:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"probe snapshot must be a JSON object: {path}")
-    return payload
+    observed_at = _probe_observed_at(payload)
+    enriched = json.loads(json.dumps(payload))
+    enriched["probe_source"] = str(payload.get("probe_source") or "external-json")
+    enriched["probe_freshness"] = {
+        "status": _probe_freshness_status(
+            session_status=payload.get("session_status") if isinstance(payload.get("session_status"), dict) else {},
+            receipt_kind="probe-json",
+        ),
+        "observed_at": observed_at,
+        "detail": (
+            f"probe-json supplied via {Path(path).resolve()}"
+            if observed_at
+            else f"probe-json supplied via {Path(path).resolve()} without an observation timestamp"
+        ),
+    }
+    enriched["probe_receipt"] = {
+        "kind": "probe-json",
+        "path": str(Path(path).resolve()),
+        "label": Path(path).name,
+        "updated_at": observed_at,
+    }
+    return enriched
 
 
 def _load_stage_state(path: Path) -> dict | None:
@@ -480,6 +501,103 @@ def _surface_state(
         "detail": detail,
         "last_heartbeat_at": last_heartbeat_at,
         "last_error": last_error,
+    }
+
+
+def _probe_observed_at(snapshot: dict) -> str | None:
+    captured_at = snapshot.get("captured_at")
+    if isinstance(captured_at, str) and captured_at:
+        return captured_at
+
+    session_status = snapshot.get("session_status")
+    if not isinstance(session_status, dict):
+        return None
+
+    latest_seen: datetime | None = None
+    latest_value: str | None = None
+    connections = session_status.get("connections")
+    if not isinstance(connections, dict):
+        return None
+
+    for connection in connections.values():
+        if not isinstance(connection, dict):
+            continue
+        raw = connection.get("last_heartbeat_at")
+        if not isinstance(raw, str) or not raw:
+            continue
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(UTC)
+        except ValueError:
+            continue
+        if latest_seen is None or parsed > latest_seen:
+            latest_seen = parsed
+            latest_value = parsed.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    return latest_value
+
+
+def _probe_freshness_status(*, session_status: dict, receipt_kind: str) -> str:
+    if receipt_kind == "seed":
+        return "seed-unverified"
+
+    session_state = str(session_status.get("session_state") or "")
+    renewal_state = str(session_status.get("renewal_state") or "")
+
+    if session_state == "stale":
+        return "stale"
+    if session_state == "healthy" or renewal_state == "fresh":
+        return "fresh"
+    if session_state == "auth-required":
+        return "blocked"
+    if renewal_state in {"attention-needed", "blocked", "not-attached"}:
+        return renewal_state
+    if session_state == "logical-profile-only":
+        return "not-attached"
+    return session_state or renewal_state or "unknown"
+
+
+def _build_probe_contract_snapshot(
+    *,
+    probe_source: str,
+    session_status: dict,
+    receipt_kind: str,
+    receipt_path: Path | None,
+    receipt_label: str,
+    receipt_updated_at: str | None,
+    freshness_detail: str,
+) -> dict:
+    observed_at = receipt_updated_at or _probe_observed_at({"session_status": session_status})
+    return {
+        "probe_source": probe_source,
+        "session_status": session_status,
+        "probe_freshness": {
+            "status": _probe_freshness_status(session_status=session_status, receipt_kind=receipt_kind),
+            "observed_at": observed_at,
+            "detail": freshness_detail,
+        },
+        "probe_receipt": {
+            "kind": receipt_kind,
+            "path": str(receipt_path.resolve()) if receipt_path else None,
+            "label": receipt_label,
+            "updated_at": receipt_updated_at or observed_at,
+        },
+    }
+
+
+def _seed_probe_freshness() -> dict:
+    return {
+        "status": "seed-unverified",
+        "observed_at": None,
+        "detail": "seed logical-session placeholders only; no source-backed receipt attached",
+    }
+
+
+def _seed_probe_receipt() -> dict:
+    return {
+        "kind": "seed",
+        "path": None,
+        "label": "seed-logical-session",
+        "updated_at": None,
     }
 
 
@@ -546,10 +664,14 @@ def _apply_connection_contract(summary: dict) -> dict:
 
 def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
     stage_dir = STEAMER_CRON_HEALTH_ROOT / probe_date / "stages"
-    aws_auth = _load_stage_state(stage_dir / "aws_auth.json")
-    ec2_power_on = _load_stage_state(stage_dir / "ec2_power_on.json")
-    ec2_kickoff = _load_stage_state(stage_dir / "ec2_kickoff.json")
-    ec2_verify = _load_stage_state(stage_dir / "ec2_verify.json")
+    aws_auth_path = stage_dir / "aws_auth.json"
+    ec2_power_on_path = stage_dir / "ec2_power_on.json"
+    ec2_kickoff_path = stage_dir / "ec2_kickoff.json"
+    ec2_verify_path = stage_dir / "ec2_verify.json"
+    aws_auth = _load_stage_state(aws_auth_path)
+    ec2_power_on = _load_stage_state(ec2_power_on_path)
+    ec2_kickoff = _load_stage_state(ec2_kickoff_path)
+    ec2_verify = _load_stage_state(ec2_verify_path)
     source = f"steamer-cron-health:{probe_date}"
 
     def stage_detail(stage: dict | None, fallback: str) -> str:
@@ -572,9 +694,9 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
         return token in blob
 
     if not any((aws_auth, ec2_power_on, ec2_kickoff, ec2_verify)):
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": "logical-profile-only",
                 "renewal_state": "not-attached",
                 "connected_surfaces": [],
@@ -594,13 +716,18 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     ),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=None,
+            receipt_label=f"steamer-cron-health:{probe_date}:missing",
+            receipt_updated_at=None,
+            freshness_detail=f"no upstream steamer-cron-health receipt found under {stage_dir}",
+        )
 
     if aws_auth and str(aws_auth.get("status")) != "success":
         detail = stage_detail(aws_auth, "aws_auth_not_ready")
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": "auth-required",
                 "renewal_state": "blocked",
                 "connected_surfaces": [],
@@ -611,14 +738,19 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     "account": _surface_state("auth", f"upstream aws auth blocked: {detail}", last_error=detail),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=aws_auth_path,
+            receipt_label=f"aws_auth:{probe_date}",
+            receipt_updated_at=stage_updated(aws_auth),
+            freshness_detail=f"steamer-cron-health blocked by aws_auth receipt: {detail}",
+        )
 
     if ec2_verify and str(ec2_verify.get("status")) == "success":
         verify_at = stage_updated(ec2_verify)
         verify_detail = stage_detail(ec2_verify, "verify_green")
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": "healthy",
                 "renewal_state": "fresh",
                 "connected_surfaces": ["marketdata", "broker", "account"],
@@ -641,7 +773,12 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     ),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=ec2_verify_path,
+            receipt_label=f"ec2_verify:{probe_date}",
+            receipt_updated_at=verify_at,
+            freshness_detail=f"steamer-cron-health verified by ec2_verify receipt: {verify_detail}",
+        )
 
     if ec2_verify:
         verify_detail = stage_detail(ec2_verify, "verify_not_ready")
@@ -658,9 +795,9 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
             state = "disconnected"
             session_state = "disconnected"
             renewal_state = "attention-needed"
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": session_state,
                 "renewal_state": renewal_state,
                 "connected_surfaces": [],
@@ -671,14 +808,19 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     "account": _surface_state(state, f"upstream ec2_verify red: {verify_detail}", last_heartbeat_at=verify_at, last_error=verify_detail),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=ec2_verify_path,
+            receipt_label=f"ec2_verify:{probe_date}",
+            receipt_updated_at=verify_at,
+            freshness_detail=f"steamer-cron-health verify receipt is not green: {verify_detail}",
+        )
 
     if ec2_kickoff and str(ec2_kickoff.get("status")) == "success":
         kickoff_at = stage_updated(ec2_kickoff)
         kickoff_detail = stage_detail(ec2_kickoff, "kickoff_started")
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": "degraded",
                 "renewal_state": "attention-needed",
                 "connected_surfaces": [],
@@ -689,14 +831,19 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     "account": _surface_state("disconnected", f"kickoff started but verify not yet green: {kickoff_detail}", last_heartbeat_at=kickoff_at),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=ec2_kickoff_path,
+            receipt_label=f"ec2_kickoff:{probe_date}",
+            receipt_updated_at=kickoff_at,
+            freshness_detail=f"steamer-cron-health kickoff receipt exists but verify is not yet green: {kickoff_detail}",
+        )
 
     if ec2_power_on and str(ec2_power_on.get("status")) == "success":
         power_on_at = stage_updated(ec2_power_on)
         power_on_detail = stage_detail(ec2_power_on, "power_on_ready")
-        return {
-            "probe_source": source,
-            "session_status": {
+        return _build_probe_contract_snapshot(
+            probe_source=source,
+            session_status={
                 "session_state": "degraded",
                 "renewal_state": "attention-needed",
                 "connected_surfaces": [],
@@ -707,12 +854,19 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                     "account": _surface_state("disconnected", f"power-on ready but kickoff/verify not yet green: {power_on_detail}", last_heartbeat_at=power_on_at),
                 },
             },
-        }
+            receipt_kind="steamer-cron-health-stage",
+            receipt_path=ec2_power_on_path,
+            receipt_label=f"ec2_power_on:{probe_date}",
+            receipt_updated_at=power_on_at,
+            freshness_detail=f"steamer-cron-health power-on receipt exists but kickoff/verify are not yet green: {power_on_detail}",
+        )
 
     fallback_detail = stage_detail(aws_auth or ec2_power_on or ec2_kickoff or ec2_verify, "upstream stage unavailable")
-    return {
-        "probe_source": source,
-        "session_status": {
+    fallback_path = aws_auth_path if aws_auth else ec2_power_on_path if ec2_power_on else ec2_kickoff_path if ec2_kickoff else ec2_verify_path if ec2_verify else None
+    fallback_updated_at = stage_updated(aws_auth or ec2_power_on or ec2_kickoff or ec2_verify)
+    return _build_probe_contract_snapshot(
+        probe_source=source,
+        session_status={
             "session_state": "degraded",
             "renewal_state": "attention-needed",
             "connected_surfaces": [],
@@ -723,7 +877,12 @@ def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
                 "account": _surface_state("disconnected", f"upstream stage not green: {fallback_detail}", last_error=fallback_detail),
             },
         },
-    }
+        receipt_kind="steamer-cron-health-stage",
+        receipt_path=fallback_path,
+        receipt_label=f"steamer-cron-health:{probe_date}:fallback",
+        receipt_updated_at=fallback_updated_at,
+        freshness_detail=f"steamer-cron-health fell back to a non-green stage receipt: {fallback_detail}",
+    )
 
 
 def _resolve_named_probe_source(*, probe_source: str | None, probe_date: str | None) -> dict | None:
@@ -772,6 +931,8 @@ def _merge_probe_snapshot(*, summary: dict, probe_snapshot: dict | None) -> dict
 
     boundary = merged.setdefault("boundary", {})
     boundary["probe_source"] = probe_snapshot.get("probe_source", "external-json")
+    boundary["probe_freshness"] = probe_snapshot.get("probe_freshness", _seed_probe_freshness())
+    boundary["probe_receipt"] = probe_snapshot.get("probe_receipt", _seed_probe_receipt())
     return _apply_connection_contract(merged)
 
 
@@ -823,6 +984,8 @@ def _inspect_logical_session(
         "boundary": {
             "activation": "prepared-only",
             "broker_connected": False,
+            "probe_freshness": _seed_probe_freshness(),
+            "probe_receipt": _seed_probe_receipt(),
             "notes": "logical session inspection only; does not establish a live broker/runtime session",
         },
     }
@@ -878,6 +1041,8 @@ def _probe_session_snapshot(*, logical_session: dict) -> dict:
         "health_status": logical_session["health_status"],
         "session_status": logical_session["session_status"],
         "trading_day_gate": logical_session["trading_day_gate"],
+        "probe_freshness": boundary.get("probe_freshness", _seed_probe_freshness()),
+        "probe_receipt": boundary.get("probe_receipt", _seed_probe_receipt()),
         "boundary": {
             "activation": boundary.get("activation", "prepared-only"),
             "broker_connected": boundary.get("broker_connected", False),
@@ -905,6 +1070,14 @@ def _print_probe_session_summary(snapshot: dict, output_path: str | None) -> Non
         f"id={snapshot['session_id']} account={snapshot['account_no']} auth_mode={snapshot['auth_mode']}"
     )
     print(f"  probe_source: {snapshot['probe_source']}")
+    print(
+        "  probe_freshness: "
+        f"status={snapshot['probe_freshness']['status']} observed_at={snapshot['probe_freshness']['observed_at']}"
+    )
+    print(
+        "  probe_receipt: "
+        f"label={snapshot['probe_receipt']['label']} path={snapshot['probe_receipt']['path']}"
+    )
     print(
         "  connections: "
         f"marketdata={connections['marketdata']['state']} "
@@ -1108,6 +1281,8 @@ def _operator_preflight_smoke(
         "deck": deck_ref,
         "auth_profile": auth_profile_path,
         "logical_session": logical_session,
+        "probe_freshness": logical_session["boundary"].get("probe_freshness", _seed_probe_freshness()),
+        "probe_receipt": logical_session["boundary"].get("probe_receipt", _seed_probe_receipt()),
         "operator_status": operator_payload,
         "blockers": blockers,
         "next_command_map": {
@@ -1152,6 +1327,8 @@ def _blocked_live_smoke_payload(*, preflight_payload: dict, preflight_exit_code:
         "ok": False,
         "smoke_status": "blocked",
         "activation": "prepared-only",
+        "probe_freshness": preflight_payload.get("probe_freshness", _seed_probe_freshness()),
+        "probe_receipt": preflight_payload.get("probe_receipt", _seed_probe_receipt()),
         "error": "live smoke readiness blocked by preflight gate",
         "failed_step": preflight_step,
         "steps": [preflight_step],
@@ -1644,6 +1821,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result.payload["steps"] = [preflight_step]
             result.payload["preflight"] = preflight_payload
+            result.payload["probe_freshness"] = preflight_payload.get("probe_freshness", _seed_probe_freshness())
+            result.payload["probe_receipt"] = preflight_payload.get("probe_receipt", _seed_probe_receipt())
             if args.as_json:
                 _print_json(result.payload)
             else:

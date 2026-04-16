@@ -168,6 +168,12 @@ def test_cli_inspect_session_can_resolve_steamer_cron_health_probe_source(
     assert payload["boundary"]["probe_source"] == f"steamer-cron-health:{probe_date}"
     assert payload["session_status"]["connections"]["broker"]["state"] == "connected"
     assert payload["boundary"]["broker_connected"] is True
+    assert payload["boundary"]["probe_freshness"]["status"] == "fresh"
+    assert payload["boundary"]["probe_freshness"]["observed_at"] == "2026-04-16T00:45:17Z"
+    assert payload["boundary"]["probe_receipt"]["label"] == f"ec2_verify:{probe_date}"
+    assert payload["boundary"]["probe_receipt"]["path"] == str(
+        (stage_root / probe_date / "stages" / "ec2_verify.json").resolve()
+    )
 
 
 def test_cli_inspect_session_named_source_missing_stage_dir_stays_not_connected(
@@ -196,6 +202,8 @@ def test_cli_inspect_session_named_source_missing_stage_dir_stays_not_connected(
     assert code == 0
     assert payload["boundary"]["probe_source"] == f"steamer-cron-health:{probe_date}"
     assert payload["session_status"]["connections"]["broker"]["state"] == "not-connected"
+    assert payload["boundary"]["probe_freshness"]["status"] == "not-attached"
+    assert payload["boundary"]["probe_receipt"]["path"] is None
 
 
 def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
@@ -216,6 +224,8 @@ def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
     assert payload["probe_source"] == "operator-probe-session:seed"
     assert payload["session_status"]["connections"]["broker"]["state"] == "not-connected"
     assert payload["capabilities"]["trade_enabled"] is True
+    assert payload["probe_freshness"]["status"] == "seed-unverified"
+    assert payload["probe_receipt"]["kind"] == "seed"
 
 
 def test_probe_json_takes_precedence_over_named_probe_source(
@@ -286,6 +296,8 @@ def test_operator_probe_session_writes_snapshot_file(capsys, tmp_path: Path) -> 
     assert payload["output_path"] == str(output_path)
     assert written["probe_source"] == "example-probe"
     assert written["session_status"]["session_state"] == "healthy"
+    assert written["probe_freshness"]["status"] == "fresh"
+    assert written["probe_receipt"]["path"] == str(Path("examples/probes/session_health.connected.json").resolve())
 
 
 def test_cli_validate_strategy_catalog_success(capsys) -> None:
@@ -768,6 +780,8 @@ def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tm
     assert code == 4
     assert payload["ok"] is False
     assert payload["smoke_status"] == "blocked"
+    assert payload["probe_freshness"]["status"] == "fresh"
+    assert payload["probe_receipt"]["kind"] == "probe-json"
     assert payload["failed_step"]["step"] == "preflight-smoke-gate"
     blocker_codes = {row["code"] for row in payload["preflight"]["blockers"]}
     assert "capability-trade-disabled" in blocker_codes
@@ -884,6 +898,8 @@ def test_operator_live_smoke_readiness_consumes_steamer_cron_health_probe_source
     assert code == 0
     assert payload["steps"][0]["step"] == "preflight-smoke-gate"
     assert payload["steps"][0]["ok"] is True
+    assert payload["probe_freshness"]["status"] == "fresh"
+    assert payload["probe_receipt"]["label"] == f"ec2_verify:{probe_date}"
     assert payload["preflight"]["logical_session"]["boundary"]["probe_source"] == (
         f"steamer-cron-health:{probe_date}"
     )
@@ -921,6 +937,8 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert code == 4
     assert payload["ok"] is False
     assert payload["preflight_status"] == "blocked"
+    assert payload["probe_freshness"]["status"] == "seed-unverified"
+    assert payload["probe_receipt"]["kind"] == "seed"
     blocker_codes = {row["code"] for row in payload["blockers"]}
     assert "marketdata-not-connected" in blocker_codes
     assert "broker-not-connected" in blocker_codes
@@ -1033,3 +1051,6 @@ def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(
     assert payload["ok"] is True
     assert payload["preflight_status"] == "ready"
     assert payload["logical_session"]["boundary"]["probe_source"] == "fixture-probe"
+    assert payload["probe_freshness"]["status"] == "fresh"
+    assert payload["probe_receipt"]["kind"] == "probe-json"
+    assert payload["probe_receipt"]["path"] == str(probe.resolve())

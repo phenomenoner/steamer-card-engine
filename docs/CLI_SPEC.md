@@ -138,9 +138,16 @@ Responsibilities:
 - when that preflight gate is blocked, `live-smoke-readiness` exits with code `4` and returns a blocked smoke payload instead of entering the smoke sequence
 - emit a canonical session-health snapshot for downstream cron/preflight consumers
 - support both fixture/manual snapshots (`--probe-json`) and named upstream truth adapters (`--probe-source`)
+- expose explicit probe freshness + receipt metadata on `probe-session`, `preflight-smoke`, and `live-smoke-readiness` so operators can see how fresh the probe is and which receipt/file it came from
 - classify preflight blockers cleanly by failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of collapsing every miss into a generic not-connected state
 - keep the account-query surface truthful: the current `steamer-cron-health` adapter proves broker + marketdata readiness, but does not independently assert account-query connectivity
 - report whether the next broker-preflight step is blocked or ready, using logical session posture + operator baseline posture as the seed gate
+
+Canonical probe truth metadata:
+
+- `probe_source`: named source or manual probe identity
+- `probe_freshness`: explicit freshness status, observed timestamp when known, and a short truth note
+- `probe_receipt`: receipt/file pointer for the source actually consumed; seed posture remains explicit as unverified
 
 Repo-side seed runner:
 
@@ -238,6 +245,7 @@ Current implementation status:
 - ✅ `operator live-smoke-readiness` pass/fail smoke bundle for the bounded live-capability sequence (still prepared-only; no broker submission)
 - ✅ `operator preflight-smoke` truthful blocked/ready gate for the next broker-preflight step
 - ✅ `operator probe-session` / `preflight-smoke` named upstream truth adapter for `steamer-cron-health` stage receipts
+- ✅ canonical operator probe/preflight/live-smoke payloads now surface explicit `probe_freshness` + `probe_receipt` metadata instead of only point-in-time readiness
 - ✅ operator auto-disarm now closes invalid arm-scope TTL metadata (missing/malformed `expires_at`) in addition to normal TTL expiry
 
 Next evolution order remains:

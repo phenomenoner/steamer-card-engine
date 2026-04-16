@@ -116,6 +116,7 @@ steamer-card-engine/
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
   - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure, reusable `session_status + connections` shape, external `--probe-json` override, and named upstream truth adapter support via `--probe-source` (`--probe-json` wins on precedence)
   - operator session probing (`operator probe-session`) that emits the canonical snapshot for downstream preflight/cron consumers
+  - canonical probe/preflight/live-smoke payloads now carry explicit `probe_freshness` + `probe_receipt` truth so operators can see both readiness and receipt provenance
   - preflight blocker classification now preserves failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of flattening every miss into `not-connected`
   - the current named adapter proves broker + marketdata readiness from upstream cron-health receipts; it does not independently prove account-query connectivity
 - `ops/scripts/trading_day_preflight_seed.sh`
@@ -143,6 +144,7 @@ steamer-card-engine/
   - this is a bounded smoke/control surface, not a broker-connected production control plane
   - `live-smoke-readiness` now consumes the same probe/preflight posture contract as `probe-session -> preflight-smoke -> cron`, and only runs the bounded live-capability sequence when that gate is ready
   - `preflight-smoke` can now consume truthful upstream Steamer cron-health receipts through the canonical probe contract, while keeping the same prepared-only boundary
+  - named-source/manual probe receipts now remain explicit in the emitted JSON surface; seed-only posture stays labeled unverified rather than pretending to have broker authority
 
 ## Sharp edges / known deltas
 

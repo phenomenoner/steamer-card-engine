@@ -238,6 +238,8 @@ uv run steamer-card-engine sim compare \
 `operator` 現在有 seed 級控制面：`status` / `arm-live` / `disarm-live` / `flatten`，含 TTL policy、
 expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-smoke` 來驗證 disarmed posture 的顯式拒單，
 以及 `live-smoke-readiness` 一鍵跑完整個 bounded live-capability smoke sequence。
+目前 `probe-session` / `preflight-smoke` / `live-smoke-readiness` 也會顯式帶出 `probe_freshness` 與 `probe_receipt`，
+讓 operator truth 不只回答 ready / blocked，也回答這個判斷來自哪個 receipt、時間有多新鮮。
 這仍不是 broker-connected runtime。
 
 ## 文件導覽
@@ -281,6 +283,7 @@ expiry/invalid-scope auto-disarm、action receipts，另外提供 `submit-order-
 - ✅ session / preflight health now align to a reusable `session_status + connections` contract so later broker-connected work can replace the source without breaking the CLI surface
 - ✅ `--probe-json` is now wired into `inspect-session` / `preflight-smoke`, so an external real probe can feed the canonical health contract without embedding vendor SDK logic into the CLI
 - ✅ `operator probe-session` now emits the canonical snapshot shape directly, and can write it to disk for cron/preflight chaining
+- ✅ canonical operator truth now carries explicit `probe_freshness` + `probe_receipt` metadata so readiness answers are tied to freshness/provenance instead of looking point-in-time only
 - ✅ `ops/scripts/trading_day_preflight_seed.sh` now provides a single repo-side seed runner for the chain `probe-session -> preflight-smoke`
 - ✅ `tools/steamer_card_engine_trading_day_preflight_cron.py` now wraps that chain into a cron-safe `NO_REPLY on green / BLOCKED on red` surface
 - ⏳ Replay runner parity hardening (still legacy-bridge based in M1)
