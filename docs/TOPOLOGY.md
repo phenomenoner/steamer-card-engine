@@ -114,21 +114,21 @@ steamer-card-engine/
     - comparator (`sim compare`) with hard gates + decision-grade report outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
+  - active execution-family JSON surfaces (`replay run`, `sim run-live`, `sim normalize-baseline`, `sim compare`, `operator probe-session`, `operator preflight-smoke`, `operator live-smoke-readiness`) now share the same machine-readable `cli_contract` envelope (`cli-command/v1`)
   - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure, reusable `session_status + connections` shape, external `--probe-json` override, and named upstream truth adapter support via `--probe-source` (`--probe-json` wins on precedence)
   - operator session probing (`operator probe-session`) that emits the canonical snapshot for downstream preflight/cron consumers
   - canonical probe/preflight/live-smoke payloads now carry explicit `probe_freshness` + `probe_receipt` truth so operators can see both readiness and receipt provenance
   - preflight blocker classification now preserves failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of flattening every miss into `not-connected`
   - the current named adapter proves broker + marketdata readiness from upstream cron-health receipts; it does not independently prove account-query connectivity
+  - sim/replay JSON error paths now stay machine-readable under `--json` instead of dropping back to plain-text-only failures
 - `ops/scripts/trading_day_preflight_seed.sh`
   - repo-side seed runner for the chain `operator probe-session -> operator preflight-smoke`
   - still accepts explicit probe fixture JSON, but can now ride named upstream truth adapters through env/CLI without changing the runner contract
 - `tools/steamer_card_engine_trading_day_preflight_cron.py`
   - cron-safe wrapper for the trading-day preflight chain (`NO_REPLY` on green, concise `BLOCKED ...` on red)
   - defaults to `STEAMER_CARD_ENGINE_PROBE_SOURCE=steamer-cron-health` when no explicit probe fixture is injected
-  - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
-  - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke|live-smoke-readiness|preflight-smoke`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
-  - pin current CLI behaviors, validation rules, and M1 comparator hard-gate behavior
+  - pin current CLI behaviors, aligned `cli_contract` JSON envelopes, JSON error posture, validation rules, and M1 comparator hard-gate behavior
 - `runs/...` + `comparisons/...`
   - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for a 3-scenario pre-sprint evidence pack
   - compare outputs are now decision-grade (`compare-manifest.json`, `diff.json`, `summary.md`), not just placeholder plumbing
@@ -210,6 +210,8 @@ Canonical note:
 - Auth/session model: `docs/AUTH_AND_SESSION_MODEL.md`
 - Day-trading guardrails: `docs/DAYTRADING_GUARDRAILS.md`
 - CLI spec: `docs/CLI_SPEC.md`
+- Operator CLI exit/JSON contract note: `docs/tech-notes/2026-04-16_steamer_card_engine_operator_cli_exit_json_contract.md`
+- Sim/replay/operator CLI alignment note: `docs/tech-notes/2026-04-16_steamer_card_engine_sim_replay_operator_cli_contract_alignment.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
