@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from steamer_card_engine.manifest import (
@@ -599,6 +600,36 @@ def _seed_probe_receipt() -> dict:
         "label": "seed-logical-session",
         "updated_at": None,
     }
+
+
+def _exit_class(exit_code: int) -> str:
+    if exit_code == 0:
+        return "success"
+    if exit_code == 4:
+        return "operator-refused"
+    if exit_code == 5:
+        return "confirmation-required"
+    return "general-failure"
+
+
+def _attach_cli_contract(
+    payload: dict[str, Any],
+    *,
+    command: str,
+    exit_code: int,
+    status_key: str,
+    status_value: str,
+) -> dict[str, Any]:
+    enriched = dict(payload)
+    enriched["cli_contract"] = {
+        "version": "operator-cli/v1",
+        "command": command,
+        "exit_code": exit_code,
+        "exit_class": _exit_class(exit_code),
+        "status_key": status_key,
+        "status": status_value,
+    }
+    return enriched
 
 
 def _critical_surface_session_state(marketdata_state: str, broker_state: str) -> tuple[str, str]:
@@ -1794,6 +1825,13 @@ def main(argv: list[str] | None = None) -> int:
                     preflight_payload=preflight_payload,
                     preflight_exit_code=preflight_exit,
                 )
+                payload = _attach_cli_contract(
+                    payload,
+                    command="operator live-smoke-readiness",
+                    exit_code=preflight_exit,
+                    status_key="smoke_status",
+                    status_value=str(payload.get("smoke_status") or "blocked"),
+                )
                 if args.as_json:
                     _print_json(payload)
                 else:
@@ -1823,6 +1861,13 @@ def main(argv: list[str] | None = None) -> int:
             result.payload["preflight"] = preflight_payload
             result.payload["probe_freshness"] = preflight_payload.get("probe_freshness", _seed_probe_freshness())
             result.payload["probe_receipt"] = preflight_payload.get("probe_receipt", _seed_probe_receipt())
+            result.payload = _attach_cli_contract(
+                result.payload,
+                command="operator live-smoke-readiness",
+                exit_code=result.exit_code,
+                status_key="smoke_status",
+                status_value=str(result.payload.get("smoke_status") or "unknown"),
+            )
             if args.as_json:
                 _print_json(result.payload)
             else:
@@ -1840,6 +1885,13 @@ def main(argv: list[str] | None = None) -> int:
                 probe_json_path=args.probe_json,
                 probe_source=args.probe_source,
                 probe_date=args.probe_date,
+            )
+            payload = _attach_cli_contract(
+                payload,
+                command="operator preflight-smoke",
+                exit_code=exit_code,
+                status_key="preflight_status",
+                status_value=str(payload.get("preflight_status") or "unknown"),
             )
             if args.as_json:
                 _print_json(payload)
@@ -1862,6 +1914,13 @@ def main(argv: list[str] | None = None) -> int:
                 payload = dict(snapshot)
                 if output_path:
                     payload["output_path"] = output_path
+                payload = _attach_cli_contract(
+                    payload,
+                    command="operator probe-session",
+                    exit_code=0,
+                    status_key="probe_status",
+                    status_value="captured",
+                )
                 _print_json(payload)
             else:
                 _print_probe_session_summary(snapshot, output_path)

@@ -226,6 +226,14 @@ def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
     assert payload["capabilities"]["trade_enabled"] is True
     assert payload["probe_freshness"]["status"] == "seed-unverified"
     assert payload["probe_receipt"]["kind"] == "seed"
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator probe-session",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "probe_status",
+        "status": "captured",
+    }
 
 
 def test_probe_json_takes_precedence_over_named_probe_source(
@@ -736,6 +744,14 @@ def test_operator_live_smoke_readiness_runs_bounded_sequence(capsys, tmp_path: P
     assert payload["smoke_status"] == "pass"
     assert payload["activation"] == "prepared-only"
     assert payload["preflight"]["preflight_status"] == "ready"
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator live-smoke-readiness",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "smoke_status",
+        "status": "pass",
+    }
     assert [step["step"] for step in payload["steps"]] == [
         "preflight-smoke-gate",
         "status-disarmed-baseline",
@@ -783,6 +799,14 @@ def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tm
     assert payload["probe_freshness"]["status"] == "fresh"
     assert payload["probe_receipt"]["kind"] == "probe-json"
     assert payload["failed_step"]["step"] == "preflight-smoke-gate"
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator live-smoke-readiness",
+        "exit_code": 4,
+        "exit_class": "operator-refused",
+        "status_key": "smoke_status",
+        "status": "blocked",
+    }
     blocker_codes = {row["code"] for row in payload["preflight"]["blockers"]}
     assert "capability-trade-disabled" in blocker_codes
     assert state_file.exists()
@@ -835,6 +859,14 @@ def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_fai
     payload = json.loads(capsys.readouterr().out)
     assert code == 1
     assert payload["ok"] is False
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator live-smoke-readiness",
+        "exit_code": 1,
+        "exit_class": "general-failure",
+        "status_key": "smoke_status",
+        "status": "fail",
+    }
     assert payload["failed_step"]["step"] == "submit-accepted-while-armed"
     assert payload["steps"][-1]["step"] == "cleanup-disarm-after-failure"
     assert payload["steps"][-1]["ok"] is True
@@ -939,6 +971,14 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert payload["preflight_status"] == "blocked"
     assert payload["probe_freshness"]["status"] == "seed-unverified"
     assert payload["probe_receipt"]["kind"] == "seed"
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator preflight-smoke",
+        "exit_code": 4,
+        "exit_class": "operator-refused",
+        "status_key": "preflight_status",
+        "status": "blocked",
+    }
     blocker_codes = {row["code"] for row in payload["blockers"]}
     assert "marketdata-not-connected" in blocker_codes
     assert "broker-not-connected" in blocker_codes
@@ -1054,3 +1094,11 @@ def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(
     assert payload["probe_freshness"]["status"] == "fresh"
     assert payload["probe_receipt"]["kind"] == "probe-json"
     assert payload["probe_receipt"]["path"] == str(probe.resolve())
+    assert payload["cli_contract"] == {
+        "version": "operator-cli/v1",
+        "command": "operator preflight-smoke",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "preflight_status",
+        "status": "ready",
+    }

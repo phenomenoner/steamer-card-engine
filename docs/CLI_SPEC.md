@@ -176,6 +176,16 @@ The CLI should support:
 - structured JSON output for automation
 - stable exit codes
 
+For the broker-preflight operator lane, JSON output now carries a small self-describing contract envelope:
+
+- `cli_contract.version`: current machine-readable payload contract version (`operator-cli/v1`)
+- `cli_contract.command`: canonical command identity (for example `operator preflight-smoke`)
+- `cli_contract.exit_code`: the same exit code returned by the process
+- `cli_contract.exit_class`: normalized family (`success`, `operator-refused`, `confirmation-required`, `general-failure`)
+- `cli_contract.status_key` + `cli_contract.status`: which command-level status field should be treated as the primary gate (`probe_status`, `preflight_status`, `smoke_status`)
+
+This keeps automation from having to reconstruct contract meaning from shell exit codes alone.
+
 ### Exit codes (current + recommended)
 
 - `0`: success
@@ -186,6 +196,12 @@ The CLI should support:
 - `5`: operator action refused due to missing explicit confirmation
 
 (Tests already assert `2` for validation errors; keep this stable.)
+
+Operator JSON surfaces that currently emit `cli_contract`:
+
+- `operator probe-session`
+- `operator preflight-smoke`
+- `operator live-smoke-readiness`
 
 Suggested flags:
 
