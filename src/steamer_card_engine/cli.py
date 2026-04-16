@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 from datetime import UTC, datetime
 import json
+import os
 from pathlib import Path
 import re
+from zoneinfo import ZoneInfo
 
 from steamer_card_engine.manifest import (
     ManifestValidationError,
@@ -39,6 +41,16 @@ from steamer_card_engine.strategy_catalog import (
 )
 
 
+TPE = ZoneInfo("Asia/Taipei")
+CRITICAL_SURFACES = ("marketdata", "broker")
+STEAMER_CRON_HEALTH_ROOT = Path(
+    os.environ.get(
+        "STEAMER_CARD_ENGINE_STEAMER_CRON_ROOT",
+        "/root/.openclaw/workspace/.state/steamer/cron-health",
+    )
+)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="steamer-card-engine",
@@ -67,6 +79,15 @@ def build_parser() -> argparse.ArgumentParser:
     auth_inspect_session.add_argument(
         "--probe-json",
         help="Optional JSON snapshot overriding the seed session_status/health fields",
+    )
+    auth_inspect_session.add_argument(
+        "--probe-source",
+        choices=("seed", "steamer-cron-health"),
+        help="Optional named probe source when no explicit --probe-json snapshot is supplied",
+    )
+    auth_inspect_session.add_argument(
+        "--probe-date",
+        help="Optional Asia/Taipei probe date (YYYYMMDD) for named probe sources",
     )
     auth_inspect_session.add_argument(
         "--trading-day-status",
@@ -299,6 +320,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSON health snapshot to replace seed not-connected session/probe fields",
     )
     preflight_smoke.add_argument(
+        "--probe-source",
+        choices=("seed", "steamer-cron-health"),
+        help="Optional named probe source when no explicit --probe-json snapshot is supplied",
+    )
+    preflight_smoke.add_argument(
+        "--probe-date",
+        help="Optional Asia/Taipei probe date (YYYYMMDD) for named probe sources",
+    )
+    preflight_smoke.add_argument(
         "--trading-day-status",
         choices=("open", "closed", "unknown"),
         default="unknown",
@@ -322,6 +352,15 @@ def build_parser() -> argparse.ArgumentParser:
     probe_session.add_argument(
         "--probe-json",
         help="Optional external JSON snapshot to pass through the canonical probe-session surface",
+    )
+    probe_session.add_argument(
+        "--probe-source",
+        choices=("seed", "steamer-cron-health"),
+        help="Optional named probe source when no explicit --probe-json snapshot is supplied",
+    )
+    probe_session.add_argument(
+        "--probe-date",
+        help="Optional Asia/Taipei probe date (YYYYMMDD) for named probe sources",
     )
     probe_session.add_argument(
         "--output",
@@ -389,6 +428,10 @@ def _seed_session_status(*, trading_day_status: str) -> dict:
     }
 
 
+def _tpe_probe_day() -> str:
+    return datetime.now(TPE).strftime("%Y%m%d")
+
+
 def _load_probe_snapshot(path: str | None) -> dict | None:
     if not path:
         return None
@@ -398,9 +441,297 @@ def _load_probe_snapshot(path: str | None) -> dict | None:
     return payload
 
 
+def _load_stage_state(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"stage state must be a JSON object: {path}")
+    return payload
+
+
+def _surface_state(
+    state: str,
+    detail: str,
+    *,
+    last_heartbeat_at: str | None = None,
+    last_error: str | None = None,
+) -> dict:
+    return {
+        "state": state,
+        "detail": detail,
+        "last_heartbeat_at": last_heartbeat_at,
+        "last_error": last_error,
+    }
+
+
+def _critical_surface_session_state(marketdata_state: str, broker_state: str) -> tuple[str, str]:
+    critical_states = (marketdata_state, broker_state)
+    if any(state == "auth" for state in critical_states):
+        return "auth-required", "blocked"
+    if any(state == "stale" for state in critical_states):
+        return "stale", "attention-needed"
+    if any(state == "capability-mismatch" for state in critical_states):
+        return "capability-mismatch", "not-attached"
+    if all(state == "connected" for state in critical_states):
+        return "healthy", "fresh"
+    if any(state == "disconnected" for state in critical_states):
+        return "disconnected", "attention-needed"
+    if all(state == "not-connected" for state in critical_states):
+        return "logical-profile-only", "not-attached"
+    return "degraded", "attention-needed"
+
+
+def _apply_connection_contract(summary: dict) -> dict:
+    session_status = summary["session_status"]
+    connections = session_status["connections"]
+    capabilities = summary["capabilities"]
+
+    if not capabilities.get("marketdata_enabled", False):
+        connections["marketdata"] = _surface_state(
+            "capability-mismatch",
+            "auth profile disables marketdata surface",
+        )
+    if not capabilities.get("account_query_enabled", False):
+        connections["account"] = _surface_state(
+            "capability-mismatch",
+            "auth profile disables account-query surface",
+        )
+
+    connected_surfaces: list[str] = []
+    degraded_surfaces: list[str] = []
+    for surface in (*CRITICAL_SURFACES, "account"):
+        state = connections[surface].get("state", "not-connected")
+        if state == "connected":
+            connected_surfaces.append(surface)
+        elif state in {"auth", "capability-mismatch", "disconnected", "stale"}:
+            degraded_surfaces.append(surface)
+
+    session_state, renewal_state = _critical_surface_session_state(
+        connections["marketdata"].get("state", "not-connected"),
+        connections["broker"].get("state", "not-connected"),
+    )
+
+    session_status["connected_surfaces"] = connected_surfaces
+    session_status["degraded_surfaces"] = degraded_surfaces
+    session_status["session_state"] = session_state
+    session_status["renewal_state"] = renewal_state
+
+    summary["health_status"]["session"] = session_state
+    summary["health_status"]["marketdata_connection"] = connections["marketdata"].get("state", "not-connected")
+    summary["health_status"]["broker_connection"] = connections["broker"].get("state", "not-connected")
+
+    boundary = summary.setdefault("boundary", {})
+    boundary["broker_connected"] = connections["broker"].get("state") == "connected"
+    return summary
+
+
+def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
+    stage_dir = STEAMER_CRON_HEALTH_ROOT / probe_date / "stages"
+    aws_auth = _load_stage_state(stage_dir / "aws_auth.json")
+    ec2_power_on = _load_stage_state(stage_dir / "ec2_power_on.json")
+    ec2_kickoff = _load_stage_state(stage_dir / "ec2_kickoff.json")
+    ec2_verify = _load_stage_state(stage_dir / "ec2_verify.json")
+    source = f"steamer-cron-health:{probe_date}"
+
+    def stage_detail(stage: dict | None, fallback: str) -> str:
+        if not stage:
+            return fallback
+        return str(stage.get("detail") or stage.get("reason") or fallback)
+
+    def stage_updated(stage: dict | None) -> str | None:
+        if not stage:
+            return None
+        raw = stage.get("updated_at")
+        return str(raw) if raw else None
+
+    def has_issue(stage: dict | None, token: str) -> bool:
+        if not stage:
+            return False
+        blob = " ".join(
+            str(stage.get(key) or "") for key in ("detail", "reason", "status")
+        )
+        return token in blob
+
+    if not any((aws_auth, ec2_power_on, ec2_kickoff, ec2_verify)):
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": "logical-profile-only",
+                "renewal_state": "not-attached",
+                "connected_surfaces": [],
+                "degraded_surfaces": [],
+                "connections": {
+                    "marketdata": _surface_state(
+                        "not-connected",
+                        f"upstream probe source missing under {stage_dir}",
+                    ),
+                    "broker": _surface_state(
+                        "not-connected",
+                        f"upstream probe source missing under {stage_dir}",
+                    ),
+                    "account": _surface_state(
+                        "not-connected",
+                        f"upstream probe source missing under {stage_dir}",
+                    ),
+                },
+            },
+        }
+
+    if aws_auth and str(aws_auth.get("status")) != "success":
+        detail = stage_detail(aws_auth, "aws_auth_not_ready")
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": "auth-required",
+                "renewal_state": "blocked",
+                "connected_surfaces": [],
+                "degraded_surfaces": ["marketdata", "broker", "account"],
+                "connections": {
+                    "marketdata": _surface_state("auth", f"upstream aws auth blocked: {detail}", last_error=detail),
+                    "broker": _surface_state("auth", f"upstream aws auth blocked: {detail}", last_error=detail),
+                    "account": _surface_state("auth", f"upstream aws auth blocked: {detail}", last_error=detail),
+                },
+            },
+        }
+
+    if ec2_verify and str(ec2_verify.get("status")) == "success":
+        verify_at = stage_updated(ec2_verify)
+        verify_detail = stage_detail(ec2_verify, "verify_green")
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": "healthy",
+                "renewal_state": "fresh",
+                "connected_surfaces": ["marketdata", "broker", "account"],
+                "degraded_surfaces": [],
+                "connections": {
+                    "marketdata": _surface_state(
+                        "connected",
+                        f"upstream ec2_verify success: {verify_detail}",
+                        last_heartbeat_at=verify_at,
+                    ),
+                    "broker": _surface_state(
+                        "connected",
+                        f"upstream live sim verified against broker-attached runtime: {verify_detail}",
+                        last_heartbeat_at=verify_at,
+                    ),
+                    "account": _surface_state(
+                        "not-connected",
+                        "upstream source does not independently verify the account-query surface",
+                        last_heartbeat_at=verify_at,
+                    ),
+                },
+            },
+        }
+
+    if ec2_verify:
+        verify_detail = stage_detail(ec2_verify, "verify_not_ready")
+        verify_at = stage_updated(ec2_verify)
+        if has_issue(ec2_verify, "ticks_stale"):
+            state = "stale"
+            session_state = "stale"
+            renewal_state = "attention-needed"
+        elif has_issue(ec2_verify, "aws_auth"):
+            state = "auth"
+            session_state = "auth-required"
+            renewal_state = "blocked"
+        else:
+            state = "disconnected"
+            session_state = "disconnected"
+            renewal_state = "attention-needed"
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": session_state,
+                "renewal_state": renewal_state,
+                "connected_surfaces": [],
+                "degraded_surfaces": ["marketdata", "broker", "account"],
+                "connections": {
+                    "marketdata": _surface_state(state, f"upstream ec2_verify red: {verify_detail}", last_heartbeat_at=verify_at, last_error=verify_detail),
+                    "broker": _surface_state(state, f"upstream ec2_verify red: {verify_detail}", last_heartbeat_at=verify_at, last_error=verify_detail),
+                    "account": _surface_state(state, f"upstream ec2_verify red: {verify_detail}", last_heartbeat_at=verify_at, last_error=verify_detail),
+                },
+            },
+        }
+
+    if ec2_kickoff and str(ec2_kickoff.get("status")) == "success":
+        kickoff_at = stage_updated(ec2_kickoff)
+        kickoff_detail = stage_detail(ec2_kickoff, "kickoff_started")
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": "degraded",
+                "renewal_state": "attention-needed",
+                "connected_surfaces": [],
+                "degraded_surfaces": ["marketdata", "broker", "account"],
+                "connections": {
+                    "marketdata": _surface_state("disconnected", f"kickoff started but verify not yet green: {kickoff_detail}", last_heartbeat_at=kickoff_at),
+                    "broker": _surface_state("disconnected", f"kickoff started but verify not yet green: {kickoff_detail}", last_heartbeat_at=kickoff_at),
+                    "account": _surface_state("disconnected", f"kickoff started but verify not yet green: {kickoff_detail}", last_heartbeat_at=kickoff_at),
+                },
+            },
+        }
+
+    if ec2_power_on and str(ec2_power_on.get("status")) == "success":
+        power_on_at = stage_updated(ec2_power_on)
+        power_on_detail = stage_detail(ec2_power_on, "power_on_ready")
+        return {
+            "probe_source": source,
+            "session_status": {
+                "session_state": "degraded",
+                "renewal_state": "attention-needed",
+                "connected_surfaces": [],
+                "degraded_surfaces": ["marketdata", "broker", "account"],
+                "connections": {
+                    "marketdata": _surface_state("disconnected", f"power-on ready but kickoff/verify not yet green: {power_on_detail}", last_heartbeat_at=power_on_at),
+                    "broker": _surface_state("disconnected", f"power-on ready but kickoff/verify not yet green: {power_on_detail}", last_heartbeat_at=power_on_at),
+                    "account": _surface_state("disconnected", f"power-on ready but kickoff/verify not yet green: {power_on_detail}", last_heartbeat_at=power_on_at),
+                },
+            },
+        }
+
+    fallback_detail = stage_detail(aws_auth or ec2_power_on or ec2_kickoff or ec2_verify, "upstream stage unavailable")
+    return {
+        "probe_source": source,
+        "session_status": {
+            "session_state": "degraded",
+            "renewal_state": "attention-needed",
+            "connected_surfaces": [],
+            "degraded_surfaces": ["marketdata", "broker", "account"],
+            "connections": {
+                "marketdata": _surface_state("disconnected", f"upstream stage not green: {fallback_detail}", last_error=fallback_detail),
+                "broker": _surface_state("disconnected", f"upstream stage not green: {fallback_detail}", last_error=fallback_detail),
+                "account": _surface_state("disconnected", f"upstream stage not green: {fallback_detail}", last_error=fallback_detail),
+            },
+        },
+    }
+
+
+def _resolve_named_probe_source(*, probe_source: str | None, probe_date: str | None) -> dict | None:
+    source = probe_source or os.environ.get("STEAMER_CARD_ENGINE_PROBE_SOURCE") or "seed"
+    if source == "seed":
+        return None
+    if source == "steamer-cron-health":
+        resolved_date = probe_date or os.environ.get("STEAMER_CARD_ENGINE_PROBE_DATE") or _tpe_probe_day()
+        return _steamer_probe_snapshot_for_date(resolved_date)
+    raise ValueError(f"unsupported probe source: {source}")
+
+
+def _resolve_probe_snapshot(
+    *,
+    probe_json_path: str | None,
+    probe_source: str | None,
+    probe_date: str | None,
+) -> dict | None:
+    if probe_json_path:
+        return _load_probe_snapshot(probe_json_path)
+    return _resolve_named_probe_source(probe_source=probe_source, probe_date=probe_date)
+
+
 def _merge_probe_snapshot(*, summary: dict, probe_snapshot: dict | None) -> dict:
     if not probe_snapshot:
-        return summary
+        return _apply_connection_contract(summary)
 
     merged = json.loads(json.dumps(summary))
     session_status = probe_snapshot.get("session_status")
@@ -423,7 +754,7 @@ def _merge_probe_snapshot(*, summary: dict, probe_snapshot: dict | None) -> dict
 
     boundary = merged.setdefault("boundary", {})
     boundary["probe_source"] = probe_snapshot.get("probe_source", "external-json")
-    return merged
+    return _apply_connection_contract(merged)
 
 
 def _inspect_logical_session(
@@ -432,6 +763,8 @@ def _inspect_logical_session(
     session_id: str | None,
     trading_day_status: str,
     probe_json_path: str | None = None,
+    probe_source: str | None = None,
+    probe_date: str | None = None,
 ) -> dict:
     profile = load_auth_profile(auth_profile_path)
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -475,7 +808,12 @@ def _inspect_logical_session(
             "notes": "logical session inspection only; does not establish a live broker/runtime session",
         },
     }
-    return _merge_probe_snapshot(summary=summary, probe_snapshot=_load_probe_snapshot(probe_json_path))
+    probe_snapshot = _resolve_probe_snapshot(
+        probe_json_path=probe_json_path,
+        probe_source=probe_source,
+        probe_date=probe_date,
+    )
+    return _merge_probe_snapshot(summary=summary, probe_snapshot=probe_snapshot)
 
 
 def _print_auth_session_summary(summary: dict) -> None:
@@ -679,6 +1017,18 @@ def _print_operator_action_summary(payload: dict) -> None:
             print(f"  {key}: {payload[key]}")
 
 
+def _surface_blocker_code(surface: str, state: str) -> str:
+    if state == "auth":
+        return f"{surface}-auth"
+    if state == "stale":
+        return f"{surface}-stale"
+    if state == "capability-mismatch":
+        return f"{surface}-capability-mismatch"
+    if state == "disconnected":
+        return f"{surface}-disconnected"
+    return f"{surface}-not-connected"
+
+
 def _operator_preflight_smoke(
     *,
     auth_profile_path: str,
@@ -688,12 +1038,16 @@ def _operator_preflight_smoke(
     receipt_dir: Path,
     session_id: str | None,
     probe_json_path: str | None,
+    probe_source: str | None,
+    probe_date: str | None,
 ) -> tuple[dict, int]:
     logical_session = _inspect_logical_session(
         auth_profile_path=auth_profile_path,
         session_id=session_id,
         trading_day_status=trading_day_status,
         probe_json_path=probe_json_path,
+        probe_source=probe_source,
+        probe_date=probe_date,
     )
     operator_result = operator_status(
         state_file=state_file,
@@ -718,9 +1072,9 @@ def _operator_preflight_smoke(
     marketdata_state = session_status["connections"]["marketdata"]["state"]
     broker_state = session_status["connections"]["broker"]["state"]
     if marketdata_state != "connected":
-        blockers.append({"code": "marketdata-not-connected", "detail": marketdata_state})
+        blockers.append({"code": _surface_blocker_code("marketdata", marketdata_state), "detail": marketdata_state})
     if broker_state != "connected":
-        blockers.append({"code": "broker-not-connected", "detail": broker_state})
+        blockers.append({"code": _surface_blocker_code("broker", broker_state), "detail": broker_state})
     if operator_payload["armed_live"]:
         blockers.append({"code": "operator-posture-armed", "detail": "preflight requires disarmed baseline"})
     if operator_payload["order_submission_gate"]["reason"] != "disarmed-posture":
@@ -944,6 +1298,8 @@ def main(argv: list[str] | None = None) -> int:
                 session_id=args.session_id,
                 trading_day_status=args.trading_day_status,
                 probe_json_path=args.probe_json,
+                probe_source=args.probe_source,
+                probe_date=args.probe_date,
             )
             if args.as_json:
                 _print_json(summary)
@@ -1230,6 +1586,8 @@ def main(argv: list[str] | None = None) -> int:
                 receipt_dir=Path(args.receipt_dir),
                 session_id=args.session_id,
                 probe_json_path=args.probe_json,
+                probe_source=args.probe_source,
+                probe_date=args.probe_date,
             )
             if args.as_json:
                 _print_json(payload)
@@ -1243,6 +1601,8 @@ def main(argv: list[str] | None = None) -> int:
                 session_id=args.session_id,
                 trading_day_status=args.trading_day_status,
                 probe_json_path=args.probe_json,
+                probe_source=args.probe_source,
+                probe_date=args.probe_date,
             )
             snapshot = _probe_session_snapshot(logical_session=logical_session)
             output_path = _write_probe_snapshot(args.output, snapshot)

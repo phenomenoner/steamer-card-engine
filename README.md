@@ -202,8 +202,10 @@ uv run python -m steamer_card_engine --help
 uv run steamer-card-engine auth validate-profile examples/profiles/tw_cash_agent_assist.toml
 uv run steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status unknown --json
 uv run steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --output .state/session_probe.json --json
+uv run steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
+uv run steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 ./ops/scripts/trading_day_preflight_seed.sh examples/decks/tw_cash_intraday.toml examples/profiles/tw_cash_password_auth.toml open examples/probes/session_health.connected.json
 python3 tools/steamer_card_engine_trading_day_preflight_cron.py
 uv run steamer-card-engine author validate-card examples/cards/gap_reclaim.toml

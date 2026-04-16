@@ -4,8 +4,15 @@ from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 
+import steamer_card_engine.cli as cli_module
 from steamer_card_engine.cli import main
 from steamer_card_engine import operator_control
+
+
+def _write_stage(root: Path, probe_date: str, stage: str, payload: dict) -> None:
+    path = root / probe_date / "stages" / f"{stage}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_cli_validate_card_success(capsys) -> None:
@@ -113,6 +120,84 @@ def test_cli_inspect_session_accepts_probe_snapshot_override(capsys, tmp_path: P
     assert payload["boundary"]["probe_source"] == "fixture-probe"
 
 
+def test_cli_inspect_session_can_resolve_steamer_cron_health_probe_source(
+    capsys, tmp_path: Path, monkeypatch
+) -> None:
+    probe_date = "20260416"
+    stage_root = tmp_path / "cron-health"
+    monkeypatch.setattr(cli_module, "STEAMER_CRON_HEALTH_ROOT", stage_root)
+    _write_stage(
+        stage_root,
+        probe_date,
+        "aws_auth",
+        {
+            "status": "success",
+            "detail": "aws_sts_ok",
+            "updated_at": "2026-04-16T00:25:14Z",
+        },
+    )
+    _write_stage(
+        stage_root,
+        probe_date,
+        "ec2_verify",
+        {
+            "status": "success",
+            "detail": "verify_green",
+            "updated_at": "2026-04-16T00:45:17Z",
+        },
+    )
+
+    code = main(
+        [
+            "auth",
+            "inspect-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-source",
+            "steamer-cron-health",
+            "--probe-date",
+            probe_date,
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["boundary"]["probe_source"] == f"steamer-cron-health:{probe_date}"
+    assert payload["session_status"]["connections"]["broker"]["state"] == "connected"
+    assert payload["boundary"]["broker_connected"] is True
+
+
+def test_cli_inspect_session_named_source_missing_stage_dir_stays_not_connected(
+    capsys, tmp_path: Path, monkeypatch
+) -> None:
+    probe_date = "20260416"
+    monkeypatch.setattr(cli_module, "STEAMER_CRON_HEALTH_ROOT", tmp_path / "missing-root")
+
+    code = main(
+        [
+            "auth",
+            "inspect-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-source",
+            "steamer-cron-health",
+            "--probe-date",
+            probe_date,
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["boundary"]["probe_source"] == f"steamer-cron-health:{probe_date}"
+    assert payload["session_status"]["connections"]["broker"]["state"] == "not-connected"
+
+
 def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
     code = main(
         [
@@ -131,6 +216,49 @@ def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
     assert payload["probe_source"] == "operator-probe-session:seed"
     assert payload["session_status"]["connections"]["broker"]["state"] == "not-connected"
     assert payload["capabilities"]["trade_enabled"] is True
+
+
+def test_probe_json_takes_precedence_over_named_probe_source(
+    capsys, tmp_path: Path, monkeypatch
+) -> None:
+    probe_date = "20260416"
+    stage_root = tmp_path / "cron-health"
+    monkeypatch.setattr(cli_module, "STEAMER_CRON_HEALTH_ROOT", stage_root)
+    _write_stage(
+        stage_root,
+        probe_date,
+        "ec2_verify",
+        {
+            "status": "success",
+            "detail": "verify_green",
+            "updated_at": "2026-04-16T00:45:17Z",
+        },
+    )
+    probe = tmp_path / "probe.json"
+    probe.write_text(Path("examples/probes/session_health.connected.json").read_text(encoding="utf-8"), encoding="utf-8")
+
+    code = main(
+        [
+            "auth",
+            "inspect-session",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            str(probe),
+            "--probe-source",
+            "steamer-cron-health",
+            "--probe-date",
+            probe_date,
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["boundary"]["probe_source"] == "example-probe"
+    assert payload["session_status"]["connections"]["account"]["state"] == "connected"
 
 
 def test_operator_probe_session_writes_snapshot_file(capsys, tmp_path: Path) -> None:
@@ -720,6 +848,59 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert payload["logical_session"]["trading_day_gate"]["status"] == "open"
     assert payload["replacement_contract"]["expected_connected_surfaces"] == ["marketdata", "broker"]
     assert payload["operator_status"]["armed_live"] is False
+
+
+def test_operator_preflight_smoke_classifies_stale_probe_states(
+    capsys, tmp_path: Path
+) -> None:
+    state_file = tmp_path / "operator_state.json"
+    receipt_dir = tmp_path / "receipts"
+    probe = tmp_path / "probe.json"
+    probe.write_text(
+        json.dumps(
+            {
+                "probe_source": "fixture-probe",
+                "session_status": {
+                    "session_state": "stale",
+                    "renewal_state": "attention-needed",
+                    "connected_surfaces": [],
+                    "degraded_surfaces": ["marketdata", "broker"],
+                    "connections": {
+                        "marketdata": {"state": "stale", "detail": "ticks stale", "last_heartbeat_at": None, "last_error": "ticks stale"},
+                        "broker": {"state": "stale", "detail": "ticks stale", "last_heartbeat_at": None, "last_error": "ticks stale"},
+                        "account": {"state": "stale", "detail": "ticks stale", "last_heartbeat_at": None, "last_error": "ticks stale"},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = main(
+        [
+            "operator",
+            "preflight-smoke",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--auth-profile",
+            "examples/profiles/tw_cash_password_auth.toml",
+            "--trading-day-status",
+            "open",
+            "--probe-json",
+            str(probe),
+            "--state-file",
+            str(state_file),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    blocker_codes = {row["code"] for row in payload["blockers"]}
+    assert code == 4
+    assert "marketdata-stale" in blocker_codes
+    assert "broker-stale" in blocker_codes
 
 
 def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(

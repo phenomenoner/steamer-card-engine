@@ -22,6 +22,8 @@ def main() -> int:
 
     env = dict(os.environ)
     env["STEAMER_CARD_ENGINE_STATE_ROOT"] = state_root
+    if not probe_json and not env.get("STEAMER_CARD_ENGINE_PROBE_SOURCE"):
+        env["STEAMER_CARD_ENGINE_PROBE_SOURCE"] = "steamer-cron-health"
 
     command = [
         str(RUNNER),

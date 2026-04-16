@@ -19,6 +19,7 @@ steamer-card-engine auth validate-profile ./profiles/fubon.paper.toml
 steamer-card-engine auth inspect-profile ./profiles/fubon.paper.toml
 steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --json
 steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --probe-json ./examples/probes/session_health.connected.json --json
+steamer-card-engine auth inspect-session --auth-profile ./profiles/fubon.live.toml --probe-source steamer-cron-health --probe-date 20260416 --json
 ```
 
 Responsibilities:
@@ -29,7 +30,8 @@ Responsibilities:
 - help operators confirm the intended safety boundary before live expansion
 - in seed runtime, `inspect-session` is a logical profile/session surface, not a broker-connected session attach
 - the session/preflight lane should stabilize around a reusable `session_status + connections` health shape so later broker-connected work swaps data sources, not command contracts
-- `--probe-json` is the first external inlet for real or fixture health snapshots, so broker/session probing can live outside the CLI while still feeding the canonical contract shape
+- `--probe-json` remains the fixture/manual inlet for explicit external snapshots and takes precedence when both `--probe-json` and `--probe-source` are supplied
+- `--probe-source steamer-cron-health` is the first named upstream truth adapter, translating Steamer cron-health stage files into the canonical probe contract without changing the CLI surface
 
 ### 2. Authoring commands
 
@@ -118,8 +120,10 @@ steamer-card-engine operator submit-order-smoke --symbol 2330 --side buy --quant
 steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json
 steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --output ./.state/session_probe.json --json
+steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json
 steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-json examples/probes/session_health.connected.json --json
+steamer-card-engine operator preflight-smoke --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --probe-source steamer-cron-health --probe-date 20260416 --json
 ```
 
 Responsibilities:
@@ -131,6 +135,9 @@ Responsibilities:
 - write action receipts for arm/disarm/flatten/refusals
 - run one bounded live-capability smoke sequence that proves disarmed refusal -> bounded arming -> armed acceptance receipt -> flatten/disarm closure without broker submission
 - emit a canonical session-health snapshot for downstream cron/preflight consumers
+- support both fixture/manual snapshots (`--probe-json`) and named upstream truth adapters (`--probe-source`)
+- classify preflight blockers cleanly by failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of collapsing every miss into a generic not-connected state
+- keep the account-query surface truthful: the current `steamer-cron-health` adapter proves broker + marketdata readiness, but does not independently assert account-query connectivity
 - report whether the next broker-preflight step is blocked or ready, using logical session posture + operator baseline posture as the seed gate
 
 Repo-side seed runner:
@@ -227,7 +234,8 @@ Current implementation status:
 - ✅ seed operator posture controls: `operator status|arm-live|disarm-live|flatten` + TTL policy + action receipts
 - ✅ `operator submit-order-smoke` explicit refusal while disarmed (seed smoke surface; no broker submission)
 - ✅ `operator live-smoke-readiness` pass/fail smoke bundle for the bounded live-capability sequence (still prepared-only; no broker submission)
-- ✅ `operator preflight-smoke` truthful blocked/ready gate for the next broker-preflight step (currently expected to block on not-connected seed runtime)
+- ✅ `operator preflight-smoke` truthful blocked/ready gate for the next broker-preflight step
+- ✅ `operator probe-session` / `preflight-smoke` named upstream truth adapter for `steamer-cron-health` stage receipts
 - ✅ operator auto-disarm now closes invalid arm-scope TTL metadata (missing/malformed `expires_at`) in addition to normal TTL expiry
 
 Next evolution order remains:

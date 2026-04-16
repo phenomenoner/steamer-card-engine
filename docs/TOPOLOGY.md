@@ -114,12 +114,16 @@ steamer-card-engine/
     - comparator (`sim compare`) with hard gates + decision-grade report outputs (`compare-manifest.json`, `diff.json`, `summary.md`)
 - `src/steamer_card_engine/cli.py`
   - validate/inspect CLI for manifests + M1 sim normalization/comparison commands
-  - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure, reusable `session_status + connections` shape, and optional external probe JSON inlet
+  - auth logical-session inspection (`auth inspect-session`) with seed capability/health/day-gate disclosure, reusable `session_status + connections` shape, external `--probe-json` override, and named upstream truth adapter support via `--probe-source` (`--probe-json` wins on precedence)
   - operator session probing (`operator probe-session`) that emits the canonical snapshot for downstream preflight/cron consumers
+  - preflight blocker classification now preserves failure family (`auth`, `stale`, `disconnected`, `capability-mismatch`) instead of flattening every miss into `not-connected`
+  - the current named adapter proves broker + marketdata readiness from upstream cron-health receipts; it does not independently prove account-query connectivity
 - `ops/scripts/trading_day_preflight_seed.sh`
   - repo-side seed runner for the chain `operator probe-session -> operator preflight-smoke`
+  - still accepts explicit probe fixture JSON, but can now ride named upstream truth adapters through env/CLI without changing the runner contract
 - `tools/steamer_card_engine_trading_day_preflight_cron.py`
   - cron-safe wrapper for the trading-day preflight chain (`NO_REPLY` on green, concise `BLOCKED ...` on red)
+  - defaults to `STEAMER_CARD_ENGINE_PROBE_SOURCE=steamer-cron-health` when no explicit probe fixture is injected
   - replay candidate-emission command (`replay run`) with v1 bundle output + dry-run receipt mode
   - seed operator posture controls (`status|arm-live|disarm-live|flatten|submit-order-smoke|live-smoke-readiness|preflight-smoke`) with local state/receipt trails
 - `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
@@ -138,7 +142,7 @@ steamer-card-engine/
 - operator commands now maintain a seed local posture/receipt state machine (`.state/operator_posture.json` + `.state/operator_receipts/`)
   - this is a bounded smoke/control surface, not a broker-connected production control plane
   - `live-smoke-readiness` is the first repeatable pass/fail bundle for the bounded live-capability sequence, but remains prepared-only
-  - `preflight-smoke` is the first truthful blocked/ready gate for the next broker-preflight step, and currently blocks on not-connected seed health by design
+  - `preflight-smoke` can now consume truthful upstream Steamer cron-health receipts through the canonical probe contract, while keeping the same prepared-only boundary
 
 ## Sharp edges / known deltas
 
