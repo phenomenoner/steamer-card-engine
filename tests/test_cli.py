@@ -227,7 +227,7 @@ def test_operator_probe_session_emits_canonical_seed_snapshot(capsys) -> None:
     assert payload["probe_freshness"]["status"] == "seed-unverified"
     assert payload["probe_receipt"]["kind"] == "seed"
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator probe-session",
         "exit_code": 0,
         "exit_class": "success",
@@ -745,7 +745,7 @@ def test_operator_live_smoke_readiness_runs_bounded_sequence(capsys, tmp_path: P
     assert payload["activation"] == "prepared-only"
     assert payload["preflight"]["preflight_status"] == "ready"
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator live-smoke-readiness",
         "exit_code": 0,
         "exit_class": "success",
@@ -800,7 +800,7 @@ def test_operator_live_smoke_readiness_fails_without_trade_capability(capsys, tm
     assert payload["probe_receipt"]["kind"] == "probe-json"
     assert payload["failed_step"]["step"] == "preflight-smoke-gate"
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator live-smoke-readiness",
         "exit_code": 4,
         "exit_class": "operator-refused",
@@ -860,7 +860,7 @@ def test_operator_live_smoke_readiness_cleans_up_arm_state_after_midsequence_fai
     assert code == 1
     assert payload["ok"] is False
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator live-smoke-readiness",
         "exit_code": 1,
         "exit_class": "general-failure",
@@ -972,7 +972,7 @@ def test_operator_preflight_smoke_truthfully_blocks_when_seed_runtime_not_connec
     assert payload["probe_freshness"]["status"] == "seed-unverified"
     assert payload["probe_receipt"]["kind"] == "seed"
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator preflight-smoke",
         "exit_code": 4,
         "exit_class": "operator-refused",
@@ -1095,7 +1095,7 @@ def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(
     assert payload["probe_receipt"]["kind"] == "probe-json"
     assert payload["probe_receipt"]["path"] == str(probe.resolve())
     assert payload["cli_contract"] == {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": "operator preflight-smoke",
         "exit_code": 0,
         "exit_class": "success",

@@ -622,7 +622,7 @@ def _attach_cli_contract(
 ) -> dict[str, Any]:
     enriched = dict(payload)
     enriched["cli_contract"] = {
-        "version": "operator-cli/v1",
+        "version": "cli-command/v1",
         "command": command,
         "exit_code": exit_code,
         "exit_class": _exit_class(exit_code),
@@ -630,6 +630,18 @@ def _attach_cli_contract(
         "status": status_value,
     }
     return enriched
+
+
+def _cli_command_identity(args: argparse.Namespace) -> str:
+    if args.command == "replay" and getattr(args, "replay_command", None):
+        return f"replay {args.replay_command}"
+    if args.command == "sim" and getattr(args, "sim_command", None):
+        return f"sim {args.sim_command}"
+    if args.command == "operator" and getattr(args, "operator_command", None):
+        return f"operator {args.operator_command}"
+    if args.command == "auth" and getattr(args, "auth_command", None):
+        return f"auth {args.auth_command}"
+    return str(getattr(args, "command", "unknown"))
 
 
 def _critical_surface_session_state(marketdata_state: str, broker_state: str) -> tuple[str, str]:
@@ -1653,6 +1665,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "replay" and args.replay_command == "run":
             summary = _emit_replay_candidate_bundle(args)
             if args.as_json:
+                summary = _attach_cli_contract(
+                    summary,
+                    command="replay run",
+                    exit_code=0,
+                    status_key="mode",
+                    status_value=str(summary.get("mode") or "unknown"),
+                )
                 _print_json(summary)
             else:
                 if summary.get("mode") == "dry-run":
@@ -1672,6 +1691,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "sim" and args.sim_command == "run-live":
             summary = _emit_live_sim_bundle(args)
             if args.as_json:
+                summary = _attach_cli_contract(
+                    summary,
+                    command="sim run-live",
+                    exit_code=0,
+                    status_key="mode",
+                    status_value=str(summary.get("mode") or "unknown"),
+                )
                 _print_json(summary)
             else:
                 if summary.get("mode") == "dry-run":
@@ -1702,6 +1728,13 @@ def main(argv: list[str] | None = None) -> int:
                 fill_model=args.fill_model,
             )
             if args.as_json:
+                summary = _attach_cli_contract(
+                    summary,
+                    command="sim normalize-baseline",
+                    exit_code=0,
+                    status_key="bundle_status",
+                    status_value="emitted",
+                )
                 _print_json(summary)
             else:
                 print(
@@ -1718,7 +1751,15 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=Path(args.output_dir),
                 require_scenario_fingerprint=not args.allow_missing_fingerprint,
             )
+            exit_code = 0 if summary["status"] == "pass" else 3
             if args.as_json:
+                summary = _attach_cli_contract(
+                    summary,
+                    command="sim compare",
+                    exit_code=exit_code,
+                    status_key="status",
+                    status_value=str(summary.get("status") or "unknown"),
+                )
                 _print_json(summary)
             else:
                 print(
@@ -1726,7 +1767,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"status={summary['status']} output={summary['output_dir']} "
                     f"hard_fails={len(summary['hard_fail_reasons'])}"
                 )
-            return 0 if summary["status"] == "pass" else 3
+            return exit_code
 
         if args.command == "operator" and args.operator_command == "status":
             result = operator_status(
@@ -1931,7 +1972,21 @@ def main(argv: list[str] | None = None) -> int:
     except ManifestValidationError as error:
         return _handle_manifest_error(error)
     except SimCompareError as error:
-        print(f"SIM comparability command failed: {error}", flush=True)
+        if getattr(args, "as_json", False):
+            payload = {
+                "ok": False,
+                "error": str(error),
+            }
+            payload = _attach_cli_contract(
+                payload,
+                command=_cli_command_identity(args),
+                exit_code=2,
+                status_key="status",
+                status_value="error",
+            )
+            _print_json(payload)
+        else:
+            print(f"SIM comparability command failed: {error}", flush=True)
         return 2
 
     if args.command == "operator" and args.operator_command == "inspect":

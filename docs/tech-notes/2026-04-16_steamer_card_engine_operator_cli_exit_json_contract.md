@@ -34,7 +34,7 @@ This patch makes the payload self-describing without inventing a new parallel sc
 - no runtime topology change
 - no attempt to normalize every legacy CLI surface in one pass
 
-Only the active broker-preflight operator lane was hardened.
+This note records the first operator-lane slice. A same-day follow-up later generalized the envelope across the active sim/replay execution lane as well.
 
 ## Resulting contract
 
@@ -43,7 +43,7 @@ Example shape:
 ```json
 {
   "cli_contract": {
-    "version": "operator-cli/v1",
+    "version": "cli-command/v1",
     "command": "operator preflight-smoke",
     "exit_code": 4,
     "exit_class": "operator-refused",

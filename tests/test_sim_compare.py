@@ -177,6 +177,14 @@ def test_sim_normalize_baseline_emits_bundle(tmp_path: Path, capsys) -> None:
     payload = json.loads(captured.out)
 
     assert code == 0
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "sim normalize-baseline",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "bundle_status",
+        "status": "emitted",
+    }
     assert payload["counts"]["events"] == 2
     assert payload["counts"]["execution_requests"] == 0
     assert payload["counts"]["anomalies"] >= 1
@@ -443,6 +451,14 @@ def test_sim_compare_hard_fails_execution_model_mismatch(tmp_path: Path, capsys)
 
     assert compare_code == 3
     assert payload["status"] == "fail"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "sim compare",
+        "exit_code": 3,
+        "exit_class": "general-failure",
+        "status_key": "status",
+        "status": "fail",
+    }
     assert any(
         "execution_model mismatch (hard stop)" in reason
         for reason in payload["hard_fail_reasons"]
@@ -518,6 +534,14 @@ def test_sim_compare_passes_when_hard_gates_match(tmp_path: Path, capsys) -> Non
 
     assert compare_code == 0
     assert payload["status"] == "pass"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "sim compare",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "status",
+        "status": "pass",
+    }
     diff = _load_json(compare_out / "diff.json")
     assert diff["counts"]["intents"]["baseline"] >= 1
     assert "decision_grade_diff" in diff
@@ -551,6 +575,14 @@ def test_replay_run_emits_candidate_bundle(tmp_path: Path, capsys) -> None:
     assert code == 0
     assert payload["mode"] == "replay"
     assert payload["lane"] == "steamer-card-engine"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "replay run",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "mode",
+        "status": "replay",
+    }
 
     bundle_dir = Path(payload["bundle_dir"])
     run_manifest = _load_json(bundle_dir / "run-manifest.json")
@@ -589,6 +621,14 @@ def test_replay_run_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None:
 
     assert code == 0
     assert payload["mode"] == "dry-run"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "replay run",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "mode",
+        "status": "dry-run",
+    }
     assert not Path(payload["output_dir"]).exists()
 
 
@@ -619,6 +659,14 @@ def test_sim_run_live_emits_live_sim_bundle(tmp_path: Path, capsys) -> None:
 
     assert code == 0
     assert payload["mode"] == "live-sim"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "sim run-live",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "mode",
+        "status": "live-sim",
+    }
 
     bundle_dir = Path(payload["bundle_dir"])
     run_manifest = _load_json(bundle_dir / "run-manifest.json")
@@ -656,6 +704,14 @@ def test_sim_run_live_dry_run_has_no_side_effect(tmp_path: Path, capsys) -> None
     assert code == 0
     assert payload["mode"] == "dry-run"
     assert payload["run_type"] == "live-sim"
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "sim run-live",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "mode",
+        "status": "dry-run",
+    }
     assert not Path(payload["output_dir"]).exists()
 
 
@@ -920,3 +976,39 @@ def test_sim_compare_allow_missing_fingerprint_flag(tmp_path: Path, capsys) -> N
     relaxed_payload = json.loads(capsys.readouterr().out)
     assert relaxed_code == 0
     assert relaxed_payload["status"] == "pass"
+
+
+def test_replay_run_json_error_path_stays_machine_readable(tmp_path: Path, capsys) -> None:
+    missing_baseline = tmp_path / "missing-baseline"
+    output_root = tmp_path / "runs"
+
+    code = main(
+        [
+            "replay",
+            "run",
+            "--deck",
+            "examples/decks/tw_cash_intraday.toml",
+            "--date",
+            "2026-03-13",
+            "--scenario-id",
+            "tw-gap-reclaim.twse.2026-03-13.full-session",
+            "--baseline-dir",
+            str(missing_baseline),
+            "--output-root",
+            str(output_root),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert payload["ok"] is False
+    assert "candidate replay baseline source not found" in payload["error"]
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "replay run",
+        "exit_code": 2,
+        "exit_class": "general-failure",
+        "status_key": "status",
+        "status": "error",
+    }
