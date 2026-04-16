@@ -12,3 +12,4 @@ node_modules/
 # runtime artifacts (keep repo status clean)
 runs/
 comparisons/
+.state/
