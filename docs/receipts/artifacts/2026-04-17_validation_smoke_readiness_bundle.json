@@ -1,0 +1,46 @@
+{
+  "boundary": "prepared-only / non-cash validation closure; no broker-connected execution claim",
+  "claim": "all non-real-money validation gates are closed; only explicit real-money smoke remains, and that gate is the production-facing step that subsumes broker-connected lifecycle and fill semantics",
+  "dispatch_lane": {
+    "receipt": "docs/receipts/2026-04-17_non_cash_dispatch_path_traversal.md",
+    "status": "pass"
+  },
+  "manifest_lane": {
+    "cards": [
+      "examples/cards/smoke_entry_once.toml",
+      "examples/cards/smoke_exit_once.toml",
+      "examples/cards/smoke_no_trade_guard.toml"
+    ],
+    "deck": "examples/decks/tw_cash_validation_smoke.toml",
+    "pytest_receipt": "docs/receipts/artifacts/2026-04-17_validation_smoke_pytest.txt"
+  },
+  "operator_lane": {
+    "live_smoke_artifact": "docs/receipts/artifacts/2026-04-17_validation_smoke_operator_lane.json",
+    "preflight_artifact": "docs/receipts/artifacts/2026-04-17_validation_smoke_operator_preflight.json",
+    "preflight_status": "ready",
+    "receipt_paths": [
+      ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-d2b3b419992.json",
+      ".state/validation_smoke/operator_receipts/20260417T032655Z_arm-live_op-00c8e6ba524.json",
+      ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-5a607359946.json",
+      ".state/validation_smoke/operator_receipts/20260417T032655Z_flatten_op-0af60f7644b.json"
+    ],
+    "smoke_status": "pass"
+  },
+  "remaining_gate": {
+    "count": 1,
+    "gate": "explicit real-money smoke",
+    "status": "unexecuted"
+  },
+  "runtime_lane": {
+    "artifact": "docs/receipts/artifacts/2026-04-17_validation_smoke_runtime_path.json",
+    "ok": true,
+    "scenario_ids": [
+      "entry-once",
+      "exit-blocked-without-position-open",
+      "exit-once-after-position-open",
+      "no-trade-guard"
+    ]
+  },
+  "status": "pass",
+  "topology": "unchanged"
+}

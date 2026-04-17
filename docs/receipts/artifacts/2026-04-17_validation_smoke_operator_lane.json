@@ -1,0 +1,482 @@
+{
+  "activation": "prepared-only",
+  "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+  "boundary": "seed smoke/control surface only; no broker submission executed",
+  "cli_contract": {
+    "command": "operator live-smoke-readiness",
+    "exit_class": "success",
+    "exit_code": 0,
+    "status": "pass",
+    "status_key": "smoke_status",
+    "version": "cli-command/v1"
+  },
+  "deck": "examples/decks/tw_cash_validation_smoke.toml",
+  "flatten_mode": "forced-exit",
+  "ok": true,
+  "preflight": {
+    "activation": "prepared-only",
+    "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+    "blockers": [],
+    "boundary": "seed preflight gate only; no broker/session attach is performed here",
+    "deck": "examples/decks/tw_cash_validation_smoke.toml",
+    "logical_session": {
+      "account_no": "sample-account",
+      "auth_mode": "account_password_cert",
+      "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+      "boundary": {
+        "activation": "prepared-only",
+        "broker_connected": true,
+        "notes": "logical session inspection only; does not establish a live broker/runtime session",
+        "probe_freshness": {
+          "detail": "probe-json supplied via /root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json without an observation timestamp",
+          "observed_at": null,
+          "status": "fresh"
+        },
+        "probe_receipt": {
+          "kind": "probe-json",
+          "label": "session_health.connected.json",
+          "path": "/root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json",
+          "updated_at": null
+        },
+        "probe_source": "example-probe"
+      },
+      "capabilities": {
+        "account_query_enabled": true,
+        "marketdata_enabled": true,
+        "trade_enabled": true
+      },
+      "expires_at": null,
+      "health_status": {
+        "broker_connection": "connected",
+        "marketdata_connection": "connected",
+        "runtime": "seed-ok",
+        "session": "healthy"
+      },
+      "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+      "session_id": "seed-logical-session",
+      "session_started_at": "2026-04-17T03:26:55Z",
+      "session_status": {
+        "connected_surfaces": [
+          "marketdata",
+          "broker",
+          "account"
+        ],
+        "connections": {
+          "account": {
+            "detail": "example account probe snapshot",
+            "last_error": null,
+            "last_heartbeat_at": null,
+            "state": "connected"
+          },
+          "broker": {
+            "detail": "example broker probe snapshot",
+            "last_error": null,
+            "last_heartbeat_at": null,
+            "state": "connected"
+          },
+          "marketdata": {
+            "detail": "example marketdata probe snapshot",
+            "last_error": null,
+            "last_heartbeat_at": null,
+            "state": "connected"
+          }
+        },
+        "degraded_surfaces": [],
+        "renewal_state": "fresh",
+        "session_state": "healthy"
+      },
+      "trading_day_gate": {
+        "live_allowed": true,
+        "reason": "trading-day-open",
+        "source": "seed-operator-input",
+        "status": "open"
+      }
+    },
+    "next_command_map": {
+      "bounded_live_smoke": "steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_validation_smoke.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+      "inspect_session": "steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json",
+      "operator_status": "steamer-card-engine operator status --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+      "probe_session": "steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json"
+    },
+    "ok": true,
+    "operator_status": {
+      "armed_live": false,
+      "armed_scope": null,
+      "capabilities": {
+        "account_query_enabled": true,
+        "marketdata_enabled": true,
+        "trade_enabled": true
+      },
+      "health_status": {
+        "runtime": "seed-ok",
+        "session": "ok"
+      },
+      "mode": "live",
+      "order_submission_gate": {
+        "allowed": false,
+        "reason": "disarmed-posture"
+      },
+      "policy": {
+        "arm_ttl_seconds": {
+          "max": 28800,
+          "min": 30
+        }
+      },
+      "recent_actions": [],
+      "session": {
+        "account_no": "sample-account",
+        "auth_mode": "account_password_cert",
+        "session_id": "seed-session"
+      }
+    },
+    "preflight_status": "ready",
+    "probe_freshness": {
+      "detail": "probe-json supplied via /root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json without an observation timestamp",
+      "observed_at": null,
+      "status": "fresh"
+    },
+    "probe_receipt": {
+      "kind": "probe-json",
+      "label": "session_health.connected.json",
+      "path": "/root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json",
+      "updated_at": null
+    },
+    "replacement_contract": {
+      "expected_connected_surfaces": [
+        "marketdata",
+        "broker"
+      ],
+      "session_status_source": "replace seed placeholders with adapter/session-manager health snapshots"
+    }
+  },
+  "probe_freshness": {
+    "detail": "probe-json supplied via /root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json without an observation timestamp",
+    "observed_at": null,
+    "status": "fresh"
+  },
+  "probe_receipt": {
+    "kind": "probe-json",
+    "label": "session_health.connected.json",
+    "path": "/root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json",
+    "updated_at": null
+  },
+  "receipt_paths": [
+    ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-d2b3b419992.json",
+    ".state/validation_smoke/operator_receipts/20260417T032655Z_arm-live_op-00c8e6ba524.json",
+    ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-5a607359946.json",
+    ".state/validation_smoke/operator_receipts/20260417T032655Z_flatten_op-0af60f7644b.json"
+  ],
+  "request": {
+    "quantity": 1,
+    "side": "buy",
+    "symbol": "2330"
+  },
+  "smoke_status": "pass",
+  "steps": [
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "activation": "prepared-only",
+        "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+        "blockers": [],
+        "boundary": "seed preflight gate only; no broker/session attach is performed here",
+        "deck": "examples/decks/tw_cash_validation_smoke.toml",
+        "logical_session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+          "boundary": {
+            "activation": "prepared-only",
+            "broker_connected": true,
+            "notes": "logical session inspection only; does not establish a live broker/runtime session",
+            "probe_freshness": {
+              "detail": "probe-json supplied via /root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json without an observation timestamp",
+              "observed_at": null,
+              "status": "fresh"
+            },
+            "probe_receipt": {
+              "kind": "probe-json",
+              "label": "session_health.connected.json",
+              "path": "/root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json",
+              "updated_at": null
+            },
+            "probe_source": "example-probe"
+          },
+          "capabilities": {
+            "account_query_enabled": true,
+            "marketdata_enabled": true,
+            "trade_enabled": true
+          },
+          "expires_at": null,
+          "health_status": {
+            "broker_connection": "connected",
+            "marketdata_connection": "connected",
+            "runtime": "seed-ok",
+            "session": "healthy"
+          },
+          "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+          "session_id": "seed-logical-session",
+          "session_started_at": "2026-04-17T03:26:55Z",
+          "session_status": {
+            "connected_surfaces": [
+              "marketdata",
+              "broker",
+              "account"
+            ],
+            "connections": {
+              "account": {
+                "detail": "example account probe snapshot",
+                "last_error": null,
+                "last_heartbeat_at": null,
+                "state": "connected"
+              },
+              "broker": {
+                "detail": "example broker probe snapshot",
+                "last_error": null,
+                "last_heartbeat_at": null,
+                "state": "connected"
+              },
+              "marketdata": {
+                "detail": "example marketdata probe snapshot",
+                "last_error": null,
+                "last_heartbeat_at": null,
+                "state": "connected"
+              }
+            },
+            "degraded_surfaces": [],
+            "renewal_state": "fresh",
+            "session_state": "healthy"
+          },
+          "trading_day_gate": {
+            "live_allowed": true,
+            "reason": "trading-day-open",
+            "source": "seed-operator-input",
+            "status": "open"
+          }
+        },
+        "next_command_map": {
+          "bounded_live_smoke": "steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_validation_smoke.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+          "inspect_session": "steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json",
+          "operator_status": "steamer-card-engine operator status --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+          "probe_session": "steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json"
+        },
+        "ok": true,
+        "operator_status": {
+          "armed_live": false,
+          "armed_scope": null,
+          "capabilities": {
+            "account_query_enabled": true,
+            "marketdata_enabled": true,
+            "trade_enabled": true
+          },
+          "health_status": {
+            "runtime": "seed-ok",
+            "session": "ok"
+          },
+          "mode": "live",
+          "order_submission_gate": {
+            "allowed": false,
+            "reason": "disarmed-posture"
+          },
+          "policy": {
+            "arm_ttl_seconds": {
+              "max": 28800,
+              "min": 30
+            }
+          },
+          "recent_actions": [],
+          "session": {
+            "account_no": "sample-account",
+            "auth_mode": "account_password_cert",
+            "session_id": "seed-session"
+          }
+        },
+        "preflight_status": "ready",
+        "probe_freshness": {
+          "detail": "probe-json supplied via /root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json without an observation timestamp",
+          "observed_at": null,
+          "status": "fresh"
+        },
+        "probe_receipt": {
+          "kind": "probe-json",
+          "label": "session_health.connected.json",
+          "path": "/root/.openclaw/workspace/steamer-card-engine/examples/probes/session_health.connected.json",
+          "updated_at": null
+        },
+        "replacement_contract": {
+          "expected_connected_surfaces": [
+            "marketdata",
+            "broker"
+          ],
+          "session_status_source": "replace seed placeholders with adapter/session-manager health snapshots"
+        }
+      },
+      "step": "preflight-smoke-gate"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "armed_scope": null,
+        "capabilities": {
+          "account_query_enabled": true,
+          "marketdata_enabled": true,
+          "trade_enabled": true
+        },
+        "health_status": {
+          "runtime": "seed-ok",
+          "session": "ok"
+        },
+        "mode": "live",
+        "order_submission_gate": {
+          "allowed": false,
+          "reason": "disarmed-posture"
+        },
+        "policy": {
+          "arm_ttl_seconds": {
+            "max": 28800,
+            "min": 30
+          }
+        },
+        "recent_actions": [],
+        "session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "session_id": "seed-session"
+        }
+      },
+      "step": "status-disarmed-baseline"
+    },
+    {
+      "exit_code": 4,
+      "expected_exit_code": 4,
+      "ok": true,
+      "payload": {
+        "error": "order submission refused: runtime is disarmed",
+        "gate_reason": "disarmed-posture",
+        "ok": false,
+        "receipt_path": ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-d2b3b419992.json",
+        "request": {
+          "quantity": 1,
+          "side": "buy",
+          "symbol": "2330"
+        }
+      },
+      "step": "submit-refused-while-disarmed"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": true,
+        "armed_scope": {
+          "account_no": "sample-account",
+          "armed_at": "2026-04-17T03:26:55Z",
+          "deck_id": "tw-cash-validation-smoke",
+          "deck_ref": "/root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_validation_smoke.toml",
+          "expires_at": "2026-04-17T03:31:55Z",
+          "operator_note": null,
+          "ttl_seconds": 300
+        },
+        "ok": true,
+        "receipt_path": ".state/validation_smoke/operator_receipts/20260417T032655Z_arm-live_op-00c8e6ba524.json"
+      },
+      "step": "arm-live-bounded-scope"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "dispatch": "stub-only; no broker submission executed",
+        "ok": true,
+        "receipt_path": ".state/validation_smoke/operator_receipts/20260417T032655Z_submit-order-smoke_op-5a607359946.json",
+        "request": {
+          "quantity": 1,
+          "side": "buy",
+          "symbol": "2330"
+        }
+      },
+      "step": "submit-accepted-while-armed"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "flatten_mode": "forced-exit",
+        "implicit_disarm": true,
+        "ok": true,
+        "receipt_path": ".state/validation_smoke/operator_receipts/20260417T032655Z_flatten_op-0af60f7644b.json"
+      },
+      "step": "flatten-and-close-armed-window"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "armed_scope": null,
+        "capabilities": {
+          "account_query_enabled": true,
+          "marketdata_enabled": true,
+          "trade_enabled": true
+        },
+        "health_status": {
+          "runtime": "seed-ok",
+          "session": "ok"
+        },
+        "mode": "live",
+        "order_submission_gate": {
+          "allowed": false,
+          "reason": "disarmed-posture"
+        },
+        "policy": {
+          "arm_ttl_seconds": {
+            "max": 28800,
+            "min": 30
+          }
+        },
+        "recent_actions": [
+          {
+            "acted_at": "2026-04-17T03:26:55Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-d2b3b41999254b1583062e62d95ac431",
+            "status": "refused-disarmed"
+          },
+          {
+            "acted_at": "2026-04-17T03:26:55Z",
+            "action": "arm-live",
+            "receipt_id": "op-00c8e6ba524a4f30a6203d09bb730fec",
+            "status": "armed"
+          },
+          {
+            "acted_at": "2026-04-17T03:26:55Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-5a60735994674911ab636f194e0012ec",
+            "status": "accepted-for-smoke-dispatch"
+          },
+          {
+            "acted_at": "2026-04-17T03:26:55Z",
+            "action": "flatten",
+            "receipt_id": "op-0af60f7644bf4c7ebeb5ae92073ced3b",
+            "status": "flatten-issued"
+          }
+        ],
+        "session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "session_id": "seed-session"
+        }
+      },
+      "step": "status-disarmed-after-flatten"
+    }
+  ]
+}

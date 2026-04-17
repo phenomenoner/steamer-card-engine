@@ -1,0 +1,122 @@
+{
+  "boundary": "replay/live-sim style deterministic runtime proof only; no broker submission",
+  "resolved_runtime_cards": [
+    {
+      "card_id": "smoke-entry-once-v1",
+      "entry_module": "steamer_card_engine.cards.validation_smoke:entry_once",
+      "runtime_card_id": "smoke-entry-once-v1",
+      "version": "0.1.0"
+    },
+    {
+      "card_id": "smoke-exit-once-v1",
+      "entry_module": "steamer_card_engine.cards.validation_smoke:exit_once",
+      "runtime_card_id": "smoke-exit-once-v1",
+      "version": "0.1.0"
+    },
+    {
+      "card_id": "smoke-no-trade-guard-v1",
+      "entry_module": "steamer_card_engine.cards.validation_smoke:no_trade_guard",
+      "runtime_card_id": "smoke-no-trade-guard-v1",
+      "version": "0.1.0"
+    }
+  ],
+  "result": {
+    "ok": true,
+    "scenarios": [
+      {
+        "card_ids": [
+          "smoke-entry-once-v1"
+        ],
+        "expected": {
+          "card_ids": [
+            "smoke-entry-once-v1"
+          ],
+          "intent_count": 1,
+          "intent_ids": [
+            "smoke-entry-once-v1:enter:2330"
+          ]
+        },
+        "intent_count": 1,
+        "intent_ids": [
+          "smoke-entry-once-v1:enter:2330"
+        ],
+        "ok": true,
+        "scenario_id": "entry-once",
+        "symbol": "2330",
+        "tags": [
+          "entry_once"
+        ]
+      },
+      {
+        "card_ids": [],
+        "expected": {
+          "card_ids": [],
+          "intent_count": 0,
+          "intent_ids": []
+        },
+        "intent_count": 0,
+        "intent_ids": [],
+        "ok": true,
+        "scenario_id": "exit-blocked-without-position-open",
+        "symbol": "2330",
+        "tags": [
+          "exit_once"
+        ]
+      },
+      {
+        "card_ids": [
+          "smoke-exit-once-v1"
+        ],
+        "expected": {
+          "card_ids": [
+            "smoke-exit-once-v1"
+          ],
+          "intent_count": 1,
+          "intent_ids": [
+            "smoke-exit-once-v1:exit:2330"
+          ]
+        },
+        "intent_count": 1,
+        "intent_ids": [
+          "smoke-exit-once-v1:exit:2330"
+        ],
+        "ok": true,
+        "scenario_id": "exit-once-after-position-open",
+        "symbol": "2330",
+        "tags": [
+          "exit_once",
+          "position_open"
+        ]
+      },
+      {
+        "card_ids": [],
+        "expected": {
+          "card_ids": [],
+          "intent_count": 0,
+          "intent_ids": []
+        },
+        "intent_count": 0,
+        "intent_ids": [],
+        "ok": true,
+        "scenario_id": "no-trade-guard",
+        "symbol": "2317",
+        "tags": [
+          "no_trade"
+        ]
+      }
+    ]
+  },
+  "runtime_bridge": {
+    "card_ids": [
+      "smoke-entry-once-v1",
+      "smoke-exit-once-v1",
+      "smoke-no-trade-guard-v1"
+    ],
+    "cards_dir": "/root/.openclaw/workspace/steamer-card-engine/examples/cards",
+    "deck_id": "tw-cash-validation-smoke",
+    "deck_path": "/root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_validation_smoke.toml",
+    "live_mode": false,
+    "missing_cards": []
+  },
+  "status": "pass"
+}

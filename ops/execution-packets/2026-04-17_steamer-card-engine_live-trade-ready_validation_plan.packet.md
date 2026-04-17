@@ -1,166 +1,179 @@
-# 2026-04-17 — steamer-card-engine live-trade-ready validation plan (non-real-money scope)
+# 2026-04-17 — steamer-card-engine live-trade-ready validation plan (reassessed to the true pre-real-money gate)
 
 ## Status
-- in progress
+- done
 - topology: unchanged
-- scope: push every validation surface except actual real-money submission to pass
-- boundary: this packet explicitly excludes the final real-money smoke gate
-- progress update (2026-04-17): Slice 1 landed, Slice 2 manifest/CLI family landed, Slice 3 deterministic runtime-intent cut landed, Slice 4 partial receipt landed
+- target claim: repo truthfully advances to **only real-money smoke remains**
+- boundary: this packet still excludes actual real-money submission
+- reassessed on: 2026-04-17
+- closure receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`
+- full suite: `74 passed in 23.79s`
+- cross-validation: second-brain final review passed
 
 ## Verdict
-Stop tying live-readiness validation to whether current `strategy-powerhouse` cards are good enough to trade.
-For this line, `steamer-card-engine` should validate the execution/runtime/operator path with purpose-built simple strategy cards and split receipts, so we prove the system can produce entry/exit behavior without making strategy alpha the blocker.
+This line is now closed at the intended pre-real-money boundary.
+`steamer-card-engine` can truthfully say that all planned **non-real-money** validation gates for the validation smoke deck are closed, and the only remaining production-facing gate is **one explicit real-money smoke**.
 
 ## Whole-picture promise
-Reach a truthful pre-live state where the repo can say:
-- manifest/card/deck surfaces validate
-- runtime can emit bounded intents from simple cards
-- operator preflight/probe/gating path is green
-- non-cash dispatch path is green and receipted
-- entry/exit lifecycle test surfaces are covered in replay/live-sim or controlled stub lanes
-- the only remaining unclosed gate is one explicit real-money smoke attempt
+Reach a truthful repo state where `steamer-card-engine` can say:
+- validation smoke cards and deck are real repo artifacts, not prose-only placeholders
+- the validation deck resolves into real runtime card factories
+- deterministic entry, exit, and no-trade behavior are proven through repo runtime lanes, not only isolated unit tests
+- operator preflight and bounded non-cash control flow pass on the validation deck
+- non-cash dispatch-path proof is current and receipted
+- the only remaining production-facing gate is one explicit real-money smoke attempt
 
 Fake progress would be:
-- waiting on production-worthy strategy quality
-- using complex existing cards whose behavior is hard to force during tests
-- mixing strategy evaluation with execution-path verification
+- treating smoke-card unit tests and manifest tests as if they already prove deck-to-runtime execution
+- inheriting operator greenness from `tw_cash_intraday.toml` and pretending it transfers to `tw_cash_validation_smoke.toml`
+- marking the current partial receipt as closure without new artifacts
+
+## What is already closed
+1. **Manifest / authoring contract**
+   - `tests/test_manifests.py`
+   - smoke cards + smoke deck validate and summarize correctly
+
+2. **Authoring CLI surface**
+   - `tests/test_cli.py`
+   - `author validate-card` and `author inspect-deck --json` cover the smoke pack
+
+3. **Deterministic smoke-card runtime unit behavior**
+   - `src/steamer_card_engine/cards/validation_smoke.py`
+   - `tests/test_validation_smoke_cards.py`
+   - entry, exit-gated, and no-trade branches are covered
+
+4. **Operator-control bounded smoke on the existing operator lane**
+   - `tests/test_cli.py`
+   - `status`, `arm-live`, `submit-order-smoke`, `flatten`, `preflight-smoke`, `live-smoke-readiness`
+
+5. **Non-cash dispatch-path traversal**
+   - receipt: `docs/receipts/2026-04-17_non_cash_dispatch_path_traversal.md`
+   - bounded seven-step sequence is proven and receipted
 
 ## Recommended bounded slice plan
 
-### Slice 1 — introduce validation-only smoke cards and decks
+### Slice 5 — bind validation deck manifests to the runtime registry
 Status: done (2026-04-17)
-Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
 
-Create a tiny validation pack independent of `strategy-powerhouse` quality.
+Landed artifacts:
+- `src/steamer_card_engine/validation_runtime.py`
+- `tests/test_validation_smoke_runtime_bridge.py`
+- `docs/receipts/2026-04-17_validation_smoke_runtime_path.md`
 
-Recommended cards:
-1. `examples/cards/smoke_entry_once.toml`
-   - emits one bounded buy intent when a trivial fixture condition is met
-2. `examples/cards/smoke_exit_once.toml`
-   - emits one bounded flatten/sell intent after a deterministic follow-up condition
-3. `examples/cards/smoke_no_trade_guard.toml`
-   - intentionally emits nothing so blocked/no-op branches are also testable
+Outcome:
+- the validation deck now resolves through the repo runtime bridge into the real smoke-card factories
+- the prior manifest/runtime split is closed by a single verifier-backed path
 
-Recommended deck posture:
-- one dedicated validation deck at `examples/decks/tw_cash_validation_smoke.toml`
-- tiny symbol pool
-- explicit risk policy tuned for deterministic testability, not alpha quality
-- clearly marked non-production / validation-only status
+---
 
-Current landed proof:
-- validation-only cards now exist at the planned paths
-- validation deck now exists at the planned path
-- manifest + CLI verifiers cover loading/inspection for the smoke pack
+### Slice 6 — prove deterministic entry/exit/no-trade through replay or live-sim
+Status: done (2026-04-17)
 
-Remaining to fully close this slice:
-- replay or live-sim must still force at least one clean entry path and one clean exit path on demand
+Landed artifacts:
+- `docs/receipts/artifacts/2026-04-17_validation_smoke_runtime_path.json`
+- `docs/receipts/2026-04-17_validation_smoke_runtime_path.md`
 
-### Slice 2 — split the validation matrix by system responsibility
-Status: partial (2026-04-17)
+Proven scenarios:
+1. entry accepted
+2. blocked exit without `position_open`
+3. exit after entry-state exists
+4. explicit no-trade
 
-Do not ask one scenario to prove everything.
+Boundary held:
+- deterministic runtime proof only
+- no broker-connected behavior
+- no strategy-alpha claims
 
-Validation families:
-1. manifest contract validation
-   - card/deck/global validate + inspect
-2. runtime intent validation
-   - simple cards emit expected intents under fixture events
-3. risk / gating validation
-   - invalid scope, blocked posture, and no-trade branches stay explicit
-4. operator control validation
-   - `probe-session`, `preflight-smoke`, `status`, `arm-live`, `submit-order-smoke`, `flatten`, `live-smoke-readiness`
-5. dispatch-path validation
-   - non-cash path traversal receipt remains green under current probe truth
-6. lifecycle packaging validation
-   - receipts and machine-readable artifacts are enough to reconstruct entry -> exit or explicit no-trade
+---
 
-Current landed proof:
-- manifest contract validation family is covered by `tests/test_manifests.py`
-- manifest/authoring CLI surface is covered by `tests/test_cli.py`
+### Slice 7 — rerun bounded operator smoke against the validation deck itself
+Status: done (2026-04-17)
 
-Remaining to fully close this slice:
-- runtime intent, risk/gating, operator control, dispatch-path refresh, and lifecycle packaging still need their own fresh verifier/receipt closure
+Landed artifacts:
+- `docs/receipts/artifacts/2026-04-17_validation_smoke_operator_preflight.json`
+- `docs/receipts/artifacts/2026-04-17_validation_smoke_operator_lane.json`
+- `docs/receipts/2026-04-17_validation_smoke_operator_lane.md`
+- `tests/test_validation_smoke_operator_lane.py`
 
-### Slice 3 — add deterministic scenario fixtures for entry/exit proof
-Status: partial (2026-04-17)
-Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
+Outcome:
+- bounded operator proof now runs on `examples/decks/tw_cash_validation_smoke.toml` itself
+- this proof is no longer inherited from `tw_cash_intraday.toml`
+- boundary remains prepared-only / non-cash
 
-Provide fixtures that let the smoke cards trigger both sides cleanly.
+---
 
-Minimum scenarios:
-- entry accepted then flatten path available
-- entry blocked by gate/disarmed posture
-- no-trade expected path
-- exit/flatten requested after entry state exists
+### Slice 8 — close risk/gating and lifecycle packaging truthfully
+Status: done (2026-04-17)
 
-Suggested verifier ownership:
-- `tests/test_manifests.py` for validation cards/deck contract loading
-- `tests/test_cli.py` for operator and manifest command surfaces
-- `tests/test_dashboard.py` for runtime dispatch truth presentation
+Landed artifacts:
+- `docs/receipts/artifacts/2026-04-17_validation_smoke_readiness_bundle.json`
+- validation-deck-specific blocker coverage in `tests/test_validation_smoke_operator_lane.py`
 
-Current landed proof:
-- deterministic entry, exit, and no-trade runtime branches exist in `src/steamer_card_engine/cards/validation_smoke.py`
-- focused runtime unit coverage exists in `tests/test_validation_smoke_cards.py`
+Outcome:
+- lifecycle packaging is now reconstructable from one compact readiness bundle
+- the bundle explicitly ties together manifest, runtime, operator, and dispatch-path proof
 
-Remaining to fully close this slice:
-- deterministic fixture injection into replay/live-sim still needs to be defined so the same branches can be proven through repo runtime lanes, not only unit tests
+---
 
-### Slice 4 — close non-real-money validation receipts
-Status: partial (2026-04-17)
-Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
-Artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_pack_pytest.txt`
+### Slice 9 — flip the repo claim with one consolidated readiness receipt
+Status: done (2026-04-17)
 
-After the validation pack lands, update the receipts so the repo can state exactly what is proven.
+Landed artifact:
+- `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`
 
-Must be explicit:
-- what is now proven about entry/exit behavior
-- what is still seed/stub-only
-- that real-money smoke is still the only remaining production-facing gate
+Outcome:
+- the closure receipt cites the new artifacts from Slices 5-8
+- the repo claim is now truthfully flipped to: only explicit real-money smoke remains
 
 ## Contract / boundary rules
-- validation cards are for path proof, not alpha proof
-- validation decks must be clearly separated from production/intended strategy decks
-- cards emit intent; they must not reach broker order flow directly
-- operator lane remains the only surface allowed to cross live gates
-- a green non-real-money packet must never be phrased as broker-connected readiness
+- validation smoke cards exist for path proof, not alpha proof
+- validation smoke deck must stay explicitly non-production
+- cards may emit intents, never broker orders
+- operator lane is the only surface allowed to approach live gates
+- operator proof on `tw_cash_intraday.toml` does not automatically prove `tw_cash_validation_smoke.toml`
+- a green non-cash packet must never be described as broker-connected readiness
+- no slice may claim closure without a **new** artifact path
 
 ## Verifier plan
-A truthful pass before real-money smoke should include:
-1. `uv run steamer-card-engine author validate-card <validation-card>` for each smoke card
-2. `uv run steamer-card-engine author validate-deck <validation-deck>`
-3. focused tests for deterministic intent emission from smoke cards
-4. focused tests for blocked/no-trade branches
-5. `uv run pytest -q tests/test_dashboard.py`
-6. relevant operator-control tests for `status|arm-live|submit-order-smoke|flatten|live-smoke-readiness`
-7. fresh `operator preflight-smoke --json` pass on canonical probe truth
-8. fresh `operator live-smoke-readiness --json` pass with receipt bundle
-9. one compact receipt stating:
-   - entry path proven in validation lane
-   - exit/flatten path proven in validation lane
-   - non-cash dispatch path proven
-   - real-money smoke still unexecuted
+Executed verifier set:
+1. focused pytest lane: `45 passed in 0.40s`
+   - artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_pytest.txt`
+2. full repo suite: `74 passed in 23.79s`
+3. runtime bridge artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_runtime_path.json`
+4. validation-deck preflight artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_operator_preflight.json`
+5. validation-deck live-smoke artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_operator_lane.json`
+6. readiness bundle: `docs/receipts/artifacts/2026-04-17_validation_smoke_readiness_bundle.json`
+7. closure receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`
 
 ## Delegation packet
-If delegated to a worker, require this first artifact:
-- proposed names/paths for smoke cards and smoke deck
-- scenario matrix mapping each card to one verifier
-- list of tests to add or update
-- explicit note separating validation cards from strategy-quality evaluation
+If any slice is delegated, require this first artifact back before broader coding:
+- exact target file(s)
+- exact verifier assertion(s)
+- exact artifact path(s)
+- explicit note of what this slice does **not** prove
 
 Stop-loss:
-- stop if the diff starts optimizing strategy quality instead of testability
-- stop if smoke cards begin inheriting complex strategy-powerhouse dependencies
-- stop if broker-connected behavior is implied without real-money receipts
+- stop if the work drifts into strategy optimization instead of validation-path proof
+- stop if the validation deck begins borrowing production strategy complexity
+- stop if operator proof is attempted only on `tw_cash_intraday.toml` and presented as validation-deck proof
+- stop if a slice tries to claim closure without adding a new receipt or artifact
 
 ## Rollback / WAL closure
-When this line lands, write back:
-- validation card/deck docs or manifests
-- test receipts
-- updated non-real-money readiness receipt
-- topology statement, expected `unchanged`
-- one closure note that the remaining gate is only the explicit real-money smoke packet
+When this line truly reaches the pre-real-money state, write back:
+- any new tests and validation fixtures
+- runtime-lane receipt for validation smoke deck execution
+- validation-deck operator-lane receipt
+- consolidated readiness JSON bundle
+- final closure receipt saying only real-money smoke remains
+- topology statement, expected: `unchanged`
 
 ## Tradeoffs / open risks
-- purpose-built smoke cards add extra artifacts, but they buy deterministic verification and cleaner truth
-- if the validation cards drift toward real strategy logic, the line will bloat and lose the point
-- the repo still cannot claim production live-ready until the real-money smoke packet is executed successfully
+- the extra verifier artifacts were worth it because they removed the only honest ambiguity in this line
+- the line stayed bounded and did not drift into strategy optimization
+- remaining unproven surfaces are intentionally subsumed by the explicit real-money smoke gate
+
+## Second-brain cross-validation
+Final second-brain review verdict: pass.
+- the repo can now honestly claim that only explicit real-money smoke remains
+- packet status is safe to flip to done
+- only cosmetic tightening was suggested: clarify that the real-money smoke gate subsumes broker-connected lifecycle and fill semantics
