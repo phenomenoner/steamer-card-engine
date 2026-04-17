@@ -23,6 +23,14 @@ def test_cli_validate_card_success(capsys) -> None:
     assert "OK: card manifest is valid" in captured.out
 
 
+def test_cli_validate_validation_smoke_card_success(capsys) -> None:
+    code = main(["author", "validate-card", "examples/cards/smoke_entry_once.toml"])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "OK: card manifest is valid" in captured.out
+
+
 def test_cli_inspect_deck_json(capsys) -> None:
     code = main(
         [
@@ -42,6 +50,33 @@ def test_cli_inspect_deck_json(capsys) -> None:
     assert payload["deck_id"] == "tw-cash-main"
     assert "gap-reclaim-v1" in payload["enabled_cards"]
     assert "2330" in payload["merged_symbol_scope"]
+
+
+def test_cli_inspect_validation_smoke_deck_json(capsys) -> None:
+    code = main(
+        [
+            "author",
+            "inspect-deck",
+            "examples/decks/tw_cash_validation_smoke.toml",
+            "--cards-dir",
+            "examples/cards",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert code == 0
+    assert payload["deck_id"] == "tw-cash-validation-smoke"
+    assert payload["enabled_cards"] == [
+        "smoke-entry-once-v1",
+        "smoke-exit-once-v1",
+        "smoke-no-trade-guard-v1",
+    ]
+    assert "fixture.signal.entry_once" in payload["merged_feature_requirements"]
+    assert "fixture.signal.exit_once" in payload["merged_feature_requirements"]
+    assert "fixture.signal.no_trade" in payload["merged_feature_requirements"]
 
 
 def test_cli_validate_auth_failure(capsys) -> None:

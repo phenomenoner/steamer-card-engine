@@ -1,0 +1,17 @@
+deck_id = "tw-cash-validation-smoke"
+market = "TW_CASH"
+session = "intraday"
+
+auth_profile = "profiles/tw_cash_agent_assist.toml"
+
+cards = [
+  "smoke-entry-once-v1",
+  "smoke-exit-once-v1",
+  "smoke-no-trade-guard-v1",
+]
+
+symbol_scope = ["2330", "2317"]
+
+[policy]
+live_mode = false
+allow_card_symbol_pool = true

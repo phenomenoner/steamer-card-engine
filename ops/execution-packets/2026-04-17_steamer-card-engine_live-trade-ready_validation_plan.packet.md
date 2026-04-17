@@ -1,10 +1,11 @@
 # 2026-04-17 — steamer-card-engine live-trade-ready validation plan (non-real-money scope)
 
 ## Status
-- planned
+- in progress
 - topology: unchanged
 - scope: push every validation surface except actual real-money submission to pass
 - boundary: this packet explicitly excludes the final real-money smoke gate
+- progress update (2026-04-17): Slice 1 landed, Slice 2 manifest/CLI family landed, Slice 3 deterministic runtime-intent cut landed, Slice 4 partial receipt landed
 
 ## Verdict
 Stop tying live-readiness validation to whether current `strategy-powerhouse` cards are good enough to trade.
@@ -27,6 +28,9 @@ Fake progress would be:
 ## Recommended bounded slice plan
 
 ### Slice 1 — introduce validation-only smoke cards and decks
+Status: done (2026-04-17)
+Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
+
 Create a tiny validation pack independent of `strategy-powerhouse` quality.
 
 Recommended cards:
@@ -43,10 +47,17 @@ Recommended deck posture:
 - explicit risk policy tuned for deterministic testability, not alpha quality
 - clearly marked non-production / validation-only status
 
-Success condition:
-- replay or live-sim can force at least one clean entry path and one clean exit path on demand
+Current landed proof:
+- validation-only cards now exist at the planned paths
+- validation deck now exists at the planned path
+- manifest + CLI verifiers cover loading/inspection for the smoke pack
+
+Remaining to fully close this slice:
+- replay or live-sim must still force at least one clean entry path and one clean exit path on demand
 
 ### Slice 2 — split the validation matrix by system responsibility
+Status: partial (2026-04-17)
+
 Do not ask one scenario to prove everything.
 
 Validation families:
@@ -63,10 +74,17 @@ Validation families:
 6. lifecycle packaging validation
    - receipts and machine-readable artifacts are enough to reconstruct entry -> exit or explicit no-trade
 
-Success condition:
-- each family has its own verifier and receipt path
+Current landed proof:
+- manifest contract validation family is covered by `tests/test_manifests.py`
+- manifest/authoring CLI surface is covered by `tests/test_cli.py`
+
+Remaining to fully close this slice:
+- runtime intent, risk/gating, operator control, dispatch-path refresh, and lifecycle packaging still need their own fresh verifier/receipt closure
 
 ### Slice 3 — add deterministic scenario fixtures for entry/exit proof
+Status: partial (2026-04-17)
+Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
+
 Provide fixtures that let the smoke cards trigger both sides cleanly.
 
 Minimum scenarios:
@@ -80,10 +98,18 @@ Suggested verifier ownership:
 - `tests/test_cli.py` for operator and manifest command surfaces
 - `tests/test_dashboard.py` for runtime dispatch truth presentation
 
-Success condition:
-- the repo no longer depends on live market randomness or a good alpha card just to prove path traversal
+Current landed proof:
+- deterministic entry, exit, and no-trade runtime branches exist in `src/steamer_card_engine/cards/validation_smoke.py`
+- focused runtime unit coverage exists in `tests/test_validation_smoke_cards.py`
+
+Remaining to fully close this slice:
+- deterministic fixture injection into replay/live-sim still needs to be defined so the same branches can be proven through repo runtime lanes, not only unit tests
 
 ### Slice 4 — close non-real-money validation receipts
+Status: partial (2026-04-17)
+Receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_smoke_pack.md`
+Artifact: `docs/receipts/artifacts/2026-04-17_validation_smoke_pack_pytest.txt`
+
 After the validation pack lands, update the receipts so the repo can state exactly what is proven.
 
 Must be explicit:

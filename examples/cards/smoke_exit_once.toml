@@ -1,0 +1,36 @@
+card_id = "smoke-exit-once-v1"
+name = "Smoke Exit Once"
+version = "0.1.0"
+strategy_family = "validation-smoke"
+instrument_scope = ["TW_EQUITY"]
+status = "replay-only"
+entry_module = "steamer_card_engine.cards.validation_smoke:exit_once"
+
+symbol_pool = ["2330"]
+feature_requirements = ["bars.1m", "fixture.signal.exit_once", "fixture.position.open"]
+
+[parameters]
+trigger = "exit_once"
+side = "exit"
+max_exits = 1
+
+[capital_controls]
+max_order_notional = 50000
+max_daily_notional = 50000
+max_open_positions = 1
+
+[risk_policy.stop_loss]
+mode = "percent_from_open"
+value = 1.0
+
+[risk_policy.take_profit]
+mode = "risk_reward_multiple"
+value = 1.0
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"
+
+[metadata]
+owner = "validation"
+purpose = "deterministic exit-path smoke verification"
