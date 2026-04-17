@@ -259,14 +259,15 @@ def test_strategy_pipeline_view_surfaces_line_state_and_handoff_gate() -> None:
     assert surface["campaign_state"]["dispatchable"] is False
     assert surface["campaign_state"]["research_autonomous"] is False
     assert surface["campaign_state"]["attach_autonomous"] is False
-    assert surface["campaign_state"]["runtime_dispatch"]["state"] == "skipped_not_dispatchable"
+    assert surface["campaign_state"]["runtime_dispatch"]["state"] == "misconfigured_activation"
     assert surface["campaign_state"]["selection"]["policy"] in {"runtime_dispatch", "runtime_fallback", "runtime_target_missing", "index_default", "index_fallback", "runtime_selector_v1/activation_target_not_dispatchable"}
     assert surface["campaign_state"]["selection"]["policy_id"].startswith("runtime_selector_v1/")
     assert isinstance(surface["campaign_state"]["selection"].get("candidate_set"), list)
     assert surface["control_plane"]["runtime_dispatch"]["campaign_id"] == "2026-03-tw-intraday-shadow-vcp"
+    assert surface["control_plane"]["runtime_dispatch"]["suggested_campaign_id"] == "2026-04-timesfm-regime-rank-assist"
     assert surface["control_plane"]["runtime_campaign_selection"]["selected_campaign_id"] == "2026-03-tw-intraday-shadow-vcp"
     assert surface["campaign_state"]["runtime_dispatch"]["fallback_used"] is False
-    assert surface["campaign_state"]["runtime_dispatch"]["activation_mismatch"] is False
+    assert surface["campaign_state"]["runtime_dispatch"]["activation_mismatch"] is True
     assert surface["sources"]
 
 
@@ -370,8 +371,10 @@ def test_dashboard_api_routes() -> None:
     assert pipeline_payload["components"]
     assert pipeline_payload["autonomous_drivers"]
     assert pipeline_payload["handoff_gate"]["state"] == "blocked"
-    assert pipeline_payload["control_plane"]["runtime_dispatch"]["state"] == "skipped_not_dispatchable"
-    assert pipeline_payload["campaign_state"]["runtime_dispatch"]["state"] == "skipped_not_dispatchable"
+    assert pipeline_payload["control_plane"]["runtime_dispatch"]["state"] == "misconfigured_activation"
+    assert pipeline_payload["campaign_state"]["runtime_dispatch"]["state"] == "misconfigured_activation"
+    assert pipeline_payload["control_plane"]["runtime_dispatch"]["suggested_campaign_id"] == "2026-04-timesfm-regime-rank-assist"
+    assert pipeline_payload["campaign_state"]["runtime_dispatch"]["activation_mismatch"] is True
     assert pipeline_payload["control_plane"]["runtime_campaign_selection"]["selected_campaign_id"] == "2026-03-tw-intraday-shadow-vcp"
     assert pipeline_payload["control_plane"]["runtime_campaign_selection"].get("policy_id", "").startswith("runtime_selector_v1/")
 
