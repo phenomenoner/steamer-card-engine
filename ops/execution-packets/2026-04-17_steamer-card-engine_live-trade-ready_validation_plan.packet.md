@@ -1,9 +1,12 @@
 # 2026-04-17 — steamer-card-engine live-trade-ready validation plan (reassessed to the true pre-real-money gate)
 
 ## Status
-- done
+- retired in place
+- retired_on: 2026-04-17
 - topology: unchanged
-- target claim: repo truthfully advances to **only real-money smoke remains**
+- retirement_reason: all planned slices landed; this packet is no longer an active execution surface
+- successor_surface: `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`
+- target claim achieved: repo truthfully advances to **only real-money smoke remains**
 - boundary: this packet still excludes actual real-money submission
 - reassessed on: 2026-04-17
 - closure receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`
@@ -11,8 +14,9 @@
 - cross-validation: second-brain final review passed
 
 ## Verdict
-This line is now closed at the intended pre-real-money boundary.
-`steamer-card-engine` can truthfully say that all planned **non-real-money** validation gates for the validation smoke deck are closed, and the only remaining production-facing gate is **one explicit real-money smoke**.
+Retired in place.
+This packet has finished its job and now serves only as the historical blade map for how the line reached closure.
+The live truth surface is the closure receipt: `docs/receipts/2026-04-17_live_trade_ready_validation_closure.md`.
 
 ## Whole-picture promise
 Reach a truthful repo state where `steamer-card-engine` can say:
