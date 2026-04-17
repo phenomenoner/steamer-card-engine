@@ -34,4 +34,5 @@ Real-money smoke remains unexecuted.
 - `uv run pytest -q tests/test_dashboard.py`
 
 ## Residual
+- This patch aligns the current runtime-truth branch only. A dedicated test for the genuine `skipped_not_dispatchable` branch should still be added so that path does not go dark.
 - If the runtime activation target is later changed to a dispatchable campaign, the truthful state may change again and the tests should move with the runtime receipt, not by assumption.

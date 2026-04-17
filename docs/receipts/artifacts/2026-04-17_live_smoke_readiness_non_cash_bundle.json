@@ -1,0 +1,579 @@
+{
+  "activation": "prepared-only",
+  "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+  "boundary": "seed smoke/control surface only; no broker submission executed",
+  "cli_contract": {
+    "command": "operator live-smoke-readiness",
+    "exit_class": "success",
+    "exit_code": 0,
+    "status": "pass",
+    "status_key": "smoke_status",
+    "version": "cli-command/v1"
+  },
+  "deck": "examples/decks/tw_cash_intraday.toml",
+  "flatten_mode": "forced-exit",
+  "ok": true,
+  "preflight": {
+    "activation": "prepared-only",
+    "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+    "blockers": [],
+    "boundary": "seed preflight gate only; no broker/session attach is performed here",
+    "deck": "examples/decks/tw_cash_intraday.toml",
+    "logical_session": {
+      "account_no": "sample-account",
+      "auth_mode": "account_password_cert",
+      "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+      "boundary": {
+        "activation": "prepared-only",
+        "broker_connected": true,
+        "notes": "logical session inspection only; does not establish a live broker/runtime session",
+        "probe_freshness": {
+          "detail": "steamer-cron-health verified by ec2_verify receipt: verify_green",
+          "observed_at": "2026-04-17T00:45:19Z",
+          "status": "fresh"
+        },
+        "probe_receipt": {
+          "kind": "steamer-cron-health-stage",
+          "label": "ec2_verify:20260417",
+          "path": "/root/.openclaw/workspace/.state/steamer/cron-health/20260417/stages/ec2_verify.json",
+          "updated_at": "2026-04-17T00:45:19Z"
+        },
+        "probe_source": "steamer-cron-health:20260417"
+      },
+      "capabilities": {
+        "account_query_enabled": true,
+        "marketdata_enabled": true,
+        "trade_enabled": true
+      },
+      "expires_at": null,
+      "health_status": {
+        "broker_connection": "connected",
+        "marketdata_connection": "connected",
+        "runtime": "seed-ok",
+        "session": "healthy"
+      },
+      "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+      "session_id": "seed-logical-session",
+      "session_started_at": "2026-04-17T02:04:56Z",
+      "session_status": {
+        "connected_surfaces": [
+          "marketdata",
+          "broker"
+        ],
+        "connections": {
+          "account": {
+            "detail": "upstream source does not independently verify the account-query surface",
+            "last_error": null,
+            "last_heartbeat_at": "2026-04-17T00:45:19Z",
+            "state": "not-connected"
+          },
+          "broker": {
+            "detail": "upstream live sim verified against broker-attached runtime: verify_green",
+            "last_error": null,
+            "last_heartbeat_at": "2026-04-17T00:45:19Z",
+            "state": "connected"
+          },
+          "marketdata": {
+            "detail": "upstream ec2_verify success: verify_green",
+            "last_error": null,
+            "last_heartbeat_at": "2026-04-17T00:45:19Z",
+            "state": "connected"
+          }
+        },
+        "degraded_surfaces": [],
+        "renewal_state": "fresh",
+        "session_state": "healthy"
+      },
+      "trading_day_gate": {
+        "live_allowed": true,
+        "reason": "trading-day-open",
+        "source": "seed-operator-input",
+        "status": "open"
+      }
+    },
+    "next_command_map": {
+      "bounded_live_smoke": "steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+      "inspect_session": "steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json",
+      "operator_status": "steamer-card-engine operator status --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+      "probe_session": "steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json"
+    },
+    "ok": true,
+    "operator_status": {
+      "armed_live": false,
+      "armed_scope": null,
+      "capabilities": {
+        "account_query_enabled": true,
+        "marketdata_enabled": true,
+        "trade_enabled": true
+      },
+      "health_status": {
+        "runtime": "seed-ok",
+        "session": "ok"
+      },
+      "mode": "live",
+      "order_submission_gate": {
+        "allowed": false,
+        "reason": "disarmed-posture"
+      },
+      "policy": {
+        "arm_ttl_seconds": {
+          "max": 28800,
+          "min": 30
+        }
+      },
+      "recent_actions": [
+        {
+          "acted_at": "2026-04-17T00:59:41Z",
+          "action": "flatten",
+          "receipt_id": "op-9da0894749d44d33bd18fc7df4b45183",
+          "status": "flatten-issued"
+        },
+        {
+          "acted_at": "2026-04-17T01:15:58Z",
+          "action": "submit-order-smoke",
+          "receipt_id": "op-113bfabe86784bd5ab7aac4c245aeffa",
+          "status": "refused-disarmed"
+        },
+        {
+          "acted_at": "2026-04-17T01:15:58Z",
+          "action": "arm-live",
+          "receipt_id": "op-3d4e3c0cac3a4b68b473d5c8c292223a",
+          "status": "armed"
+        },
+        {
+          "acted_at": "2026-04-17T01:15:58Z",
+          "action": "submit-order-smoke",
+          "receipt_id": "op-615c7efcc11e4acfb1a6104b9d2108b7",
+          "status": "accepted-for-smoke-dispatch"
+        },
+        {
+          "acted_at": "2026-04-17T01:15:58Z",
+          "action": "flatten",
+          "receipt_id": "op-0a2fd18feb694123be880b68ffafb83a",
+          "status": "flatten-issued"
+        }
+      ],
+      "session": {
+        "account_no": "sample-account",
+        "auth_mode": "account_password_cert",
+        "session_id": "seed-session"
+      }
+    },
+    "preflight_status": "ready",
+    "probe_freshness": {
+      "detail": "steamer-cron-health verified by ec2_verify receipt: verify_green",
+      "observed_at": "2026-04-17T00:45:19Z",
+      "status": "fresh"
+    },
+    "probe_receipt": {
+      "kind": "steamer-cron-health-stage",
+      "label": "ec2_verify:20260417",
+      "path": "/root/.openclaw/workspace/.state/steamer/cron-health/20260417/stages/ec2_verify.json",
+      "updated_at": "2026-04-17T00:45:19Z"
+    },
+    "replacement_contract": {
+      "expected_connected_surfaces": [
+        "marketdata",
+        "broker"
+      ],
+      "session_status_source": "replace seed placeholders with adapter/session-manager health snapshots"
+    }
+  },
+  "probe_freshness": {
+    "detail": "steamer-cron-health verified by ec2_verify receipt: verify_green",
+    "observed_at": "2026-04-17T00:45:19Z",
+    "status": "fresh"
+  },
+  "probe_receipt": {
+    "kind": "steamer-cron-health-stage",
+    "label": "ec2_verify:20260417",
+    "path": "/root/.openclaw/workspace/.state/steamer/cron-health/20260417/stages/ec2_verify.json",
+    "updated_at": "2026-04-17T00:45:19Z"
+  },
+  "receipt_paths": [
+    ".state/operator_receipts/20260417T020456Z_submit-order-smoke_op-dff33a4cc82.json",
+    ".state/operator_receipts/20260417T020456Z_arm-live_op-723bbb20590.json",
+    ".state/operator_receipts/20260417T020456Z_submit-order-smoke_op-437c832333f.json",
+    ".state/operator_receipts/20260417T020456Z_flatten_op-5f1e4488dbe.json"
+  ],
+  "request": {
+    "quantity": 1,
+    "side": "buy",
+    "symbol": "2330"
+  },
+  "smoke_status": "pass",
+  "steps": [
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "activation": "prepared-only",
+        "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+        "blockers": [],
+        "boundary": "seed preflight gate only; no broker/session attach is performed here",
+        "deck": "examples/decks/tw_cash_intraday.toml",
+        "logical_session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "auth_profile": "examples/profiles/tw_cash_password_auth.toml",
+          "boundary": {
+            "activation": "prepared-only",
+            "broker_connected": true,
+            "notes": "logical session inspection only; does not establish a live broker/runtime session",
+            "probe_freshness": {
+              "detail": "steamer-cron-health verified by ec2_verify receipt: verify_green",
+              "observed_at": "2026-04-17T00:45:19Z",
+              "status": "fresh"
+            },
+            "probe_receipt": {
+              "kind": "steamer-cron-health-stage",
+              "label": "ec2_verify:20260417",
+              "path": "/root/.openclaw/workspace/.state/steamer/cron-health/20260417/stages/ec2_verify.json",
+              "updated_at": "2026-04-17T00:45:19Z"
+            },
+            "probe_source": "steamer-cron-health:20260417"
+          },
+          "capabilities": {
+            "account_query_enabled": true,
+            "marketdata_enabled": true,
+            "trade_enabled": true
+          },
+          "expires_at": null,
+          "health_status": {
+            "broker_connection": "connected",
+            "marketdata_connection": "connected",
+            "runtime": "seed-ok",
+            "session": "healthy"
+          },
+          "renewal_hint": "seed-runtime: real broker/session renewal not attached",
+          "session_id": "seed-logical-session",
+          "session_started_at": "2026-04-17T02:04:56Z",
+          "session_status": {
+            "connected_surfaces": [
+              "marketdata",
+              "broker"
+            ],
+            "connections": {
+              "account": {
+                "detail": "upstream source does not independently verify the account-query surface",
+                "last_error": null,
+                "last_heartbeat_at": "2026-04-17T00:45:19Z",
+                "state": "not-connected"
+              },
+              "broker": {
+                "detail": "upstream live sim verified against broker-attached runtime: verify_green",
+                "last_error": null,
+                "last_heartbeat_at": "2026-04-17T00:45:19Z",
+                "state": "connected"
+              },
+              "marketdata": {
+                "detail": "upstream ec2_verify success: verify_green",
+                "last_error": null,
+                "last_heartbeat_at": "2026-04-17T00:45:19Z",
+                "state": "connected"
+              }
+            },
+            "degraded_surfaces": [],
+            "renewal_state": "fresh",
+            "session_state": "healthy"
+          },
+          "trading_day_gate": {
+            "live_allowed": true,
+            "reason": "trading-day-open",
+            "source": "seed-operator-input",
+            "status": "open"
+          }
+        },
+        "next_command_map": {
+          "bounded_live_smoke": "steamer-card-engine operator live-smoke-readiness --deck examples/decks/tw_cash_intraday.toml --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+          "inspect_session": "steamer-card-engine auth inspect-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json",
+          "operator_status": "steamer-card-engine operator status --auth-profile examples/profiles/tw_cash_password_auth.toml --json",
+          "probe_session": "steamer-card-engine operator probe-session --auth-profile examples/profiles/tw_cash_password_auth.toml --trading-day-status open --json"
+        },
+        "ok": true,
+        "operator_status": {
+          "armed_live": false,
+          "armed_scope": null,
+          "capabilities": {
+            "account_query_enabled": true,
+            "marketdata_enabled": true,
+            "trade_enabled": true
+          },
+          "health_status": {
+            "runtime": "seed-ok",
+            "session": "ok"
+          },
+          "mode": "live",
+          "order_submission_gate": {
+            "allowed": false,
+            "reason": "disarmed-posture"
+          },
+          "policy": {
+            "arm_ttl_seconds": {
+              "max": 28800,
+              "min": 30
+            }
+          },
+          "recent_actions": [
+            {
+              "acted_at": "2026-04-17T00:59:41Z",
+              "action": "flatten",
+              "receipt_id": "op-9da0894749d44d33bd18fc7df4b45183",
+              "status": "flatten-issued"
+            },
+            {
+              "acted_at": "2026-04-17T01:15:58Z",
+              "action": "submit-order-smoke",
+              "receipt_id": "op-113bfabe86784bd5ab7aac4c245aeffa",
+              "status": "refused-disarmed"
+            },
+            {
+              "acted_at": "2026-04-17T01:15:58Z",
+              "action": "arm-live",
+              "receipt_id": "op-3d4e3c0cac3a4b68b473d5c8c292223a",
+              "status": "armed"
+            },
+            {
+              "acted_at": "2026-04-17T01:15:58Z",
+              "action": "submit-order-smoke",
+              "receipt_id": "op-615c7efcc11e4acfb1a6104b9d2108b7",
+              "status": "accepted-for-smoke-dispatch"
+            },
+            {
+              "acted_at": "2026-04-17T01:15:58Z",
+              "action": "flatten",
+              "receipt_id": "op-0a2fd18feb694123be880b68ffafb83a",
+              "status": "flatten-issued"
+            }
+          ],
+          "session": {
+            "account_no": "sample-account",
+            "auth_mode": "account_password_cert",
+            "session_id": "seed-session"
+          }
+        },
+        "preflight_status": "ready",
+        "probe_freshness": {
+          "detail": "steamer-cron-health verified by ec2_verify receipt: verify_green",
+          "observed_at": "2026-04-17T00:45:19Z",
+          "status": "fresh"
+        },
+        "probe_receipt": {
+          "kind": "steamer-cron-health-stage",
+          "label": "ec2_verify:20260417",
+          "path": "/root/.openclaw/workspace/.state/steamer/cron-health/20260417/stages/ec2_verify.json",
+          "updated_at": "2026-04-17T00:45:19Z"
+        },
+        "replacement_contract": {
+          "expected_connected_surfaces": [
+            "marketdata",
+            "broker"
+          ],
+          "session_status_source": "replace seed placeholders with adapter/session-manager health snapshots"
+        }
+      },
+      "step": "preflight-smoke-gate"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "armed_scope": null,
+        "capabilities": {
+          "account_query_enabled": true,
+          "marketdata_enabled": true,
+          "trade_enabled": true
+        },
+        "health_status": {
+          "runtime": "seed-ok",
+          "session": "ok"
+        },
+        "mode": "live",
+        "order_submission_gate": {
+          "allowed": false,
+          "reason": "disarmed-posture"
+        },
+        "policy": {
+          "arm_ttl_seconds": {
+            "max": 28800,
+            "min": 30
+          }
+        },
+        "recent_actions": [
+          {
+            "acted_at": "2026-04-17T00:59:41Z",
+            "action": "flatten",
+            "receipt_id": "op-9da0894749d44d33bd18fc7df4b45183",
+            "status": "flatten-issued"
+          },
+          {
+            "acted_at": "2026-04-17T01:15:58Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-113bfabe86784bd5ab7aac4c245aeffa",
+            "status": "refused-disarmed"
+          },
+          {
+            "acted_at": "2026-04-17T01:15:58Z",
+            "action": "arm-live",
+            "receipt_id": "op-3d4e3c0cac3a4b68b473d5c8c292223a",
+            "status": "armed"
+          },
+          {
+            "acted_at": "2026-04-17T01:15:58Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-615c7efcc11e4acfb1a6104b9d2108b7",
+            "status": "accepted-for-smoke-dispatch"
+          },
+          {
+            "acted_at": "2026-04-17T01:15:58Z",
+            "action": "flatten",
+            "receipt_id": "op-0a2fd18feb694123be880b68ffafb83a",
+            "status": "flatten-issued"
+          }
+        ],
+        "session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "session_id": "seed-session"
+        }
+      },
+      "step": "status-disarmed-baseline"
+    },
+    {
+      "exit_code": 4,
+      "expected_exit_code": 4,
+      "ok": true,
+      "payload": {
+        "error": "order submission refused: runtime is disarmed",
+        "gate_reason": "disarmed-posture",
+        "ok": false,
+        "receipt_path": ".state/operator_receipts/20260417T020456Z_submit-order-smoke_op-dff33a4cc82.json",
+        "request": {
+          "quantity": 1,
+          "side": "buy",
+          "symbol": "2330"
+        }
+      },
+      "step": "submit-refused-while-disarmed"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": true,
+        "armed_scope": {
+          "account_no": "sample-account",
+          "armed_at": "2026-04-17T02:04:56Z",
+          "deck_id": "tw-cash-main",
+          "deck_ref": "/root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_intraday.toml",
+          "expires_at": "2026-04-17T02:09:56Z",
+          "operator_note": null,
+          "ttl_seconds": 300
+        },
+        "ok": true,
+        "receipt_path": ".state/operator_receipts/20260417T020456Z_arm-live_op-723bbb20590.json"
+      },
+      "step": "arm-live-bounded-scope"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "dispatch": "stub-only; no broker submission executed",
+        "ok": true,
+        "receipt_path": ".state/operator_receipts/20260417T020456Z_submit-order-smoke_op-437c832333f.json",
+        "request": {
+          "quantity": 1,
+          "side": "buy",
+          "symbol": "2330"
+        }
+      },
+      "step": "submit-accepted-while-armed"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "flatten_mode": "forced-exit",
+        "implicit_disarm": true,
+        "ok": true,
+        "receipt_path": ".state/operator_receipts/20260417T020456Z_flatten_op-5f1e4488dbe.json"
+      },
+      "step": "flatten-and-close-armed-window"
+    },
+    {
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "ok": true,
+      "payload": {
+        "armed_live": false,
+        "armed_scope": null,
+        "capabilities": {
+          "account_query_enabled": true,
+          "marketdata_enabled": true,
+          "trade_enabled": true
+        },
+        "health_status": {
+          "runtime": "seed-ok",
+          "session": "ok"
+        },
+        "mode": "live",
+        "order_submission_gate": {
+          "allowed": false,
+          "reason": "disarmed-posture"
+        },
+        "policy": {
+          "arm_ttl_seconds": {
+            "max": 28800,
+            "min": 30
+          }
+        },
+        "recent_actions": [
+          {
+            "acted_at": "2026-04-17T01:15:58Z",
+            "action": "flatten",
+            "receipt_id": "op-0a2fd18feb694123be880b68ffafb83a",
+            "status": "flatten-issued"
+          },
+          {
+            "acted_at": "2026-04-17T02:04:56Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-dff33a4cc8244ac2997833ae1a34d7ef",
+            "status": "refused-disarmed"
+          },
+          {
+            "acted_at": "2026-04-17T02:04:56Z",
+            "action": "arm-live",
+            "receipt_id": "op-723bbb2059014fc6b391bb3d4e0b7e9c",
+            "status": "armed"
+          },
+          {
+            "acted_at": "2026-04-17T02:04:56Z",
+            "action": "submit-order-smoke",
+            "receipt_id": "op-437c832333f74bbdb4d622127a3a469c",
+            "status": "accepted-for-smoke-dispatch"
+          },
+          {
+            "acted_at": "2026-04-17T02:04:56Z",
+            "action": "flatten",
+            "receipt_id": "op-5f1e4488dbea4d2cafc131680a58d0df",
+            "status": "flatten-issued"
+          }
+        ],
+        "session": {
+          "account_no": "sample-account",
+          "auth_mode": "account_password_cert",
+          "session_id": "seed-session"
+        }
+      },
+      "step": "status-disarmed-after-flatten"
+    }
+  ]
+}
