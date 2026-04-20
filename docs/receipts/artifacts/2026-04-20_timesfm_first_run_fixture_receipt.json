@@ -1,0 +1,379 @@
+{
+  "baselines_run": [
+    "last_return",
+    "momentum_5_20",
+    "simple_reversal",
+    "moving_average_slope",
+    "simple_volatility_proxy"
+  ],
+  "family_id": "timesfm_regime_rank_assist",
+  "input_contract": {
+    "evaluation_dates": {
+      "count": 4,
+      "end": "2026-01-24",
+      "start": "2026-01-21"
+    },
+    "fixed_universe_symbols": [
+      "AAA",
+      "BBB",
+      "CCC"
+    ],
+    "required_columns": [
+      "date",
+      "symbol",
+      "close"
+    ],
+    "slice_count": 3,
+    "timesfm_columns": [
+      "timesfm_score",
+      "timesfm_pred_return",
+      "timesfm_pred_price"
+    ],
+    "top_k": 1,
+    "turnover_cost_bps": 10.0
+  },
+  "input_path": "/root/.openclaw/workspace/steamer-card-engine/tests/fixtures/timesfm_first_run_fixture.csv",
+  "interpretation": {
+    "strongest_trivial_baseline": "last_return",
+    "timesfm_vs_strongest": {
+      "friction_delta": 0.0,
+      "rank_ic_delta": 0.0,
+      "spread_delta": 0.0
+    }
+  },
+  "markdown_receipt": "# Result receipt — TimesFM v1 bucket baseline\n\n- recorded: 2026-04-20T10:42:14.381802+00:00\n- family_id: `timesfm_regime_rank_assist`\n- variant_id: `timesfm_bucket_baseline_daily_30m`\n- verifier_id: `timesfm_regime_rank_assist_v1_bucket_baseline`\n- verdict: `HOLD`\n- topology: unchanged\n\n## Universe rule\n- fixed-universe symbols (3): AAA, BBB, CCC\n- input path: `/root/.openclaw/workspace/steamer-card-engine/tests/fixtures/timesfm_first_run_fixture.csv`\n\n## Date range / walk-forward slices\n- evaluation dates: 2026-01-21 -> 2026-01-24 (4 sessions)\n- slice count: 3\n\n## Baselines run\n- last_return\n- momentum_5_20\n- simple_reversal\n- moving_average_slope\n- simple_volatility_proxy\n\n## Score mappings run\n- TimesFM score resolved from one of: timesfm_score / timesfm_pred_return / timesfm_pred_price\n\n## Decision-grade metrics\n- TimesFM rank IC: 1.0000\n- TimesFM top bucket hit rate: 1.0000\n- TimesFM top-minus-bottom spread: 0.080000\n- TimesFM friction-aware score: 0.080000\n- strongest trivial baseline: last_return\n- strongest baseline rank IC: 1.0000\n- strongest baseline top-minus-bottom spread: 0.080000\n- strongest baseline friction-aware score: 0.080000\n\n## Interpretation\nThis runnable substrate now computes the bounded first-pass benchmark honestly from a daily cross-sectional CSV. Result quality still depends on the input dataset; this receipt does not imply live-sim or card activation.\n\n## What this proves\n- the TimesFM first-run lane now has an executable local substrate\n- the lane can emit a bounded receipt with fixed-universe, slice, baseline, and friction-aware metrics\n\n## What this does not prove\n- no live-readiness claim\n- no intraday edge claim\n- no automatic promotion to an active card/deck\n\n## Next governed move\n- run the same tool on a real fixed-universe daily dataset and judge PROMISING / HOLD / ITERATE / KILL from the resulting receipt",
+  "recorded_at": "2026-04-20T10:42:14.381802+00:00",
+  "score_mappings_run": [
+    "timesfm"
+  ],
+  "strategy_results": {
+    "last_return": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": 0.0799999968819638,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.0799999968819638
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": 0.07999999999999996,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.07999999999999996
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": 0.08000000000000002,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.08000000000000002
+        }
+      ],
+      "strategy": "last_return",
+      "summary": {
+        "friction_aware_score": 0.07999999896065459,
+        "ordering_rate": 1.0,
+        "rank_ic": 0.9999999999999997,
+        "top_bucket_hit_rate": 1.0,
+        "top_minus_bottom_spread": 0.07999999896065459
+      }
+    },
+    "momentum_5_20": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": -0.0799999968819638,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.0799999968819638
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": -0.07999999999999996,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.07999999999999996
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": -0.08000000000000002,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.08000000000000002
+        }
+      ],
+      "strategy": "momentum_5_20",
+      "summary": {
+        "friction_aware_score": -0.07999999896065459,
+        "ordering_rate": 0.0,
+        "rank_ic": -0.9999999999999997,
+        "top_bucket_hit_rate": 0.0,
+        "top_minus_bottom_spread": -0.07999999896065459
+      }
+    },
+    "moving_average_slope": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": 0.0799999968819638,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.0799999968819638
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": 0.07999999999999996,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.07999999999999996
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": 0.08000000000000002,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.08000000000000002
+        }
+      ],
+      "strategy": "moving_average_slope",
+      "summary": {
+        "friction_aware_score": 0.07999999896065459,
+        "ordering_rate": 1.0,
+        "rank_ic": 0.9999999999999997,
+        "top_bucket_hit_rate": 1.0,
+        "top_minus_bottom_spread": 0.07999999896065459
+      }
+    },
+    "simple_reversal": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": -0.0799999968819638,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.0799999968819638
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": -0.07999999999999996,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.07999999999999996
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": -0.08000000000000002,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.9999999999999998,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 0.0,
+          "top_minus_bottom_spread": -0.08000000000000002
+        }
+      ],
+      "strategy": "simple_reversal",
+      "summary": {
+        "friction_aware_score": -0.07999999896065459,
+        "ordering_rate": 0.0,
+        "rank_ic": -0.9999999999999997,
+        "top_bucket_hit_rate": 0.0,
+        "top_minus_bottom_spread": -0.07999999896065459
+      }
+    },
+    "simple_volatility_proxy": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": -0.04999999688196377,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.4999999999999999,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": -0.04999999688196377
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": -0.04999999999999982,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.4999999999999999,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": -0.04999999999999982
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": -0.050000000000000044,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 0.0,
+          "rank_ic": -0.4999999999999999,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": -0.050000000000000044
+        }
+      ],
+      "strategy": "simple_volatility_proxy",
+      "summary": {
+        "friction_aware_score": -0.049999998960654546,
+        "ordering_rate": 0.0,
+        "rank_ic": -0.49999999999999983,
+        "top_bucket_hit_rate": 1.0,
+        "top_minus_bottom_spread": -0.049999998960654546
+      }
+    },
+    "timesfm": {
+      "slice_results": [
+        {
+          "date_range": {
+            "end": "2026-01-21",
+            "start": "2026-01-21"
+          },
+          "friction_aware_score": 0.0799999968819638,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 1,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.0799999968819638
+        },
+        {
+          "date_range": {
+            "end": "2026-01-22",
+            "start": "2026-01-22"
+          },
+          "friction_aware_score": 0.07999999999999996,
+          "mean_turnover": 0.0,
+          "observations": 1,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 2,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.07999999999999996
+        },
+        {
+          "date_range": {
+            "end": "2026-01-24",
+            "start": "2026-01-23"
+          },
+          "friction_aware_score": 0.08000000000000002,
+          "mean_turnover": 0.0,
+          "observations": 2,
+          "ordering_rate": 1.0,
+          "rank_ic": 0.9999999999999998,
+          "slice_id": 3,
+          "top_bucket_hit_rate": 1.0,
+          "top_minus_bottom_spread": 0.08000000000000002
+        }
+      ],
+      "strategy": "timesfm",
+      "summary": {
+        "friction_aware_score": 0.07999999896065459,
+        "ordering_rate": 1.0,
+        "rank_ic": 0.9999999999999997,
+        "top_bucket_hit_rate": 1.0,
+        "top_minus_bottom_spread": 0.07999999896065459
+      }
+    }
+  },
+  "topology": "unchanged",
+  "variant_id": "timesfm_bucket_baseline_daily_30m",
+  "verdict": "HOLD",
+  "verifier_id": "timesfm_regime_rank_assist_v1_bucket_baseline"
+}
