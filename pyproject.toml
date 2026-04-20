@@ -26,6 +26,7 @@ dependencies = [
 
 [project.scripts]
 steamer-card-engine = "steamer_card_engine.cli:main"
+steamer-card-engine-timesfm-build-input = "steamer_card_engine.timesfm_input_bridge:main"
 steamer-card-engine-timesfm-first-run = "steamer_card_engine.timesfm_first_run:main"
 
 [tool.hatch.build.targets.wheel]

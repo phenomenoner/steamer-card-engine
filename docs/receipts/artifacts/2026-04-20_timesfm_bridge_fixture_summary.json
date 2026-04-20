@@ -1,0 +1,14 @@
+{
+  "close_history_path": "tests/fixtures/timesfm_bridge_close_history.csv",
+  "score_path": "tests/fixtures/timesfm_bridge_scores.csv",
+  "watchlist_path": "tests/fixtures/timesfm_bridge_watchlist.csv",
+  "out_path": "docs/receipts/artifacts/2026-04-20_timesfm_bridge_fixture_input.csv",
+  "score_column": "timesfm_pred_return",
+  "rows_written": 72,
+  "unique_dates": 24,
+  "unique_symbols": 3,
+  "skipped_empty_scores": 0,
+  "skipped_watchlist": 0,
+  "missing_close_rows": 0,
+  "missing_close_examples": []
+}
