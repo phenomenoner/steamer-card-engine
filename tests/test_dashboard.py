@@ -13,6 +13,7 @@ from steamer_card_engine.dashboard.fixtures import repo_root
 from steamer_card_engine.dashboard.history_source_index import STATE_RELATIVE_PATH, build_strategy_history_source_index
 from steamer_card_engine.dashboard.strategy_pipeline import build_strategy_pipeline_view
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
+from steamer_card_engine.observer import build_mock_observer_session, reset_observer_repository_cache
 
 
 def _load_json(path: Path) -> dict:
@@ -60,6 +61,88 @@ def _target_labels(workspace_root: Path, payload: dict | None) -> list[str]:
         elif variant_id:
             labels.append(variant_id)
     return labels
+
+
+def test_observer_api_defaults_to_mock_session() -> None:
+    reset_observer_repository_cache()
+    client = TestClient(create_app())
+
+    sessions = client.get("/api/observer/sessions")
+    assert sessions.status_code == 200
+    payload = sessions.json()
+    assert payload["items"]
+    assert payload["items"][0]["session_id"] == "aws-live-sim-demo"
+
+
+def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) -> None:
+    bundle = build_mock_observer_session()
+    attachment = {
+        "metadata": {
+            "session_id": "aws-live-sim-private",
+            "engine_id": "steamer-card-engine.live-sim.private",
+            "session_label": "AWS live(sim) private attachment",
+            "market_mode": "live(sim)",
+            "symbol": "2330.TW",
+            "timeframe": "1m",
+        },
+        "events": [
+            {
+                **event.to_dict(),
+                "session_id": "aws-live-sim-private",
+                "engine_id": "steamer-card-engine.live-sim.private",
+                "event_id": f"private-{event.event_id}",
+            }
+            for event in bundle.events
+        ],
+    }
+    attachment_path = tmp_path / "observer-attachment.json"
+    attachment_path.write_text(json.dumps(attachment), encoding="utf-8")
+
+    monkeypatch.setenv("STEAMER_OBSERVER_BUNDLE_JSON", str(attachment_path))
+    monkeypatch.setenv("STEAMER_OBSERVER_INCLUDE_MOCK", "0")
+    reset_observer_repository_cache()
+
+    client = TestClient(create_app())
+
+    sessions = client.get("/api/observer/sessions")
+    assert sessions.status_code == 200
+    payload = sessions.json()
+    assert payload["items"] == [{
+        "session_id": "aws-live-sim-private",
+        "engine_id": "steamer-card-engine.live-sim.private",
+        "symbol": "2330.TW",
+        "market_mode": "live(sim)",
+        "freshness_state": "degraded",
+    }]
+
+    bootstrap = client.get("/api/observer/sessions/aws-live-sim-private/bootstrap")
+    assert bootstrap.status_code == 200
+    bootstrap_payload = bootstrap.json()
+    assert bootstrap_payload["session_id"] == "aws-live-sim-private"
+    assert bootstrap_payload["engine_id"] == "steamer-card-engine.live-sim.private"
+    assert bootstrap_payload["chart"]["candles"]
+    assert bootstrap_payload["timeline"]
+
+    candles = client.get("/api/observer/sessions/aws-live-sim-private/candles?limit=2")
+    assert candles.status_code == 200
+    assert len(candles.json()["items"]) == 2
+
+    timeline = client.get("/api/observer/sessions/aws-live-sim-private/timeline?limit=3")
+    assert timeline.status_code == 200
+    assert len(timeline.json()["items"]) == 3
+
+    with client.websocket_connect("/api/observer/sessions/aws-live-sim-private/stream?after_seq=14") as websocket:
+        first = websocket.receive_json()
+        second = websocket.receive_json()
+        third = websocket.receive_json()
+
+    assert first["seq"] == 15
+    assert second["seq"] == 16
+    assert third == {"type": "stream_end", "after_seq": 14}
+
+    monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
+    monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
+    reset_observer_repository_cache()
 
 
 def test_dashboard_fixture_dates_include_recent_manual_live_days() -> None:

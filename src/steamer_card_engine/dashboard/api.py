@@ -4,13 +4,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from steamer_card_engine.observer import (
-    list_mock_sessions,
-    observer_bootstrap_payload,
-    observer_candles_payload,
-    observer_stream_events,
-    observer_timeline_payload,
-)
+from steamer_card_engine.observer import observer_repository_from_env
 
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
@@ -88,33 +82,41 @@ def create_app() -> FastAPI:
     def strategy_pipeline() -> dict:
         return build_strategy_pipeline_view(root)
 
+    observer_repo = observer_repository_from_env()
+
     @app.get("/api/observer/sessions")
     def observer_sessions() -> dict:
-        return {"items": list_mock_sessions()}
+        return {"items": observer_repo.list_sessions()}
 
     @app.get("/api/observer/sessions/{session_id}/bootstrap")
     def observer_bootstrap(session_id: str) -> dict:
-        if session_id != "aws-live-sim-demo":
-            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
-        return observer_bootstrap_payload()
+        try:
+            return observer_repo.bootstrap_payload(session_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.get("/api/observer/sessions/{session_id}/candles")
     def observer_candles(session_id: str, limit: int = 500) -> dict:
-        if session_id != "aws-live-sim-demo":
-            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
-        return observer_candles_payload(limit=limit)
+        try:
+            return observer_repo.candles_payload(session_id, limit=limit)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.get("/api/observer/sessions/{session_id}/timeline")
     def observer_timeline(session_id: str, limit: int = 200) -> dict:
-        if session_id != "aws-live-sim-demo":
-            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
-        return observer_timeline_payload(limit=limit)
+        try:
+            return observer_repo.timeline_payload(session_id, limit=limit)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.websocket("/api/observer/sessions/{session_id}/stream")
     async def observer_stream(websocket: WebSocket, session_id: str) -> None:
-        if session_id != "aws-live-sim-demo":
+        try:
+            observer_repo.require_bundle(session_id)
+        except KeyError:
             await websocket.close(code=4404)
             return
+
         await websocket.accept()
         raw_after_seq = websocket.query_params.get("after_seq", "0")
         try:
@@ -125,7 +127,7 @@ def create_app() -> FastAPI:
             return
 
         try:
-            for event in observer_stream_events(after_seq=after_seq):
+            for event in observer_repo.stream_events(session_id, after_seq=after_seq):
                 await websocket.send_json(event)
             await websocket.send_json({"type": "stream_end", "after_seq": after_seq})
         except WebSocketDisconnect:

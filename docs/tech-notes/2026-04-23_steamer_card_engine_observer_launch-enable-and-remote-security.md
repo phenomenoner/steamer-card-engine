@@ -21,6 +21,12 @@ Deliverables:
 - append-only observer event emitter
 - latest-state projection materializer for bootstrap rebuild
 - explicit seq allocator / monotonic ordering contract
+- a public-safe attachment seam so the observer API can mount sanitized session bundles without importing private mapping logic
+
+Current public-safe attachment seam:
+- `STEAMER_OBSERVER_BUNDLE_JSON=<path[:path2...]>` mounts one or more sanitized observer session bundle JSON files
+- `STEAMER_OBSERVER_INCLUDE_MOCK=0` disables the demo session so a private-attached session can be the only exposed observer surface
+- bundle contract is `metadata + events` with optional `candles` / `bootstrap`; if `bootstrap` is omitted the repo-side bridge rebuilds it from the event stream
 
 Done means:
 - one real session can emit sanitized bootstrap + stream payloads matching the v0 observer contract
