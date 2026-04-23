@@ -234,6 +234,7 @@ def _build_execution_payload(
     symbol: str,
     side: str,
     phase_assessment: Any,
+    requested_qty: float = 1.0,
 ) -> dict[str, Any]:
     profile_name = phase_assessment.default_order_profile if phase_assessment else None
     return {
@@ -255,7 +256,7 @@ def _build_execution_payload(
         "requested_user_def_suffix": (
             phase_assessment.requested_user_def_suffix if phase_assessment else None
         ),
-        "qty": 0.0,
+        "qty": float(requested_qty),
         "limit_price": None,
     }
 
@@ -281,6 +282,39 @@ def _build_lifecycle_placeholder(
         "phase_semantic_label": execution_payload.get("phase_semantic_label"),
         "order_profile_name": execution_payload.get("order_profile_name"),
     }
+
+
+def _build_lifecycle_event(
+    *,
+    execution_payload: dict[str, Any],
+    state: str,
+    event_time_utc: str,
+    cum_qty: float,
+    leaves_qty: float,
+    last_fill_qty: float | None,
+    last_fill_price: float | None,
+    reason_code: str,
+) -> dict[str, Any]:
+    exec_request_id = str(execution_payload["exec_request_id"])
+    return {
+        "lifecycle_event_id": f"lifecycle-{state}-{exec_request_id}",
+        "exec_request_id": exec_request_id,
+        "order_id": f"order-{exec_request_id}",
+        "event_time_utc": event_time_utc,
+        "state": state,
+        "cum_qty": cum_qty,
+        "leaves_qty": leaves_qty,
+        "last_fill_qty": last_fill_qty,
+        "last_fill_price": last_fill_price,
+        "reason_code": reason_code,
+        "market_phase": execution_payload.get("market_phase"),
+        "phase_semantic_label": execution_payload.get("phase_semantic_label"),
+        "order_profile_name": execution_payload.get("order_profile_name"),
+    }
+
+
+def _signed_qty(side: str, qty: float) -> float:
+    return qty if side == "buy" else -qty
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -378,9 +412,17 @@ def normalize_baseline_bundle(
     risk_total = 0
     execution_total = 0
     order_lifecycle_total = 0
+    fill_total = 0
+    position_total = 0
     symbols: set[str] = set()
     min_event_time: str | None = None
     max_event_time: str | None = None
+    latest_price_by_symbol: dict[str, float] = {}
+    position_state_by_symbol: dict[str, dict[str, Any]] = {}
+    realized_pnl_gross_total = 0.0
+    entry_fill_count = 0
+    exit_fill_count = 0
+    max_position_qty = 0.0
 
     event_log_path = output_dir / "event-log.jsonl"
     feature_path = output_dir / "feature-provenance.jsonl"
@@ -401,9 +443,6 @@ def normalize_baseline_bundle(
         fills_path.open("w", encoding="utf-8") as fills_file,
         positions_path.open("w", encoding="utf-8") as positions_file,
     ):
-        del fills_file
-        del positions_file
-
         seq_no = 0
         for source in event_sources:
             for line_no, row in _jsonl_iter(source):
@@ -425,6 +464,9 @@ def normalize_baseline_bundle(
 
                 symbol = str(row.get("symbol") or "UNKNOWN")
                 symbols.add(symbol)
+                price = row.get("price")
+                if isinstance(price, (int, float)):
+                    latest_price_by_symbol[symbol] = float(price)
 
                 if min_event_time is None or event_time < min_event_time:
                     min_event_time = event_time
@@ -621,6 +663,87 @@ def normalize_baseline_bundle(
                         lifecycle_file.write(json.dumps(lifecycle_payload, ensure_ascii=False) + "\n")
                         execution_total += 1
                         order_lifecycle_total += 1
+
+                        fill_qty = float(execution_payload.get("qty") or 0.0)
+                        fill_price = latest_price_by_symbol.get(symbol)
+                        if fill_qty > 0 and fill_price is not None:
+                            lifecycle_file.write(
+                                json.dumps(
+                                    _build_lifecycle_event(
+                                        execution_payload=execution_payload,
+                                        state="filled",
+                                        event_time_utc=decision_ts,
+                                        cum_qty=fill_qty,
+                                        leaves_qty=0.0,
+                                        last_fill_qty=fill_qty,
+                                        last_fill_price=fill_price,
+                                        reason_code=reason_code,
+                                    ),
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            order_lifecycle_total += 1
+
+                            prior = position_state_by_symbol.get(
+                                symbol,
+                                {
+                                    "position_id": f"position-{symbol}",
+                                    "net_qty": 0.0,
+                                    "avg_cost": 0.0,
+                                },
+                            )
+                            prior_net = float(prior["net_qty"])
+                            signed_fill = _signed_qty(side, fill_qty)
+                            new_net = prior_net + signed_fill
+                            avg_cost = fill_price if new_net != 0 else 0.0
+                            position_state_by_symbol[symbol] = {
+                                "position_id": prior["position_id"],
+                                "net_qty": new_net,
+                                "avg_cost": avg_cost,
+                            }
+
+                            fills_file.write(
+                                json.dumps(
+                                    {
+                                        "fill_id": f"fill-{execution_payload['exec_request_id']}",
+                                        "order_id": f"order-{execution_payload['exec_request_id']}",
+                                        "position_id": prior["position_id"],
+                                        "fill_time_utc": decision_ts,
+                                        "symbol": symbol,
+                                        "side": side,
+                                        "qty": fill_qty,
+                                        "price": fill_price,
+                                        "fee_amount": 0.0,
+                                        "tax_amount": 0.0,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            fill_total += 1
+
+                            positions_file.write(
+                                json.dumps(
+                                    {
+                                        "position_event_id": f"position-event-{execution_payload['exec_request_id']}",
+                                        "position_id": prior["position_id"],
+                                        "event_time_utc": decision_ts,
+                                        "symbol": symbol,
+                                        "net_qty": new_net,
+                                        "avg_cost": avg_cost,
+                                        "position_state": "open" if new_net != 0 else "flat",
+                                        "exit_reason": None,
+                                        "realized_pnl_gross": 0.0,
+                                        "realized_pnl_net": 0.0,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            position_total += 1
+                            entry_fill_count += 1
+                            max_position_qty = max(max_position_qty, abs(new_net))
                 elif stage in {"exit", "reduce"}:
                     if phase_assessment is not None and phase_assessment.allows_exit_monitoring:
                         execution_payload = _build_execution_payload(
@@ -639,6 +762,87 @@ def normalize_baseline_bundle(
                         lifecycle_file.write(json.dumps(lifecycle_payload, ensure_ascii=False) + "\n")
                         execution_total += 1
                         order_lifecycle_total += 1
+
+                        current = position_state_by_symbol.get(symbol)
+                        fill_qty = float(execution_payload.get("qty") or 0.0)
+                        fill_price = latest_price_by_symbol.get(symbol)
+                        if current and fill_qty > 0 and fill_price is not None and float(current.get("net_qty") or 0.0) != 0.0:
+                            prior_net = float(current["net_qty"])
+                            signed_fill = _signed_qty(side, min(fill_qty, abs(prior_net)))
+                            closed_qty = abs(signed_fill)
+                            new_net = prior_net + signed_fill
+                            avg_cost = float(current.get("avg_cost") or 0.0)
+                            realized_piece = 0.0
+                            if prior_net > 0 and side == "sell":
+                                realized_piece = (fill_price - avg_cost) * closed_qty
+                            elif prior_net < 0 and side == "buy":
+                                realized_piece = (avg_cost - fill_price) * closed_qty
+                            realized_pnl_gross_total += realized_piece
+
+                            lifecycle_file.write(
+                                json.dumps(
+                                    _build_lifecycle_event(
+                                        execution_payload=execution_payload,
+                                        state="filled",
+                                        event_time_utc=decision_ts,
+                                        cum_qty=closed_qty,
+                                        leaves_qty=max(abs(new_net), 0.0),
+                                        last_fill_qty=closed_qty,
+                                        last_fill_price=fill_price,
+                                        reason_code=reason_code,
+                                    ),
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            order_lifecycle_total += 1
+
+                            fills_file.write(
+                                json.dumps(
+                                    {
+                                        "fill_id": f"fill-{execution_payload['exec_request_id']}",
+                                        "order_id": f"order-{execution_payload['exec_request_id']}",
+                                        "position_id": current["position_id"],
+                                        "fill_time_utc": decision_ts,
+                                        "symbol": symbol,
+                                        "side": side,
+                                        "qty": closed_qty,
+                                        "price": fill_price,
+                                        "fee_amount": 0.0,
+                                        "tax_amount": 0.0,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            fill_total += 1
+
+                            new_avg_cost = 0.0 if new_net == 0 else avg_cost
+                            position_state_by_symbol[symbol] = {
+                                "position_id": current["position_id"],
+                                "net_qty": new_net,
+                                "avg_cost": new_avg_cost,
+                            }
+                            positions_file.write(
+                                json.dumps(
+                                    {
+                                        "position_event_id": f"position-event-{execution_payload['exec_request_id']}",
+                                        "position_id": current["position_id"],
+                                        "event_time_utc": decision_ts,
+                                        "symbol": symbol,
+                                        "net_qty": new_net,
+                                        "avg_cost": new_avg_cost,
+                                        "position_state": "open" if new_net != 0 else "flat",
+                                        "exit_reason": reason_code if new_net == 0 else None,
+                                        "realized_pnl_gross": realized_piece,
+                                        "realized_pnl_net": realized_piece,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            position_total += 1
+                            exit_fill_count += 1
                     else:
                         add_anomaly(
                             "major",
@@ -822,19 +1026,16 @@ def normalize_baseline_bundle(
 
     pnl_summary = {
         "currency": "TWD",
-        "realized_pnl_gross": 0.0,
+        "realized_pnl_gross": realized_pnl_gross_total,
         "fees_total": 0.0,
         "taxes_total": 0.0,
-        "realized_pnl_net": 0.0,
-        # NOTE: This normalizer does not currently emit fills/positions/PnL; keep
-        # pnl-summary aligned with that truth. Any legacy "entry" metrics are
-        # carried as diagnostic fields instead of being reported as executed entries.
-        "entry_count": 0,
-        "exit_count": 0,
+        "realized_pnl_net": realized_pnl_gross_total,
+        "entry_count": entry_fill_count,
+        "exit_count": exit_fill_count,
         "exit_reason_counts": {},
-        "win_count": 0,
-        "loss_count": 0,
-        "max_position_qty": 0.0,
+        "win_count": 1 if realized_pnl_gross_total > 0 else 0,
+        "loss_count": 1 if realized_pnl_gross_total < 0 else 0,
+        "max_position_qty": max_position_qty,
         "entry_request_count": execution_total,
     }
 
@@ -971,8 +1172,8 @@ def normalize_baseline_bundle(
             "risk_receipts": risk_total,
             "execution_requests": execution_total,
             "order_lifecycle": order_lifecycle_total,
-            "fills": 0,
-            "positions": 0,
+            "fills": fill_total,
+            "positions": position_total,
             "anomalies": len(anomalies),
         },
     }

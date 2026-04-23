@@ -241,15 +241,30 @@ def test_sim_normalize_baseline_regular_session_emits_execution_request(tmp_path
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     execution_rows = [json.loads(line) for line in (output_dir / "execution-log.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    lifecycle_rows = [json.loads(line) for line in (output_dir / "order-lifecycle.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    fill_rows = [json.loads(line) for line in (output_dir / "fills.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    position_rows = [json.loads(line) for line in (output_dir / "positions.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    pnl_summary = _load_json(output_dir / "pnl-summary.json")
     run_manifest = _load_json(output_dir / "run-manifest.json")
 
     assert code == 0
     assert payload["counts"]["execution_requests"] == 1
+    assert payload["counts"]["fills"] == 1
+    assert payload["counts"]["positions"] == 1
     assert execution_rows[0]["market_phase"] == "regular_session"
     assert execution_rows[0]["phase_semantic_label"] == "regular_entry"
     assert execution_rows[0]["time_in_force"] == "IOC"
     assert execution_rows[0]["order_profile_name"] == "regular-entry-market-ioc"
     assert execution_rows[0]["requested_user_def_suffix"] == "Enter"
+    assert execution_rows[0]["qty"] == 1.0
+    assert lifecycle_rows[0]["state"] == "new"
+    assert lifecycle_rows[1]["state"] == "filled"
+    assert fill_rows[0]["symbol"] == "2330"
+    assert fill_rows[0]["qty"] == 1.0
+    assert position_rows[0]["net_qty"] == 1.0
+    assert position_rows[0]["position_state"] == "open"
+    assert pnl_summary["entry_count"] == 1
+    assert pnl_summary["max_position_qty"] == 1.0
     assert run_manifest["session_phase_trace"][0]["phase"] == "pre_open_trial_match"
     assert run_manifest["session_phase_trace"][-1]["phase"] == "regular_session"
 
