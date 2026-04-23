@@ -29,6 +29,7 @@ from steamer_card_engine.operator_control import (
     operator_status,
     operator_submit_order_smoke,
 )
+from steamer_card_engine.observer.sim import build_sim_observer_bundle, write_sim_observer_bundle_json
 from steamer_card_engine.sim_compare import (
     SimCompareError,
     compare_bundles,
@@ -227,6 +228,19 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--output-dir", required=True)
     compare.add_argument("--allow-missing-fingerprint", action="store_true")
     compare.add_argument("--json", action="store_true", dest="as_json")
+
+    observer_bundle = sim_sub.add_parser(
+        "emit-observer-bundle",
+        help="Convert a normalized SIM bundle into an observer attachment bundle",
+    )
+    observer_bundle.add_argument("--bundle-dir", required=True)
+    observer_bundle.add_argument("--output", required=True)
+    observer_bundle.add_argument("--session-id", required=True)
+    observer_bundle.add_argument("--engine-id", default="steamer-card-engine.sim")
+    observer_bundle.add_argument("--session-label", default="Steamer simulated observer")
+    observer_bundle.add_argument("--market-mode", default="sim")
+    observer_bundle.add_argument("--timeframe", default="1m")
+    observer_bundle.add_argument("--json", action="store_true", dest="as_json")
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
@@ -1768,6 +1782,46 @@ def main(argv: list[str] | None = None) -> int:
                     f"hard_fails={len(summary['hard_fail_reasons'])}"
                 )
             return exit_code
+
+        if args.command == "sim" and args.sim_command == "emit-observer-bundle":
+            output_path = Path(args.output)
+            bundle = build_sim_observer_bundle(
+                bundle_dir=Path(args.bundle_dir),
+                session_id=args.session_id,
+                engine_id=args.engine_id,
+                session_label=args.session_label,
+                market_mode=args.market_mode,
+                timeframe=args.timeframe,
+            )
+            write_sim_observer_bundle_json(bundle=bundle, output_path=output_path)
+            summary = {
+                "session_id": bundle.bootstrap.session_id,
+                "engine_id": bundle.bootstrap.engine_id,
+                "symbol": bundle.bootstrap.symbol,
+                "market_mode": bundle.bootstrap.market_mode,
+                "output": str(output_path),
+                "counts": {
+                    "events": len(bundle.events),
+                    "candles": len(bundle.candles),
+                    "timeline": len(bundle.bootstrap.timeline),
+                },
+            }
+            if args.as_json:
+                summary = _attach_cli_contract(
+                    summary,
+                    command="sim emit-observer-bundle",
+                    exit_code=0,
+                    status_key="bundle_status",
+                    status_value="emitted",
+                )
+                _print_json(summary)
+            else:
+                print(
+                    "Observer bundle emitted "
+                    f"session_id={bundle.bootstrap.session_id} output={output_path} "
+                    f"events={len(bundle.events)}"
+                )
+            return 0
 
         if args.command == "operator" and args.operator_command == "status":
             result = operator_status(

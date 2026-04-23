@@ -129,3 +129,34 @@ def test_written_sim_observer_bundle_mounts_via_dashboard(monkeypatch, tmp_path:
     monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
     monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
     reset_observer_repository_cache()
+
+
+def test_cli_emits_sim_observer_bundle_json(tmp_path: Path, capsys) -> None:
+    bundle_dir = _emit_sim_bundle(tmp_path)
+    capsys.readouterr()
+    output_path = tmp_path / "observer-sim-attachment.json"
+
+    code = main(
+        [
+            "sim",
+            "emit-observer-bundle",
+            "--bundle-dir",
+            str(bundle_dir),
+            "--output",
+            str(output_path),
+            "--session-id",
+            "sim-2026-03-13-2330",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    mounted = load_bundle_from_json(output_path)
+
+    assert code == 0
+    assert payload["session_id"] == "sim-2026-03-13-2330"
+    assert payload["output"] == str(output_path)
+    assert payload["counts"]["events"] >= 1
+    assert payload["cli_contract"]["command"] == "sim emit-observer-bundle"
+    assert mounted.bootstrap.session_id == "sim-2026-03-13-2330"
+    assert mounted.bootstrap.position.quantity == 1
