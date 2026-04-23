@@ -3,18 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from functools import lru_cache
 
-from .schema import (
-    CandleBar,
-    ChartMarker,
-    FillSummary,
-    HealthSummary,
-    ObserverBootstrap,
-    ObserverEvent,
-    ObserverSessionBundle,
-    OrderSummary,
-    PositionSummary,
-    TimelineEntry,
-)
+from .bridge import ObserverProjector, ObserverSessionMetadata
+from .schema import CandleBar, ObserverEvent, ObserverSessionBundle
 
 
 def _event(
@@ -68,42 +58,18 @@ def build_mock_observer_session() -> ObserverSessionBundle:
         _event(16, "candle_bar", "2026-04-23T09:05:00Z", "degraded", title="09:05 candle", summary="Observer remains coherent under degraded freshness.", candle=asdict(candles[5])),
     ]
 
-    markers = [
-        ChartMarker(time="2026-04-23T09:01:00Z", position="belowBar", shape="arrowUp", color="#5ef3b1", text="BUY SUBMIT", event_id="evt-0005"),
-        ChartMarker(time="2026-04-23T09:02:00Z", position="belowBar", shape="circle", color="#80c2ff", text="FILL 100", event_id="evt-0008"),
-        ChartMarker(time="2026-04-23T09:03:00Z", position="aboveBar", shape="square", color="#ffcd81", text="LAG", event_id="evt-0011"),
-        ChartMarker(time="2026-04-23T09:05:05Z", position="aboveBar", shape="square", color="#ff6b6b", text="GAP", event_id="evt-0015"),
-    ]
-
     snapshot_seq = 14
     snapshot_events = [event for event in events if event.seq <= snapshot_seq]
-    timeline = [
-        TimelineEntry(seq=event.seq, event_time=event.event_time, event_type=event.event_type, title=str(event.partial_data.get("title", event.event_type)), summary=str(event.partial_data.get("summary", "")), freshness_state=event.freshness_state, status=("warn" if event.freshness_state in {"lagging", "degraded", "stale"} else "ok"))
-        for event in reversed(snapshot_events)
-    ]
-
-    bootstrap = ObserverBootstrap(
-        schema_version="observer.v0",
+    projector = ObserverProjector(timeline_limit=12)
+    metadata = ObserverSessionMetadata(
         session_id="aws-live-sim-demo",
         engine_id="steamer-card-engine.live-sim",
         session_label="AWS live(sim) observer demo",
         market_mode="live(sim)",
         symbol="2330.TW",
         timeframe="1m",
-        generated_at="2026-04-23T09:04:10Z",
-        latest_seq=snapshot_seq,
-        freshness_state="fresh",
-        chart={
-            "candles": [asdict(item) for item in candles[:5]],
-            "markers": [asdict(item) for item in markers[:3]],
-            "position_band": {"side": "long", "avg_price": 143.06, "last_price": 143.5},
-        },
-        position=PositionSummary(side="long", quantity=100, avg_price=143.06, market_price=143.5, unrealized_pnl=44.0, realized_pnl=0.0),
-        open_orders=[OrderSummary(order_id="ord-001", status="filled", side="buy", quantity=100, limit_price=143.05, filled_quantity=100, submitted_at="2026-04-23T09:01:15Z")],
-        last_fill=FillSummary(fill_id="fill-001", side="buy", quantity=100, price=143.06, filled_at="2026-04-23T09:02:03Z"),
-        health=HealthSummary(engine_state="healthy", feed_freshness_seconds=2, freshness_state="fresh", incidents=["feed_lag_6s"]),
-        timeline=timeline[:12],
     )
+    bootstrap = projector.bootstrap_from_events(metadata, snapshot_events)
     return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
 
 

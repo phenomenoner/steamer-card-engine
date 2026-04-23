@@ -77,10 +77,28 @@ Open `櫻花刀舞 non-stop` implementation with this sequence:
   - `./.venv/bin/pytest tests/test_dashboard.py -q` -> `12 passed`
   - `npm --prefix frontend run build` -> pass
 
+## Private bridge v0 progress
+- Landed public-safe observer bridge planning artifacts:
+  - `docs/tech-notes/2026-04-23_steamer_card_engine_observer_private_bridge_v0.md`
+  - `ops/execution-packets/2026-04-23_steamer-card-engine_observer-private-bridge-v0.packet.md`
+- Landed `src/steamer_card_engine/observer/bridge.py` as a deterministic read-only projection layer that rebuilds bootstrap state from sanitized observer events.
+- Refactored the mock observer path to rebuild bootstrap through the bridge instead of duplicating snapshot presentation state by hand.
+- Added focused bridge tests in `tests/test_observer_bridge.py`.
+- Verifiers passed for the bridge slice:
+  - `ruff check src/steamer_card_engine/observer src/steamer_card_engine/dashboard/api.py tests/test_dashboard.py tests/test_observer_bridge.py`
+  - `pytest tests/test_dashboard.py tests/test_observer_bridge.py -q` -> `17 passed`
+  - `npm --prefix frontend run build` -> pass
+- Claude review on bridge v0 produced real fixes and they were absorbed immediately:
+  - `apply()` is now explicit mutating contract instead of mutating plus returning state
+  - `to_bar_time()` now rejects invalid timestamp shapes instead of silently truncating garbage
+  - `order_acknowledged` no longer fabricates phantom orders when sequence history is missing
+  - incremental `apply()` / duplicate-seq / health-gap event behavior is now test-covered
+- Meaningful next gate remains unchanged: real private live adapter attachment is still separate and intentionally not landed in the public-safe repo.
+
 ## Next recommended move
-1. split the packaging modernization (`pyproject.toml`) into its own cleanup commit if we want a surgically clean feature history
-2. prepare the observer slice as the first local milestone commit
-3. keep public push blocked until we intentionally choose the safe publication moment
+1. absorb bounded code-review findings for bridge v0 if any
+2. commit the bridge slice as the next local milestone
+3. then cut the first private-adapter attachment packet against the new projection boundary
 
 ## Topology statement
 Unchanged.
