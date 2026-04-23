@@ -32,8 +32,8 @@ steamer-card-engine-timesfm-first-run = "steamer_card_engine.timesfm_first_run:m
 [tool.hatch.build.targets.wheel]
 packages = ["src/steamer_card_engine"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
   "httpx>=0.28.0",
   "pytest>=8.3.5",
   "ruff>=0.11.0",
