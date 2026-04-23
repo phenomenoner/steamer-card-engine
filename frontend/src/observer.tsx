@@ -1,4 +1,4 @@
-import { createChart, type IChartApi, type ISeriesApi, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
+import { CandlestickSeries, createChart, createSeriesMarkers, type IChartApi, type ISeriesApi, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type FreshnessState = "fresh" | "lagging" | "stale" | "degraded";
@@ -253,52 +253,72 @@ function ObserverChart({ candles, markers }: { candles: Candle[]; markers: Chart
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [chartError, setChartError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hostRef.current) return;
-    const chart = createChart(hostRef.current, {
-      autoSize: true,
-      layout: { background: { color: "#0a1016" }, textColor: "#8ba8bb" },
-      grid: { vertLines: { color: "rgba(141,170,186,0.08)" }, horzLines: { color: "rgba(141,170,186,0.08)" } },
-      timeScale: { timeVisible: true, secondsVisible: true, borderColor: "rgba(141,170,186,0.2)" },
-      rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
-      crosshair: { vertLine: { color: "rgba(94,243,177,0.3)" }, horzLine: { color: "rgba(94,243,177,0.3)" } },
-    });
-    const series = chart.addCandlestickSeries({
-      upColor: "#5ef3b1",
-      downColor: "#ff6b6b",
-      borderVisible: false,
-      wickUpColor: "#5ef3b1",
-      wickDownColor: "#ff6b6b",
-    });
-    chartRef.current = chart;
-    seriesRef.current = series;
-    return () => chart.remove();
+    try {
+      const chart = createChart(hostRef.current, {
+        autoSize: true,
+        layout: { background: { color: "#0a1016" }, textColor: "#8ba8bb" },
+        grid: { vertLines: { color: "rgba(141,170,186,0.08)" }, horzLines: { color: "rgba(141,170,186,0.08)" } },
+        timeScale: { timeVisible: true, secondsVisible: true, borderColor: "rgba(141,170,186,0.2)" },
+        rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
+        crosshair: { vertLine: { color: "rgba(94,243,177,0.3)" }, horzLine: { color: "rgba(94,243,177,0.3)" } },
+      });
+      const series = chart.addSeries(CandlestickSeries, {
+        upColor: "#5ef3b1",
+        downColor: "#ff6b6b",
+        borderVisible: false,
+        wickUpColor: "#5ef3b1",
+        wickDownColor: "#ff6b6b",
+      });
+      chartRef.current = chart;
+      seriesRef.current = series;
+      setChartError(null);
+      return () => chart.remove();
+    } catch (error) {
+      setChartError(error instanceof Error ? error.message : String(error));
+      return;
+    }
   }, []);
 
   useEffect(() => {
     if (!seriesRef.current || !chartRef.current) return;
-    const data: CandlestickData[] = candles.map((candle) => ({
-      time: toUtcTimestamp(candle.time),
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-    }));
-    seriesRef.current.setData(data);
-    seriesRef.current.setMarkers(
-      [...markers]
-        .sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime())
-        .map((marker) => ({
-          time: toUtcTimestamp(marker.time),
-          position: marker.position,
-          shape: marker.shape,
-          color: marker.color,
-          text: marker.text,
-        })),
-    );
-    chartRef.current.timeScale().fitContent();
+    try {
+      const data: CandlestickData[] = candles
+        .filter((candle) => [candle.open, candle.high, candle.low, candle.close].every((value) => Number.isFinite(value)))
+        .map((candle) => ({
+          time: toUtcTimestamp(candle.time),
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+        }));
+      seriesRef.current.setData(data);
+      createSeriesMarkers(
+        seriesRef.current,
+        [...markers]
+          .filter((marker) => marker.time && marker.position && marker.shape)
+          .sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime())
+          .map((marker) => ({
+            time: toUtcTimestamp(marker.time),
+            position: marker.position,
+            shape: marker.shape,
+            color: marker.color,
+            text: marker.text,
+          })),
+      );
+      chartRef.current.timeScale().fitContent();
+      setChartError(null);
+    } catch (error) {
+      setChartError(error instanceof Error ? error.message : String(error));
+    }
   }, [candles, markers]);
+
+  if (chartError) {
+    return <div className="state-block text-alert">CHART ERROR: {chartError}</div>;
+  }
 
   return <div className="observer-chart" ref={hostRef} />;
 }
