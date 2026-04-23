@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
+import { ObserverSurface } from "./observer";
 
-type DashboardTab = "live-sim" | "strategy-powerhouse" | "strategy-pipeline";
+type DashboardTab = "observer" | "live-sim" | "strategy-powerhouse" | "strategy-pipeline";
 
 type DateItem = {
   date: string;
@@ -1364,7 +1365,7 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
 }
 
 function App() {
-  const [dashboardTab, setDashboardTab] = useState<DashboardTab>("live-sim");
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>("observer");
   const [dates, setDates] = useState<DateItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [deck, setDeck] = useState<DeckView | null>(null);
@@ -1476,14 +1477,23 @@ function App() {
           <div className="hero-info">
             <h1>Steamer Dashboard</h1>
             <p>
-              {dashboardTab === "live-sim"
-                ? liveSimSubtitle
-                : dashboardTab === "strategy-powerhouse"
-                  ? "Research/control truth from local strategy-powerhouse artifacts. Read-only; no execution authority."
-                  : "Whole-pipeline design, components, autonomous drivers, and handoff gates from local state/receipts. Read-only."}
+              {dashboardTab === "observer"
+                ? "Browser-openable live observer sidecar for one sanitized engine session. Chart, markers, orders, fills, position, and freshness all reconcile from one sequence."
+                : dashboardTab === "live-sim"
+                  ? liveSimSubtitle
+                  : dashboardTab === "strategy-powerhouse"
+                    ? "Research/control truth from local strategy-powerhouse artifacts. Read-only; no execution authority."
+                    : "Whole-pipeline design, components, autonomous drivers, and handoff gates from local state/receipts. Read-only."}
             </p>
           </div>
           <nav className="dashboard-tabs">
+            <button
+              className={`dashboard-tab ${dashboardTab === "observer" ? "dashboard-tab-active" : ""}`}
+              onClick={() => setDashboardTab("observer")}
+              type="button"
+            >
+              Observer Sidecar
+            </button>
             <button
               className={`dashboard-tab ${dashboardTab === "live-sim" ? "dashboard-tab-active" : ""}`}
               onClick={() => setDashboardTab("live-sim")}
@@ -1525,7 +1535,9 @@ function App() {
         ) : null}
       </header>
 
-      {dashboardTab === "live-sim" ? (
+      {dashboardTab === "observer" ? (
+        <ObserverSurface />
+      ) : dashboardTab === "live-sim" ? (
         deckLoading ? (
           <div className="state-block">Engaging deck link…</div>
         ) : deck ? (

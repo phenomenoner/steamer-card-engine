@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+from steamer_card_engine.observer import (
+    list_mock_sessions,
+    observer_bootstrap_payload,
+    observer_candles_payload,
+    observer_stream_events,
+    observer_timeline_payload,
+)
 
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
@@ -79,6 +87,50 @@ def create_app() -> FastAPI:
     @app.get("/api/strategy-pipeline")
     def strategy_pipeline() -> dict:
         return build_strategy_pipeline_view(root)
+
+    @app.get("/api/observer/sessions")
+    def observer_sessions() -> dict:
+        return {"items": list_mock_sessions()}
+
+    @app.get("/api/observer/sessions/{session_id}/bootstrap")
+    def observer_bootstrap(session_id: str) -> dict:
+        if session_id != "aws-live-sim-demo":
+            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
+        return observer_bootstrap_payload()
+
+    @app.get("/api/observer/sessions/{session_id}/candles")
+    def observer_candles(session_id: str, limit: int = 500) -> dict:
+        if session_id != "aws-live-sim-demo":
+            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
+        return observer_candles_payload(limit=limit)
+
+    @app.get("/api/observer/sessions/{session_id}/timeline")
+    def observer_timeline(session_id: str, limit: int = 200) -> dict:
+        if session_id != "aws-live-sim-demo":
+            raise HTTPException(status_code=404, detail=f"unknown observer session: {session_id}")
+        return observer_timeline_payload(limit=limit)
+
+    @app.websocket("/api/observer/sessions/{session_id}/stream")
+    async def observer_stream(websocket: WebSocket, session_id: str) -> None:
+        if session_id != "aws-live-sim-demo":
+            await websocket.close(code=4404)
+            return
+        await websocket.accept()
+        raw_after_seq = websocket.query_params.get("after_seq", "0")
+        try:
+            after_seq = int(raw_after_seq)
+        except ValueError:
+            await websocket.send_json({"type": "error", "detail": f"invalid after_seq: {raw_after_seq}"})
+            await websocket.close(code=4400)
+            return
+
+        try:
+            for event in observer_stream_events(after_seq=after_seq):
+                await websocket.send_json(event)
+            await websocket.send_json({"type": "stream_end", "after_seq": after_seq})
+        except WebSocketDisconnect:
+            return
+        await websocket.close()
 
     @app.exception_handler(DashboardDataError)
     async def dashboard_data_error_handler(_request, error: DashboardDataError) -> JSONResponse:

@@ -697,19 +697,115 @@ button {
 
 .text-alert { color: var(--alert); }
 
+/* --- Observer Sidecar --- */
+
+.observer-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.observer-hero-panel h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.observer-hero-body {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.observer-title-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.observer-top-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.observer-top-meta > div,
+.observer-incident {
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.observer-top-meta strong {
+  display: block;
+  margin-top: 6px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.observer-metrics-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.observer-metric-card strong {
+  font-size: 1.35rem;
+}
+
+.observer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 24px;
+}
+
+.observer-right-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.observer-chart-wrap {
+  padding: 12px;
+}
+
+.observer-chart {
+  width: 100%;
+  height: 520px;
+}
+
+.observer-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.observer-health-grid,
+.observer-kv-grid {
+  margin-bottom: 0;
+}
+
+.observer-timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
 @media (max-width: 1200px) {
-  .dashboard-surface {
+  .dashboard-surface,
+  .observer-grid {
     grid-template-columns: 1fr;
   }
 
-  .hero {
+  .hero,
+  .observer-hero-body {
     flex-direction: column;
     align-items: flex-start;
   }
 }
 
 @media (max-width: 768px) {
-  .metrics-row {
+  .metrics-row,
+  .observer-metrics-row,
+  .observer-top-meta {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -719,13 +815,17 @@ button {
 }
 
 @media (max-width: 560px) {
-  .metrics-row {
+  .metrics-row,
+  .observer-metrics-row,
+  .observer-top-meta {
     grid-template-columns: 1fr;
   }
 
   .strategy-summary-head,
-  .history-item-head {
+  .history-item-head,
+  .observer-title-row {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .timeline-trigger {

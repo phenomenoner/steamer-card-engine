@@ -387,3 +387,51 @@ def test_dashboard_api_404_for_unknown_day() -> None:
     client = TestClient(create_app())
     response = client.get("/api/days/1999-01-01/summary")
     assert response.status_code == 404
+
+
+def test_observer_api_seed_routes_and_stream_reconcile_contract() -> None:
+    client = TestClient(create_app())
+
+    sessions_response = client.get("/api/observer/sessions")
+    assert sessions_response.status_code == 200
+    sessions = sessions_response.json()["items"]
+    assert sessions
+    session_id = sessions[0]["session_id"]
+
+    bootstrap_response = client.get(f"/api/observer/sessions/{session_id}/bootstrap")
+    assert bootstrap_response.status_code == 200
+    bootstrap = bootstrap_response.json()
+    assert bootstrap["schema_version"] == "observer.v0"
+    assert bootstrap["latest_seq"] == 14
+    assert bootstrap["chart"]["candles"]
+    assert bootstrap["chart"]["markers"]
+    assert len(bootstrap["timeline"]) == 12
+
+    candles_response = client.get(f"/api/observer/sessions/{session_id}/candles?limit=3")
+    assert candles_response.status_code == 200
+    candles = candles_response.json()["items"]
+    assert len(candles) == 3
+
+    timeline_response = client.get(f"/api/observer/sessions/{session_id}/timeline?limit=5")
+    assert timeline_response.status_code == 200
+    timeline = timeline_response.json()["items"]
+    assert len(timeline) == 5
+    assert timeline[0]["seq"] >= timeline[-1]["seq"]
+
+    unknown_bootstrap = client.get("/api/observer/sessions/unknown/bootstrap")
+    assert unknown_bootstrap.status_code == 404
+
+    with client.websocket_connect(f"/api/observer/sessions/{session_id}/stream?after_seq=14") as websocket:
+        first_event = websocket.receive_json()
+        second_event = websocket.receive_json()
+
+    assert first_event["seq"] == 15
+    assert first_event["event_type"] == "data_gap_detected"
+    assert second_event["seq"] == 16
+    assert second_event["event_type"] == "candle_bar"
+
+    with client.websocket_connect(f"/api/observer/sessions/{session_id}/stream?after_seq=abc") as websocket:
+        error_payload = websocket.receive_json()
+
+    assert error_payload["type"] == "error"
+    assert "invalid after_seq" in error_payload["detail"]
