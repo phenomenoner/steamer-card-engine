@@ -76,6 +76,16 @@ Example capability questions the runtime should answer cleanly:
 
 Trading permission is a capability envelope, not a casual paper/live flag. A submit is allowed only when the logical session and broker adapter capability profile both explicitly permit the action and execution mode. Successful login with marketdata or account access must still fail closed for broker submit if `trade_enabled`, `paper_trading_enabled`, `live_trading_enabled`, or the required supported action is absent.
 
+The seed contract now models this as a logical session capability envelope:
+
+- `authenticated` / logged-in state is separate from authority.
+- `marketdata_enabled` can allow feed health checks without implying account or trade access.
+- `account_query_enabled` can allow positions/balances health checks without implying submit authority.
+- `trade_enabled`, `paper_trading_enabled`, and `live_trading_enabled` must all be explicit for the requested mode.
+- Unknown execution modes fail closed before any broker call.
+
+Public session/receipt serialization must remain placeholder-safe: account scope should be represented as an opaque scope such as `<ACCOUNT_SCOPE>`, and public messages/references should be bounded and sanitized rather than carrying raw vendor payloads, credentials, account identifiers, or symbols.
+
 ## AuthSessionManager responsibilities
 
 - validate profile shape before attempting login

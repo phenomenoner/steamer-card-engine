@@ -132,6 +132,14 @@ Permission semantics are intentionally fail-closed:
 The runtime may reject a request before the vendor call if the capability profile and session context do not both authorize it.
 That rejection should still produce a normalized broker receipt.
 
+The seed helper contract for submit preflight combines two envelopes and fails closed:
+
+1. the logical `SessionContext` must be authenticated and explicitly allow `submit` for the requested execution mode;
+2. the `BrokerCapabilityProfile` must also explicitly allow `submit` for the same execution mode;
+3. any unknown execution mode is rejected as `capability_mismatch` before adapter dispatch.
+
+This preserves the distinction between a healthy login/session and trading authority. A logged-in session may still be valid for marketdata or account health while broker submit remains unavailable.
+
 ### Normalized broker error envelope
 
 Broker adapters must translate vendor failures into this taxonomy:
@@ -154,6 +162,7 @@ Each normalized broker error must carry stable metadata:
 
 Raw vendor responses, credentials, tokens, certificates, account secrets, and environment dumps must not be embedded in normalized receipts.
 Only opaque references suitable for later local lookup belong in `raw_ref`.
+Public receipt serializers should bound and sanitize free-text `message`, `raw_ref`, receipt ids, and broker ids. Adapter implementations are still responsible for never placing raw vendor payloads or secrets into normalized fields in the first place.
 
 ### Minimum interface sketch
 

@@ -7,6 +7,9 @@ from steamer_card_engine.adapters.base import (
     BrokerCapabilityProfile,
     BrokerReceipt,
     ExecutionRequest,
+    SessionCapabilityEnvelope,
+    SessionContext,
+    broker_submit_preflight,
     normalized_broker_reject,
 )
 
@@ -120,3 +123,117 @@ def test_capability_profile_rejects_unknown_execution_mode_fail_closed() -> None
     )
 
     assert profile.allows("submit", "sandbox") is False  # type: ignore[arg-type]
+
+
+def test_logged_in_trade_disabled_session_allows_data_health_but_submit_fails_closed() -> None:
+    session = SessionContext(
+        session_id="session-fixture-1",
+        auth_mode="account_api_key_cert",
+        authenticated=True,
+        health_status="healthy",
+        capabilities=SessionCapabilityEnvelope(
+            marketdata_enabled=True,
+            account_query_enabled=True,
+            trade_enabled=False,
+            paper_trading_enabled=False,
+            live_trading_enabled=False,
+            supported_actions=("marketdata", "positions"),
+        ),
+        account_scope="<ACCOUNT_SCOPE>",
+    )
+    broker = BrokerCapabilityProfile(
+        trade_enabled=True,
+        paper_trading_enabled=True,
+        supported_actions=("submit",),
+        credential_permission_state="paper-only",
+    )
+    request = ExecutionRequest(
+        request_id="req-session-paper-1",
+        symbol="<SYMBOL>",
+        side="buy",
+        quantity=1,
+        execution_mode="paper",
+    )
+
+    decision = broker_submit_preflight(session=session, broker=broker, request=request)
+    receipt = decision.to_receipt(request.request_id, receipt_id="receipt:req-session-paper-1")
+
+    assert session.allows_marketdata() is True
+    assert session.allows_account_query("positions") is True
+    assert decision.allowed is False
+    assert decision.session_allows is False
+    assert decision.broker_allows is True
+    assert receipt.status == "rejected"
+    assert receipt.error is not None
+    assert receipt.error.category == "capability_mismatch"
+
+
+def test_unknown_execution_mode_submit_preflight_fails_closed() -> None:
+    session = SessionContext(
+        session_id="session-fixture-2",
+        auth_mode="account_api_key_cert",
+        authenticated=True,
+        health_status="healthy",
+        capabilities=SessionCapabilityEnvelope(
+            trade_enabled=True,
+            paper_trading_enabled=True,
+            live_trading_enabled=True,
+            supported_actions=("submit",),
+        ),
+    )
+    broker = BrokerCapabilityProfile(
+        trade_enabled=True,
+        paper_trading_enabled=True,
+        live_trading_enabled=True,
+        supported_actions=("submit",),
+    )
+    request = ExecutionRequest(
+        request_id="req-unknown-mode",
+        symbol="<SYMBOL>",
+        side="buy",
+        quantity=1,
+        execution_mode="sandbox",  # type: ignore[arg-type]
+    )
+
+    decision = broker_submit_preflight(session=session, broker=broker, request=request)
+
+    assert decision.allowed is False
+    assert decision.category == "capability_mismatch"
+    assert decision.session_allows is False
+    assert decision.broker_allows is False
+
+
+def test_public_receipt_sanitizes_message_and_raw_ref() -> None:
+    receipt = normalized_broker_reject(
+        request_id="req-secret-public",
+        category="unknown",
+        message="broker token=super-secret-token leaked in raw payload",
+        retryable=False,
+        safe_to_replay=False,
+        raw_ref="local log token=super-secret-token",
+        receipt_id="receipt id one",
+    )
+
+    public_payload = receipt.to_public_dict()
+    serialized = json.dumps(public_payload, sort_keys=True)
+
+    assert "super-secret-token" not in serialized
+    assert public_payload["message"] == "[redacted]"
+    assert public_payload["raw_ref"] == "[redacted]"
+    assert public_payload["receipt_id"] == "receipt_id_one"
+
+
+def test_session_public_dict_uses_placeholder_safe_scope() -> None:
+    session = SessionContext(
+        session_id="session-fixture-3",
+        authenticated=True,
+        capabilities=SessionCapabilityEnvelope(marketdata_enabled=True),
+        account_scope="<ACCOUNT_SCOPE>",
+        vendor_metadata={"token": "super-secret-token"},
+    )
+
+    serialized = json.dumps(session.to_public_dict(), sort_keys=True)
+
+    assert "super-secret-token" not in serialized
+    assert "<ACCOUNT_SCOPE>" not in serialized
+    assert "_ACCOUNT_SCOPE_" in serialized
