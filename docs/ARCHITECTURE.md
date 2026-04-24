@@ -162,8 +162,11 @@ Responsibilities:
 - fan out normalized events to subscribed cards/components
 - maintain subscription state and symbol routing
 - expose recordable and replay-compatible event shapes
+- expose aggregate-only stats/introspection for receipts and health checks
 
 Rule of thumb: cards may **declare** symbol pools, but they do not open transport connections themselves.
+
+Stats/introspection boundary: `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md` defines the target `market-data-hub-stats/v1` shape. It permits counts, timestamps, stale/error summaries, and replay/live parity booleans; it forbids raw symbols, subscriber identities, raw events, account data, and private paths. Current seed runtime support is intentionally small and should not be described as full native runtime introspection until implemented.
 
 ### FeaturePipeline
 
@@ -270,6 +273,9 @@ The runtime should produce receipts for:
 - risk decisions
 - execution actions
 - replay/live-sim run metadata
+- aggregate-only evidence provenance envelopes when summarizing local evidence archives or reports
+
+`docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md` is the remote-safe contract for provenance envelopes: opaque source pointers, archive/report hashes, parser/schema versions, aggregate row/event/action counts, bounded reason counts, and aggregate MarketDataHub stats only.
 
 This is the minimum required to make agent-authored changes reviewable.
 

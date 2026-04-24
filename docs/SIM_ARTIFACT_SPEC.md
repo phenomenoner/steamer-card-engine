@@ -125,6 +125,12 @@ Recommended (v1, for stronger cross-lane checks):
 - `config_hash`
 - `python_version`
 
+Aggregate evidence provenance note:
+
+- When a sim artifact is produced from or summarized beside a local evidence archive/report, emit or link a remote-safe `evidence-provenance-envelope/v1` payload as defined in `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md`.
+- The envelope is separate from raw run artifacts. It may carry opaque source pointers, archive/report hashes, parser/schema versions, aggregate counts, bounded reason counts, and aggregate MarketDataHub stats only.
+- It must not contain raw symbols, accounts, params, orders/trades, fills, positions, event excerpts, subscriber identities, or private paths.
+
 `market_event_source` minimum:
 
 - `source_id` (dataset identity/path hash)
@@ -375,6 +381,8 @@ Artifacts must not contain:
 
 - raw credentials, API keys, cert passwords, session tokens
 - personal identifiers unrelated to run analysis
+
+Aggregate provenance envelopes add stricter remote-safe constraints for shareable summaries: no raw symbols, accounts, raw params, orders/trades, raw event excerpts, subscriber identities, or private path leakage. See `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md`.
 
 If sensitive fields are needed for debugging, store redacted values only.
 

@@ -13,6 +13,8 @@ This map is ordered by expected ROI for the current Steamer topology.
 
 ### 1. Evidence Provenance Envelope + MarketDataHub stats
 
+Contract draft: `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md` defines the remote-safe, aggregate-only envelope and MarketDataHub stats/introspection target.
+
 Current Steamer fit:
 - `/workspace/steamer` already treats `.data/<host>/<date>.7z` as the local-only evidence source.
 - `dt3` and `r6` already split short/long-focused broker-host evidence.

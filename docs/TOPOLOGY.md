@@ -27,6 +27,7 @@ steamer-card-engine/
 │   ├── M1_EVIDENCE_PACK_ACCEPTANCE_CONTRACT.md
 │   ├── M1_EVIDENCE_PACK_INDEX.md
 │   ├── EVIDENCE_PACKAGING_HYGIENE.md
+│   ├── EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md
 │   ├── SIM_ARTIFACT_SPEC.md
 │   ├── SCENARIO_SPEC.md
 │   ├── CONSULTANT_REVIEW_COPILOT.md
@@ -102,6 +103,7 @@ steamer-card-engine/
 - `docs/MILESTONE_M1_SIM_COMPARABILITY.md` — bounded milestone plan for replay/live-sim artifact comparability
 - `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md` — baseline inventory + comparison contract v0 + sprint-ready stage ordering for M1 execution
 - `docs/SIM_ARTIFACT_SPEC.md` — simulation run artifacts, provenance, and checksum/index contract
+- `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md` — remote-safe aggregate provenance envelope + MarketDataHub stats/introspection contract draft
 - `docs/SCENARIO_SPEC.md` — shared scenario identity contract for baseline-vs-candidate comparability
 
 ### Executable seed (v0.1)
@@ -140,6 +142,7 @@ steamer-card-engine/
 
 - `src/steamer_card_engine/runtime/components.py`
   - **names** the future components, but does not implement conflict resolution / risk / execution
+  - exposes only seed-grade, aggregate-only MarketDataHub stats helpers aligned with `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md`; this is not full native runtime introspection
 - operator commands now maintain a seed local posture/receipt state machine (`.state/operator_posture.json` + `.state/operator_receipts/`)
   - this is a bounded smoke/control surface, not a broker-connected production control plane
   - `live-smoke-readiness` now consumes the same probe/preflight posture contract as `probe-session -> preflight-smoke -> cron`, and only runs the bounded live-capability sequence when that gate is ready
@@ -214,6 +217,7 @@ Canonical note:
 - Sim/replay/operator CLI alignment note: `docs/tech-notes/2026-04-16_steamer_card_engine_sim_replay_operator_cli_contract_alignment.md`
 - Migration sequencing: `docs/MIGRATION_PLAN.md`
 - SIM artifact contract: `docs/SIM_ARTIFACT_SPEC.md`
+- Evidence provenance envelope contract: `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md`
 - Scenario identity contract: `docs/SCENARIO_SPEC.md`
 - M1 pointers: `docs/MILESTONE_M1_SIM_COMPARABILITY.md`, `docs/M1_SIM_COMPARABILITY_FOUNDATION_PACK.md`, `docs/M1_EVIDENCE_PACK_INDEX.md`
 - P1 sprint truth: `ops/sprints/steamer-card-engine-p1-live-trading-capability-v0-sprint.md`
