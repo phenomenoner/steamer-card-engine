@@ -1,7 +1,16 @@
 # FinceptTerminal Absorption Map for Steamer
 
-Status: planning input, remote-safe, no strategy-private params.
+Status: absorbed items 1–5 closed as contract-first seed surfaces, remote-safe, no strategy-private params.
 Source posture: FinceptTerminal was inspected as a pattern library only. Do not copy AGPL code.
+
+## Closure status
+
+- Item 1 — Evidence Provenance Envelope + MarketDataHub stats: closed.
+- Item 2 — BrokerAdapter capability + normalized error envelope: closed.
+- Item 3 — AuthSessionManager capability envelope: closed.
+- Item 4 — Strategy Powerhouse handoff task/activity receipts: closed in `strategy-powerhouse-framework`, with receipts mirrored here.
+- Item 5 — Limited read-only control-plane tool registry: closed.
+
 
 ## Verdict
 
