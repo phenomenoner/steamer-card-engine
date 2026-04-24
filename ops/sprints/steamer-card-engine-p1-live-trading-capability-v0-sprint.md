@@ -83,6 +83,7 @@ Launch confirmation meaning:
 - The second risk is **milestone collision**: if Sprint A and Product Sprint P1 are allowed to own the same gate, both lines will drift and fake progress.
 - The third risk is **authority ambiguity**: if auth/session posture does not visibly state `trade_enabled`, live-capability claims become unsafe theater.
 - The fourth risk is **market-phase ambiguity at the open**: current repo truth does not yet operationalize 盤前試搓 vs 正式開盤 semantics, pre-open order-style restrictions, or full-session coverage validation; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-08_steamer_card_engine_market-phase-gating-gap_backlog.md` and planning packet `/root/.openclaw/workspace/steamer-card-engine/ops/execution-packets/2026-04-08_steamer-card-engine_market-phase-gating-and-dashboard-truth.packet.md`.
+- The fifth risk is **observer lifecycle truth gap**: repo-visible run artifacts still keep order/fill/position lifecycle lanes empty, so the observer must not synthesize fills/positions from request logs; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-23_steamer_card_engine_observer_lifecycle_source_blocker.md`.
 
 ## Allowed auto-actions
 
@@ -182,3 +183,4 @@ Current sprint read:
 - 2026-04-21 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-22 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-23 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed and the market-phase backlog remains a bounded follow-up rather than a milestone re-cut (no topology change).
+- 2026-04-24 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; committed the observer lifecycle source blocker note to keep reportability honest (no topology change).
