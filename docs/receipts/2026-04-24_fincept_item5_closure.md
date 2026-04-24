@@ -3,6 +3,10 @@
 Date: 2026-04-24
 Item: Limited read-only control-plane tool registry
 
+## Commit
+
+- `dddc335` — Add read-only control-plane tool registry
+
 ## Implemented
 
 - Minimal read-only control-plane registry contract in `src/steamer_card_engine/control_plane.py`.

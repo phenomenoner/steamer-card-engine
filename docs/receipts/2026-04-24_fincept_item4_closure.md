@@ -12,7 +12,7 @@ Strategy Powerhouse Framework:
 
 Steamer Card Engine receipts:
 
-- pending commit for this closure receipt and blade map
+- `deacf0e` — docs: close Fincept absorption item 4
 
 ## Implemented
 
@@ -73,6 +73,6 @@ Framework contract topology changed: yes.
 Runtime execution topology changed: no.
 Gateway restart required: no.
 
-## Next item
+## Historical next step
 
-Proceed to ROI item 5: limited read-only control-plane tool registry.
+ROI item 5 was the next step at the time of this receipt and is now closed. See `docs/receipts/2026-04-24_fincept_absorption_rollup_closure.md`.

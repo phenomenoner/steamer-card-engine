@@ -39,6 +39,6 @@ Topology changed: docs/test/base adapter contract only inside `steamer-card-engi
 Authority broadened: no.
 Runtime live-trading capability changed: no.
 
-## Next item
+## Historical next step
 
-Proceed to ROI item 3: AuthSessionManager capability envelope.
+ROI item 3 was the next step at the time of this receipt and is now closed. See `docs/receipts/2026-04-24_fincept_absorption_rollup_closure.md`.

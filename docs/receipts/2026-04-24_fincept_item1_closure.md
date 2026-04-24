@@ -37,6 +37,6 @@ Topology changed: docs/code surface added inside `steamer-card-engine` only.
 Authority broadened: no.
 Runtime live-trading capability changed: no.
 
-## Next item
+## Historical next step
 
-Proceed to ROI item 2: BrokerAdapter capability + normalized error envelope.
+ROI item 2 was the next step at the time of this receipt and is now closed. See `docs/receipts/2026-04-24_fincept_absorption_rollup_closure.md`.

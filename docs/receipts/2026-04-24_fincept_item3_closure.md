@@ -50,6 +50,6 @@ Gateway restart required: no.
 
 Item 2's non-blocking receipt-safety nit was addressed in this slice with bounded public sanitization helpers. Adapter implementations remain responsible for never putting raw vendor payloads/secrets into normalized fields.
 
-## Next item
+## Historical next step
 
-Proceed to ROI item 4: Strategy Powerhouse handoff task/activity receipts.
+ROI item 4 was the next step at the time of this receipt and is now closed. See `docs/receipts/2026-04-24_fincept_absorption_rollup_closure.md`.
