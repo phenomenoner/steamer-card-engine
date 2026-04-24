@@ -70,8 +70,11 @@ Example capability questions the runtime should answer cleanly:
 
 - Can this session subscribe market data?
 - Can this session query positions?
-- Can this session submit orders?
+- Can this session submit paper orders?
+- Can this session submit live orders?
 - Does this session require renewal or re-login?
+
+Trading permission is a capability envelope, not a casual paper/live flag. A submit is allowed only when the logical session and broker adapter capability profile both explicitly permit the action and execution mode. Successful login with marketdata or account access must still fail closed for broker submit if `trade_enabled`, `paper_trading_enabled`, `live_trading_enabled`, or the required supported action is absent.
 
 ## AuthSessionManager responsibilities
 

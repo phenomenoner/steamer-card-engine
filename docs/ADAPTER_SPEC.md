@@ -104,6 +104,56 @@ class MarketDataAdapter(Protocol):
 - normalize broker-side errors and statuses
 - avoid leaking vendor-specific oddities into card code
 - preserve account and routing identity so mixed lifecycle events do not bleed across cards or accounts
+- fail closed when the active session or adapter capability profile does not explicitly permit the requested operation
+
+### Broker capability profile
+
+Broker adapters must expose capability facts as structured data, not as an informal paper/live boolean.
+
+Minimum broker capability fields:
+
+- `marketdata_enabled`
+- `account_query_enabled`
+- `trade_enabled`
+- `paper_trading_enabled`
+- `live_trading_enabled`
+- `supported_actions`, for example `submit`, `cancel`, `replace`, `positions`
+- `rate_limit_policy`, when known
+- `credential_permission_state`, for example `unknown`, `reduced`, `paper-only`, `live-enabled`
+
+Permission semantics are intentionally fail-closed:
+
+- paper submit requires `trade_enabled`, `paper_trading_enabled`, and `submit` in `supported_actions`
+- live submit requires `trade_enabled`, `live_trading_enabled`, and `submit` in `supported_actions`
+- cancel / replace require the same explicit trade permission and supported-action checks
+- account queries require `account_query_enabled` and the relevant supported action
+- successful login is not proof of trading readiness
+
+The runtime may reject a request before the vendor call if the capability profile and session context do not both authorize it.
+That rejection should still produce a normalized broker receipt.
+
+### Normalized broker error envelope
+
+Broker adapters must translate vendor failures into this taxonomy:
+
+- `auth`
+- `insufficient_funds`
+- `invalid_order`
+- `rate_limit`
+- `network`
+- `unavailable`
+- `capability_mismatch`
+- `unknown`
+
+Each normalized broker error must carry stable metadata:
+
+- `retryable`: whether the same operation may succeed later without changing the request
+- `safe_to_replay`: whether replaying the request through the runtime is safe
+- `raw_ref`: an opaque vendor/log reference, never raw payload text
+- `receipt_id`: a runtime-generated receipt identifier when available
+
+Raw vendor responses, credentials, tokens, certificates, account secrets, and environment dumps must not be embedded in normalized receipts.
+Only opaque references suitable for later local lookup belong in `raw_ref`.
 
 ### Minimum interface sketch
 
