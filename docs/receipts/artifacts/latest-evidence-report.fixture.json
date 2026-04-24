@@ -1,0 +1,12 @@
+{
+  "schema_version": "latest-evidence-report-fixture/v1",
+  "evidence_date": "2026-04-24",
+  "pointer_kind": "sanitized-local-pointer",
+  "summary": "aggregate-only latest evidence report fixture for the read-only control-plane registry",
+  "contains_raw_evidence": false,
+  "contains_raw_symbols": false,
+  "contains_strategy_params": false,
+  "contains_credentials": false,
+  "contains_account_data": false,
+  "receipt_id": "control-plane:latest_evidence_report:read:control-plane-fixture-request"
+}

@@ -277,6 +277,8 @@ The runtime should produce receipts for:
 
 `docs/EVIDENCE_PROVENANCE_ENVELOPE_SPEC.md` is the remote-safe contract for provenance envelopes: opaque source pointers, archive/report hashes, parser/schema versions, aggregate row/event/action counts, bounded reason counts, and aggregate MarketDataHub stats only.
 
+`docs/CONTROL_PLANE_TOOL_REGISTRY_SPEC.md` is the remote-safe contract for read-only control-plane inspection tools. Its seed tool, `latest_evidence_report`, returns a sanitized pointer plus receipt only; it does not execute runtime paths, mutate cards/decks, launch live-sim, call broker/account APIs, or expose private evidence material.
+
 This is the minimum required to make agent-authored changes reviewable.
 
 ## Latency posture
