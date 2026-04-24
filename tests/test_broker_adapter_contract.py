@@ -109,3 +109,14 @@ def test_normalized_receipt_does_not_expose_vendor_payload_or_secrets() -> None:
     assert "raw_response" not in serialized
     assert "token" not in serialized
     assert "fixture-log:capability-mismatch" in serialized
+
+
+def test_capability_profile_rejects_unknown_execution_mode_fail_closed() -> None:
+    profile = BrokerCapabilityProfile(
+        trade_enabled=True,
+        paper_trading_enabled=True,
+        live_trading_enabled=True,
+        supported_actions=("submit",),
+    )
+
+    assert profile.allows("submit", "sandbox") is False  # type: ignore[arg-type]

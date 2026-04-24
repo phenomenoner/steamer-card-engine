@@ -67,7 +67,9 @@ class BrokerCapabilityProfile:
             return False
         if mode == "live":
             return self.live_trading_enabled
-        return self.paper_trading_enabled
+        if mode == "paper":
+            return self.paper_trading_enabled
+        return False
 
 
 @dataclass(frozen=True, slots=True)
