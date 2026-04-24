@@ -6,6 +6,23 @@ from steamer_card_engine.adapters.base import ExecutionRequest, MarketEvent
 from steamer_card_engine.models import Intent
 
 
+_ALLOWED_CONNECTION_STATES = frozenset(
+    {"unknown", "disconnected", "connecting", "connected", "degraded", "replaying"}
+)
+_ALLOWED_STALE_REASONS = frozenset(
+    {"source_idle", "lag_exceeded", "disconnected", "replay_gap", "unknown"}
+)
+_ALLOWED_ERROR_CLASSES = frozenset(
+    {"parse_error", "schema_mismatch", "stale_source", "adapter_error", "unknown"}
+)
+
+
+def _bounded_value(value: str | None, allowed: frozenset[str]) -> str | None:
+    if value is None:
+        return None
+    return value if value in allowed else "unknown"
+
+
 @dataclass(frozen=True, slots=True)
 class MarketDataHubStats:
     """Aggregate-only MarketDataHub introspection seed.
@@ -42,15 +59,16 @@ class MarketDataHub:
         """Return aggregate-only stats without leaking symbol/subscriber identities."""
 
         return MarketDataHubStats(
-            connection_state=self.connection_state,
+            connection_state=_bounded_value(self.connection_state, _ALLOWED_CONNECTION_STATES)
+            or "unknown",
             subscription_count=len(self.subscribed_symbols),
             subscriber_count=self.subscriber_count,
             event_count=self.event_count,
             last_event_at_utc=self.last_event_at_utc,
             stale=self.stale,
-            stale_reason=self.stale_reason,
+            stale_reason=_bounded_value(self.stale_reason, _ALLOWED_STALE_REASONS),
             error_count=self.error_count,
-            last_error_class=self.last_error_class,
+            last_error_class=_bounded_value(self.last_error_class, _ALLOWED_ERROR_CLASSES),
         )
 
 

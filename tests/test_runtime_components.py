@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 from steamer_card_engine.runtime.components import MarketDataHub
 
 
@@ -25,3 +27,23 @@ def test_market_data_hub_stats_are_aggregate_only() -> None:
     assert not hasattr(stats, "subscribed_symbols")
     assert not hasattr(stats, "subscribers")
     assert not hasattr(stats, "events")
+
+
+def test_market_data_hub_stats_bound_raw_looking_health_strings() -> None:
+    hub = MarketDataHub(
+        subscribed_symbols={"<PRIVATE_SYMBOL>"},
+        connection_state="connected to /workspace/private/path",
+        stale=True,
+        stale_reason="raw exception mentions <PRIVATE_SYMBOL>",
+        last_error_class="Traceback account=123 symbol=<PRIVATE_SYMBOL>",
+    )
+
+    stats = hub.stats()
+    serialized = asdict(stats)
+
+    assert stats.connection_state == "unknown"
+    assert stats.stale_reason == "unknown"
+    assert stats.last_error_class == "unknown"
+    assert "<PRIVATE_SYMBOL>" not in repr(serialized)
+    assert "/workspace/private/path" not in repr(serialized)
+    assert "account=123" not in repr(serialized)
