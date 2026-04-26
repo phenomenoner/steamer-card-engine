@@ -9,11 +9,12 @@ import tomllib
 from fastapi.testclient import TestClient
 
 from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fixture_dates
-from steamer_card_engine.dashboard.fixtures import repo_root
+from steamer_card_engine.dashboard.fixtures import FixtureDay, repo_root
 from steamer_card_engine.dashboard.history_source_index import STATE_RELATIVE_PATH, build_strategy_history_source_index
 from steamer_card_engine.dashboard.strategy_pipeline import build_strategy_pipeline_view
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 from steamer_card_engine.observer import build_mock_observer_session, reset_observer_repository_cache
+from steamer_card_engine.observer.history import _build_record
 
 
 def _load_json(path: Path) -> dict:
@@ -518,3 +519,86 @@ def test_observer_api_seed_routes_and_stream_reconcile_contract() -> None:
 
     assert error_payload["type"] == "error"
     assert "invalid after_seq" in error_payload["detail"]
+
+
+def test_observer_history_api_projects_sanitized_fixture_sessions() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/observer/history/sessions?limit=2")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["items"]
+    assert payload["count"] <= 2
+
+    first = payload["items"][0]
+    assert first["session_id"].startswith("history-")
+    assert first["market_mode"] == "replay-static"
+    assert first["source_kind"] == "dashboard-fixture-static-projection"
+    assert first["source_path_ref"].startswith("runs/steamer-card-engine/")
+    assert "workspace" not in first["source_path_ref"]
+    assert {"historical", "static", "generated"}.issubset(set(first["tags"]))
+
+    bootstrap = client.get(f"/api/observer/history/sessions/{first['session_id']}/bootstrap")
+    assert bootstrap.status_code == 200
+    bootstrap_payload = bootstrap.json()
+    assert bootstrap_payload["session_id"] == first["session_id"]
+    assert bootstrap_payload["market_mode"] == "replay-static"
+    assert bootstrap_payload["chart"]["candles"]
+    assert bootstrap_payload["timeline"]
+    assert bootstrap_payload["provenance"]["labels"] == ["historical", "static", "generated"]
+    assert "workspace" not in bootstrap_payload["provenance"]["source_path_ref"]
+
+    candles = client.get(f"/api/observer/history/sessions/{first['session_id']}/candles?limit=3")
+    assert candles.status_code == 200
+    candle_items = candles.json()["items"]
+    assert len(candle_items) == 3
+    assert len({item["time"] for item in candle_items}) == len(candle_items)
+
+    bad_cursor = client.get(f"/api/observer/history/sessions/{first['session_id']}/candles?cursor=-1")
+    assert bad_cursor.status_code == 400
+
+    timeline = client.get(f"/api/observer/history/sessions/{first['session_id']}/timeline?limit=2")
+    assert timeline.status_code == 200
+    assert len(timeline.json()["items"]) == 2
+
+
+def test_observer_history_api_not_found_and_compare_no_synthetic_metrics() -> None:
+    client = TestClient(create_app())
+    sessions = client.get("/api/observer/history/sessions?limit=2").json()["items"]
+    assert len(sessions) >= 2
+
+    missing = client.get("/api/observer/history/sessions/not-a-session/bootstrap")
+    assert missing.status_code == 404
+
+    compare = client.get(
+        "/api/observer/history/compare",
+        params={"left_session_id": sessions[0]["session_id"], "right_session_id": sessions[1]["session_id"]},
+    )
+    assert compare.status_code == 200
+    payload = compare.json()
+    assert payload["compare_available"] is False
+    assert payload["status"] == "artifact_refs_only"
+    assert "counts" not in payload
+    assert payload["artifact_refs"]
+
+
+def test_observer_history_skips_artifacts_outside_repo_root(tmp_path: Path) -> None:
+    root = repo_root()
+    outside = tmp_path / "external-bundle"
+    outside.mkdir()
+    fixture = FixtureDay(
+        date="2026-01-01",
+        comparison_dir=root / "comparisons" / "synthetic-compare",
+        baseline_dir=root / "runs" / "baseline-bot" / "2026-01-01" / "baseline",
+        candidate_dir=outside,
+        baseline_run_id="baseline",
+        candidate_run_id="candidate",
+        compare_manifest=root / "comparisons" / "synthetic-compare" / "compare-manifest.json",
+        diff=root / "comparisons" / "synthetic-compare" / "diff.json",
+        summary=root / "comparisons" / "synthetic-compare" / "summary.md",
+        compare_status="pass",
+        compare_version="test",
+        comparison_family="test",
+    )
+
+    assert _build_record(fixture, root) is None

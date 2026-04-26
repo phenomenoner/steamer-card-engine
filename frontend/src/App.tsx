@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { ObserverSurface } from "./observer";
+import { ObserverSurface, ReplayHistorySurface } from "./observer";
 
 type DashboardTab = "observer" | "live-sim" | "strategy-powerhouse" | "strategy-pipeline";
 
@@ -1365,17 +1365,26 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
 }
 
 function ObserverOnlyApp() {
+  const [observerTab, setObserverTab] = useState<"live" | "history">("live");
   return (
     <div className="page-shell observer-only-shell">
       <header className="hero observer-only-hero">
         <div className="hero-copy">
           <div className="hero-info">
             <h1>Steamer Observer</h1>
-            <p>Browser-openable read-only monitor for one sanitized engine session.</p>
+            <p>{observerTab === "live" ? "Browser-openable read-only monitor for one sanitized engine session." : "Read-only browser for sanitized historical replay bundles."}</p>
           </div>
+          <nav className="dashboard-tabs observer-mode-tabs">
+            <button className={`dashboard-tab ${observerTab === "live" ? "dashboard-tab-active" : ""}`} onClick={() => setObserverTab("live")} type="button">
+              Live Monitor
+            </button>
+            <button className={`dashboard-tab ${observerTab === "history" ? "dashboard-tab-active" : ""}`} onClick={() => setObserverTab("history")} type="button">
+              Replay History
+            </button>
+          </nav>
         </div>
       </header>
-      <ObserverSurface />
+      {observerTab === "live" ? <ObserverSurface /> : <ReplayHistorySurface />}
     </div>
   );
 }

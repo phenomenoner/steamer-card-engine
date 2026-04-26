@@ -14,6 +14,23 @@ type ObserverSession = {
   freshness_state: FreshnessState;
 };
 
+type HistorySession = ObserverSession & {
+  source_kind: string;
+  source_path_ref: string;
+  date: string;
+  generated_at: string;
+  session_label: string;
+  timeframe: string;
+  scenario_id: string | null;
+  deck_id: string | null;
+  run_type: string;
+  latest_seq: number;
+  event_count: number;
+  candle_count: number;
+  has_compare: boolean;
+  tags: string[];
+};
+
 type Candle = {
   time: string;
   open: number;
@@ -97,6 +114,12 @@ type ObserverBootstrap = {
   last_fill: FillSummary | null;
   health: HealthSummary;
   timeline: TimelineEntry[];
+  provenance?: {
+    source_kind: string;
+    source_path_ref: string;
+    compare_ref?: string | null;
+    labels: string[];
+  };
 };
 
 type ObserverEvent = {
@@ -567,6 +590,178 @@ export function ObserverSurface() {
           ))}
         </div>
       </section>
+    </main>
+  );
+}
+
+export function ReplayHistorySurface() {
+  const [sessions, setSessions] = useState<HistorySession[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bootstrap, setBootstrap] = useState<ObserverBootstrap | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingList(true);
+    getJson<{ items: HistorySession[] }>("/api/observer/history/sessions?limit=20")
+      .then((payload) => {
+        if (cancelled) return;
+        setSessions(payload.items);
+        if (payload.items[0]) setSelectedId(payload.items[0].session_id);
+      })
+      .catch((reason) => setError(String(reason)))
+      .finally(() => {
+        if (!cancelled) setLoadingList(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setBootstrap(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDetail(true);
+    getJson<ObserverBootstrap>(`/api/observer/history/sessions/${selectedId}/bootstrap`)
+      .then((payload) => {
+        if (!cancelled) setBootstrap(payload);
+      })
+      .catch((reason) => setError(String(reason)))
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
+  const selected = sessions.find((item) => item.session_id === selectedId) ?? null;
+  const freshnessClass = tone(bootstrap?.freshness_state ?? selected?.freshness_state ?? "stale");
+
+  if (loadingList) return <div className="state-block">Loading sanitized observer history…</div>;
+  if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
+  if (!sessions.length) {
+    return (
+      <div className="state-block observer-empty-state">
+        <strong>No replay history configured.</strong>
+        <span>No sanitized dashboard fixture bundles are currently projected into observer history.</span>
+      </div>
+    );
+  }
+
+  return (
+    <main className="observer-surface replay-history-surface">
+      <section className="panel observer-hero-panel">
+        <div className="panel-header">
+          <h3>Replay History</h3>
+          <div className="observer-chip-row">
+            <span className="status-chip status-chip-muted">READ ONLY</span>
+            <span className="status-chip status-chip-muted">STATIC</span>
+            <span className="status-chip status-chip-muted">GENERATED</span>
+          </div>
+        </div>
+        <div className="panel-body observer-hero-body">
+          <div>
+            <div className="observer-title-row">
+              <h2>Historical observer bundles</h2>
+              <span className="pill">{sessions.length} sessions</span>
+            </div>
+            <p className="strategy-note">Static replay browser built from sanitized repo-local dashboard artifacts. No websocket, trading, approval, or runtime-control actions are available here.</p>
+          </div>
+        </div>
+      </section>
+
+      <div className="replay-history-grid">
+        <section className="panel">
+          <div className="panel-header"><h3>Session Library</h3><span className="pill">curated fixtures</span></div>
+          <div className="panel-body observer-list-panel replay-session-list">
+            {sessions.map((session) => (
+              <button
+                className={`history-item replay-session-button ${selectedId === session.session_id ? "history-item-highlight" : ""}`}
+                key={session.session_id}
+                onClick={() => setSelectedId(session.session_id)}
+                type="button"
+              >
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">{session.date} · {session.symbol}</div>
+                    <div className="card-meta">{session.run_type} · {session.timeframe}</div>
+                  </div>
+                  <span className={`status-chip status-chip-${tone(session.freshness_state)}`}>{session.freshness_state}</span>
+                </div>
+                <p className="card-meta">events {session.event_count} · candles {session.candle_count} · seq {session.latest_seq}</p>
+                <p className="card-meta">{session.source_kind}</p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel replay-detail-panel">
+          <div className="panel-header"><h3>Replay Detail</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap?.freshness_state ?? selected?.freshness_state}</span></div>
+          {loadingDetail ? (
+            <div className="state-block">Loading sanitized observer bundle…</div>
+          ) : bootstrap && selected ? (
+            <div className="panel-body replay-detail-body">
+              <div className="observer-title-row">
+                <h2>{bootstrap.session_label}</h2>
+                <span className="pill">replay-static</span>
+              </div>
+              <div className="observer-top-meta replay-top-meta">
+                <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+                <div><span className="mini-label">source</span><strong>{bootstrap.provenance?.source_kind ?? selected.source_kind}</strong></div>
+                <div><span className="mini-label">receipt ref</span><strong>{bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</strong></div>
+                <div><span className="mini-label">compare</span><strong>{selected.has_compare ? "artifact ref" : "unavailable"}</strong></div>
+              </div>
+              <div className="metrics-row observer-metrics-row replay-metrics-row">
+                <InfoCard label="symbol" value={bootstrap.symbol} subvalue={selected.scenario_id ?? "scenario unavailable"} />
+                <InfoCard label="events" value={String(selected.event_count)} subvalue={`latest seq ${bootstrap.latest_seq}`} />
+                <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue="state at replay end" />
+                <InfoCard label="labels" value="STATIC" subvalue={(bootstrap.provenance?.labels ?? selected.tags).join(" · ")} />
+              </div>
+              <div className="observer-grid replay-observer-grid">
+                <section className="panel observer-chart-panel">
+                  <div className="panel-header"><h3>Static Chart</h3><span className="pill">no websocket</span></div>
+                  <div className="panel-body observer-chart-wrap"><ObserverChart candles={bootstrap.chart.candles} markers={bootstrap.chart.markers.slice(-MARKER_LIMIT)} /></div>
+                </section>
+                <aside className="observer-right-rail">
+                  <section className="panel">
+                    <div className="panel-header"><h3>Provenance</h3><span className="pill">sanitized</span></div>
+                    <div className="panel-body observer-list-panel">
+                      <div className="observer-incident">source_ref={bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</div>
+                      {bootstrap.provenance?.compare_ref ? <div className="observer-incident">compare_ref={bootstrap.provenance.compare_ref}</div> : null}
+                      <div className="observer-incident">deck={selected.deck_id ?? "—"}</div>
+                    </div>
+                  </section>
+                </aside>
+              </div>
+              <section className="panel replay-timeline-panel">
+                <div className="panel-header"><h3>Event Timeline</h3><span className="pill">static order</span></div>
+                <div className="panel-body observer-timeline-grid">
+                  {bootstrap.timeline.map((item) => (
+                    <article className="history-item" key={item.seq}>
+                      <div className="history-item-head">
+                        <div>
+                          <div className="card-title history-title">#{item.seq} · {item.title}</div>
+                          <div className="card-meta">{formatTimestamp(item.event_time)} · {item.event_type}</div>
+                        </div>
+                        <span className={`status-chip status-chip-${tone(item.freshness_state)}`}>{item.status}</span>
+                      </div>
+                      <p className="card-meta">{item.summary}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className="state-block">Select a historical session to open replay detail.</div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from steamer_card_engine.observer import observer_repository_from_env
+from steamer_card_engine.observer.history import ObserverHistoryError, observer_history_repository
 
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
         return build_strategy_pipeline_view(root)
 
     observer_repo = observer_repository_from_env()
+    observer_history_repo = observer_history_repository()
 
     @app.get("/api/observer/sessions")
     def observer_sessions() -> dict:
@@ -106,6 +108,45 @@ def create_app() -> FastAPI:
     def observer_timeline(session_id: str, limit: int = 200) -> dict:
         try:
             return observer_repo.timeline_payload(session_id, limit=limit)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+    @app.get("/api/observer/history/sessions")
+    def observer_history_sessions(limit: int = 20, cursor: str | None = None) -> dict:
+        try:
+            return observer_history_repo.list_sessions(limit=limit, cursor=cursor)
+        except ObserverHistoryError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.get("/api/observer/history/sessions/{session_id}/bootstrap")
+    def observer_history_bootstrap(session_id: str) -> dict:
+        try:
+            return observer_history_repo.bootstrap_payload(session_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+    @app.get("/api/observer/history/sessions/{session_id}/candles")
+    def observer_history_candles(session_id: str, limit: int = 500, cursor: str | None = None) -> dict:
+        try:
+            return observer_history_repo.candles_payload(session_id, limit=limit, cursor=cursor)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except (ObserverHistoryError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.get("/api/observer/history/sessions/{session_id}/timeline")
+    def observer_history_timeline(session_id: str, limit: int = 200, cursor: str | None = None) -> dict:
+        try:
+            return observer_history_repo.timeline_payload(session_id, limit=limit, cursor=cursor)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except (ObserverHistoryError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.get("/api/observer/history/compare")
+    def observer_history_compare(left_session_id: str, right_session_id: str) -> dict:
+        try:
+            return observer_history_repo.compare_payload(left_session_id, right_session_id)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
 
