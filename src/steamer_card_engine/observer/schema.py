@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from .bridge import ObserverSessionMetadata
 
 
 SchemaVersion = Literal["observer.v0"]
@@ -137,6 +140,7 @@ class ObserverSessionBundle:
     bootstrap: ObserverBootstrap
     candles: list[CandleBar]
     events: list[ObserverEvent]
+    metadata: "ObserverSessionMetadata | None" = None
 
 
 def utc_now_iso() -> str:

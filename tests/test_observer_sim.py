@@ -100,6 +100,11 @@ def test_written_sim_observer_bundle_mounts_via_dashboard(monkeypatch, tmp_path:
     assert reloaded.bootstrap.position.quantity == 1
     assert reloaded.bootstrap.last_fill is not None
     assert reloaded.bootstrap.last_fill.quantity == 1
+    assert reloaded.metadata is not None
+    assert reloaded.metadata.symbol_pool
+    assert "2330" in reloaded.metadata.symbol_pool
+    assert isinstance(reloaded.metadata.symbol_pool_source, str)
+    assert reloaded.metadata.symbol_pool_source.startswith("sim-bundle-")
 
     monkeypatch.setenv("STEAMER_OBSERVER_BUNDLE_JSON", str(attachment_path))
     monkeypatch.setenv("STEAMER_OBSERVER_INCLUDE_MOCK", "0")

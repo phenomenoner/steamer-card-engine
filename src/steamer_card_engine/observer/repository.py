@@ -30,6 +30,21 @@ def _coerce_symbol_list(value: object) -> list[str]:
     return symbols
 
 
+def _coerce_optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _bundle_pool_source_label(raw_source: str | None) -> str:
+    if raw_source is None:
+        return "observer-bundle-metadata"
+    if raw_source.startswith("observer-bundle-metadata"):
+        return raw_source
+    return f"observer-bundle-metadata:{raw_source}"
+
+
 def _load_fixture_or_deck_symbol_pool() -> tuple[list[str], str]:
     try:
         from steamer_card_engine.dashboard.fixtures import discover_fixture_days, repo_root
@@ -109,6 +124,8 @@ def _metadata_from_payload(payload: dict, path: Path) -> ObserverSessionMetadata
             market_mode=str(metadata["market_mode"]),
             symbol=str(metadata["symbol"]),
             timeframe=str(metadata["timeframe"]),
+            symbol_pool=_coerce_symbol_list(metadata.get("symbol_pool")),
+            symbol_pool_source=_coerce_optional_text(metadata.get("symbol_pool_source")),
         )
     except KeyError as error:
         raise ObserverRepositoryError(f"observer bundle metadata missing field {error.args[0]!r}: {path}") from error
@@ -231,13 +248,38 @@ def load_bundle_from_json(path: Path) -> ObserverSessionBundle:
     if bootstrap.engine_id != metadata.engine_id:
         raise ObserverRepositoryError(f"observer bundle engine metadata mismatch: {path}")
 
-    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
+    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events, metadata=metadata)
 
 
 class ObserverSessionRepository:
     def __init__(self, bundles: dict[str, ObserverSessionBundle]):
         self._bundles = bundles
-        self._pool_symbols, self._pool_source = _load_fixture_or_deck_symbol_pool()
+        self._fixture_pool_symbols, self._fixture_pool_source = _load_fixture_or_deck_symbol_pool()
+
+    def _bundle_metadata_symbol_pool(self) -> tuple[list[str], str] | None:
+        seen: set[str] = set()
+        merged_symbols: list[str] = []
+        source_kinds: list[str] = []
+
+        for bundle in self._bundles.values():
+            metadata = bundle.metadata
+            if metadata is None or not metadata.symbol_pool:
+                continue
+            for symbol in metadata.symbol_pool:
+                normalized = str(symbol).strip()
+                if not normalized or normalized in seen:
+                    continue
+                seen.add(normalized)
+                merged_symbols.append(normalized)
+            source_label = _bundle_pool_source_label(metadata.symbol_pool_source)
+            if source_label not in source_kinds:
+                source_kinds.append(source_label)
+
+        if not merged_symbols:
+            return None
+        if len(source_kinds) == 1:
+            return merged_symbols, source_kinds[0]
+        return merged_symbols, "observer-bundle-metadata:mixed"
 
     def list_sessions(self) -> list[dict[str, str]]:
         return [
@@ -254,8 +296,17 @@ class ObserverSessionRepository:
     def list_sessions_payload(self) -> dict[str, Any]:
         items = self.list_sessions()
         fallback_symbols = sorted({item["symbol"] for item in items if isinstance(item.get("symbol"), str) and item["symbol"].strip()})
-        pool_symbols = self._pool_symbols or fallback_symbols
-        source_kind = self._pool_source if self._pool_symbols else "observer-sessions-fallback"
+
+        metadata_pool = self._bundle_metadata_symbol_pool()
+        if metadata_pool is not None:
+            pool_symbols, source_kind = metadata_pool
+        elif self._fixture_pool_symbols:
+            pool_symbols = self._fixture_pool_symbols
+            source_kind = self._fixture_pool_source
+        else:
+            pool_symbols = fallback_symbols
+            source_kind = "observer-sessions-fallback"
+
         return {
             "items": items,
             "default_session_id": items[0]["session_id"] if items else None,

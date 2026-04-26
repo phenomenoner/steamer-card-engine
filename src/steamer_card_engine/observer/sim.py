@@ -39,6 +39,40 @@ def _timestamp_or_now(value: Any) -> str:
     return utc_now_iso()
 
 
+def _coerce_symbol_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    seen: set[str] = set()
+    symbols: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        symbol = item.strip()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        symbols.append(symbol)
+    return symbols
+
+
+def _load_bundle_symbol_pool(bundle_dir: Path) -> tuple[list[str], str | None]:
+    scenario_spec_path = bundle_dir / "scenario-spec.json"
+    if scenario_spec_path.exists():
+        try:
+            scenario_spec = _load_json(scenario_spec_path)
+        except SimObserverError:
+            scenario_spec = {}
+        symbol_set = scenario_spec.get("symbol_set")
+        if isinstance(symbol_set, dict):
+            symbols = _coerce_symbol_list(symbol_set.get("symbols"))
+            if symbols:
+                return symbols, "sim-bundle-scenario-spec-symbol-set"
+        legacy_symbols = _coerce_symbol_list(scenario_spec.get("symbols"))
+        if legacy_symbols:
+            return legacy_symbols, "sim-bundle-scenario-spec-symbol-list"
+    return [], None
+
+
 def _build_candles(event_rows: list[dict[str, Any]]) -> tuple[str, list[CandleBar], dict[str, float]]:
     symbol = "UNKNOWN"
     latest_prices: dict[str, float] = {}
@@ -95,6 +129,15 @@ def build_sim_observer_bundle(
     pnl_summary = _load_json(bundle_dir / "pnl-summary.json") if (bundle_dir / "pnl-summary.json").exists() else {}
 
     symbol, candles, latest_prices = _build_candles(event_rows)
+    symbol_pool, symbol_pool_source = _load_bundle_symbol_pool(bundle_dir)
+    if not symbol_pool:
+        observed_symbols = _coerce_symbol_list([row.get("symbol") for row in event_rows])
+        if observed_symbols:
+            symbol_pool = observed_symbols
+            symbol_pool_source = "sim-bundle-observed-symbols"
+    if not symbol_pool and symbol != "UNKNOWN":
+        symbol_pool = [symbol]
+        symbol_pool_source = "sim-bundle-primary-symbol"
     started_at = _timestamp_or_now(event_rows[0].get("event_time_utc") if event_rows else None)
 
     events: list[ObserverEvent] = []
@@ -251,21 +294,30 @@ def build_sim_observer_bundle(
         market_mode=market_mode,
         symbol=f"{symbol}.TW",
         timeframe=timeframe,
+        symbol_pool=symbol_pool,
+        symbol_pool_source=symbol_pool_source,
     )
     bootstrap = ObserverProjector(timeline_limit=12).bootstrap_from_events(metadata, events)
-    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
+    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events, metadata=metadata)
 
 
 def write_sim_observer_bundle_json(*, bundle: ObserverSessionBundle, output_path: Path) -> None:
+    metadata = bundle.metadata
+    metadata_payload = {
+        "session_id": bundle.bootstrap.session_id,
+        "engine_id": bundle.bootstrap.engine_id,
+        "session_label": bundle.bootstrap.session_label,
+        "market_mode": bundle.bootstrap.market_mode,
+        "symbol": bundle.bootstrap.symbol,
+        "timeframe": bundle.bootstrap.timeframe,
+    }
+    if metadata is not None and metadata.symbol_pool:
+        metadata_payload["symbol_pool"] = metadata.symbol_pool
+    if metadata is not None and metadata.symbol_pool_source:
+        metadata_payload["symbol_pool_source"] = metadata.symbol_pool_source
+
     payload = {
-        "metadata": {
-            "session_id": bundle.bootstrap.session_id,
-            "engine_id": bundle.bootstrap.engine_id,
-            "session_label": bundle.bootstrap.session_label,
-            "market_mode": bundle.bootstrap.market_mode,
-            "symbol": bundle.bootstrap.symbol,
-            "timeframe": bundle.bootstrap.timeframe,
-        },
+        "metadata": metadata_payload,
         "events": [event.to_dict() for event in bundle.events],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)

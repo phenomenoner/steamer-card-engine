@@ -70,7 +70,7 @@ def build_mock_observer_session() -> ObserverSessionBundle:
         timeframe="1m",
     )
     bootstrap = projector.bootstrap_from_events(metadata, snapshot_events)
-    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
+    return ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events, metadata=metadata)
 
 
 def list_mock_sessions() -> list[dict[str, str]]:

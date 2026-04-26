@@ -30,6 +30,8 @@ class ObserverSessionMetadata:
     market_mode: str
     symbol: str
     timeframe: str
+    symbol_pool: list[str] = field(default_factory=list)
+    symbol_pool_source: str | None = None
 
 
 @dataclass

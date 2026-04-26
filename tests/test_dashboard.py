@@ -530,6 +530,108 @@ def test_observer_api_seed_routes_and_stream_reconcile_contract() -> None:
     assert "invalid after_seq" in error_payload["detail"]
 
 
+def test_observer_sessions_symbol_pool_prefers_bundle_metadata_over_fixture_sample(monkeypatch, tmp_path: Path) -> None:
+    from steamer_card_engine.observer import repository as observer_repository
+
+    fixture_symbols = ["1101", "1301", "2303"]
+    monkeypatch.setattr(
+        observer_repository,
+        "_load_fixture_or_deck_symbol_pool",
+        lambda: (fixture_symbols, "dashboard-fixture-symbol-set-sample"),
+    )
+
+    bundle = build_mock_observer_session()
+    metadata_symbols = ["2330", "2317", "2454", "3017"]
+    attachment = {
+        "metadata": {
+            "session_id": "aws-live-sim-private",
+            "engine_id": "steamer-card-engine.live-sim.private",
+            "session_label": "AWS live(sim) private attachment",
+            "market_mode": "live(sim)",
+            "symbol": "2330.TW",
+            "timeframe": "1m",
+            "symbol_pool": metadata_symbols,
+            "symbol_pool_source": "live-run-scenario-symbol-set",
+        },
+        "events": [
+            {
+                **event.to_dict(),
+                "session_id": "aws-live-sim-private",
+                "engine_id": "steamer-card-engine.live-sim.private",
+                "event_id": f"private-{event.event_id}",
+            }
+            for event in bundle.events
+        ],
+    }
+    attachment_path = tmp_path / "observer-attachment-metadata.json"
+    attachment_path.write_text(json.dumps(attachment), encoding="utf-8")
+
+    monkeypatch.setenv("STEAMER_OBSERVER_BUNDLE_JSON", str(attachment_path))
+    monkeypatch.setenv("STEAMER_OBSERVER_INCLUDE_MOCK", "0")
+    reset_observer_repository_cache()
+
+    client = TestClient(create_app())
+    payload = client.get("/api/observer/sessions").json()
+
+    assert payload["symbol_pool"]["source_kind"] == "observer-bundle-metadata:live-run-scenario-symbol-set"
+    assert payload["symbol_pool"]["symbol_count"] == len(metadata_symbols)
+    assert payload["symbol_pool"]["top_symbols"] == metadata_symbols[:5]
+    assert payload["symbol_pool"]["sample_symbols"] == metadata_symbols[:8]
+
+    monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
+    monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
+    reset_observer_repository_cache()
+
+
+def test_observer_sessions_symbol_pool_uses_fixture_sample_when_bundle_metadata_missing(monkeypatch, tmp_path: Path) -> None:
+    from steamer_card_engine.observer import repository as observer_repository
+
+    fixture_symbols = ["1101", "1301", "2303", "2308", "2881", "2882"]
+    monkeypatch.setattr(
+        observer_repository,
+        "_load_fixture_or_deck_symbol_pool",
+        lambda: (fixture_symbols, "dashboard-fixture-symbol-set-sample"),
+    )
+
+    bundle = build_mock_observer_session()
+    attachment = {
+        "metadata": {
+            "session_id": "aws-live-sim-private-no-pool",
+            "engine_id": "steamer-card-engine.live-sim.private",
+            "session_label": "AWS live(sim) private attachment",
+            "market_mode": "live(sim)",
+            "symbol": "2330.TW",
+            "timeframe": "1m",
+        },
+        "events": [
+            {
+                **event.to_dict(),
+                "session_id": "aws-live-sim-private-no-pool",
+                "engine_id": "steamer-card-engine.live-sim.private",
+                "event_id": f"private-nopool-{event.event_id}",
+            }
+            for event in bundle.events
+        ],
+    }
+    attachment_path = tmp_path / "observer-attachment-no-pool.json"
+    attachment_path.write_text(json.dumps(attachment), encoding="utf-8")
+
+    monkeypatch.setenv("STEAMER_OBSERVER_BUNDLE_JSON", str(attachment_path))
+    monkeypatch.setenv("STEAMER_OBSERVER_INCLUDE_MOCK", "0")
+    reset_observer_repository_cache()
+
+    client = TestClient(create_app())
+    payload = client.get("/api/observer/sessions").json()
+
+    assert payload["symbol_pool"]["source_kind"] == "dashboard-fixture-symbol-set-sample"
+    assert payload["symbol_pool"]["symbol_count"] == len(fixture_symbols)
+    assert payload["symbol_pool"]["top_symbols"] == fixture_symbols[:5]
+
+    monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
+    monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
+    reset_observer_repository_cache()
+
+
 def test_observer_sessions_symbol_pool_falls_back_to_live_sessions(monkeypatch, tmp_path: Path) -> None:
     from steamer_card_engine.dashboard import fixtures as dashboard_fixtures
 

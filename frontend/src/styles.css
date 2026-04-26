@@ -705,6 +705,65 @@ button {
   gap: 24px;
 }
 
+.observer-status-strip,
+.observer-universe-card,
+.observer-focus-card {
+  width: 100%;
+}
+
+.observer-status-body {
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+}
+
+.observer-universe-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.observer-universe-copy {
+  margin-bottom: 0;
+}
+
+.observer-focus-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.observer-focus-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.observer-focus-selector-block {
+  padding: 14px;
+  border: 1px solid rgba(94, 243, 177, 0.4);
+  background: rgba(94, 243, 177, 0.08);
+  box-shadow: inset 0 0 24px rgba(94, 243, 177, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.observer-focus-helper {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.observer-focus-helper-single {
+  color: var(--accent-warm);
+  border: 1px solid rgba(255, 205, 129, 0.35);
+  background: rgba(255, 205, 129, 0.08);
+  padding: 10px;
+}
+
+.observer-focus-meta-grid {
+  margin-top: 0;
+}
+
 .observer-only-shell {
   max-width: 1600px;
 }
@@ -794,12 +853,19 @@ button {
 }
 
 .observer-session-selector select {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(10, 16, 22, 0.72);
+  border: 1px solid rgba(94, 243, 177, 0.5);
+  border-radius: 10px;
+  background: rgba(10, 16, 22, 0.9);
   color: var(--text);
-  padding: 8px 10px;
+  padding: 10px 12px;
   font: inherit;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(94, 243, 177, 0.12);
+}
+
+.observer-session-selector-single select {
+  border-color: rgba(255, 205, 129, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 205, 129, 0.12);
 }
 
 .observer-pool-overview {
@@ -899,6 +965,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .observer-focus-layout {
+    grid-template-columns: 1fr;
+  }
+
   .hero,
   .observer-hero-body {
     flex-direction: column;
@@ -909,7 +979,8 @@ button {
 @media (max-width: 768px) {
   .metrics-row,
   .observer-metrics-row,
-  .observer-top-meta {
+  .observer-top-meta,
+  .observer-status-body {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -925,7 +996,8 @@ button {
 @media (max-width: 560px) {
   .metrics-row,
   .observer-metrics-row,
-  .observer-top-meta {
+  .observer-top-meta,
+  .observer-status-body {
     grid-template-columns: 1fr;
   }
 

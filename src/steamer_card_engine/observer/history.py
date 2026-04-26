@@ -249,10 +249,12 @@ def _build_record(fixture: FixtureDay, root: Path) -> HistorySessionRecord | Non
         market_mode="replay-static",
         symbol=symbol,
         timeframe="tick-projection",
+        symbol_pool=[symbol],
+        symbol_pool_source="history-static-tick-projection",
     )
     projector = ObserverProjector(timeline_limit=20, candle_limit=MAX_PROJECTED_CANDLES)
     bootstrap = projector.bootstrap_from_events(metadata, events)
-    bundle = ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
+    bundle = ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events, metadata=metadata)
 
     event_count = _count_jsonl(bundle_dir / "event-log.jsonl")
     deck_id = config.get("deck_id")

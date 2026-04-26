@@ -30,9 +30,26 @@ type ObserverSessionsPayload = {
 };
 
 function symbolPoolLabel(sourceKind: string) {
-  if (sourceKind === "observer-sessions-fallback") return "mounted observer sessions";
-  if (sourceKind.endsWith("-sample")) return "dashboard fixture sample";
-  return sourceKind;
+  if (sourceKind === "observer-sessions-fallback") return "Mounted sessions fallback";
+  if (sourceKind === "observer-bundle-metadata") return "Mounted bundle metadata (actual)";
+  if (sourceKind.startsWith("observer-bundle-metadata:")) {
+    return `Mounted bundle metadata (${sourceKind.slice("observer-bundle-metadata:".length)})`;
+  }
+  if (sourceKind.endsWith("-sample")) return "Fixture sample fallback";
+  return `Pool source: ${sourceKind}`;
+}
+
+function symbolPoolSubcopy(sourceKind: string) {
+  if (sourceKind === "observer-sessions-fallback") {
+    return "Pool metadata missing. Universe is inferred from mounted sessions.";
+  }
+  if (sourceKind === "observer-bundle-metadata" || sourceKind.startsWith("observer-bundle-metadata:")) {
+    return "Using mounted bundle metadata for actual run universe context.";
+  }
+  if (sourceKind.endsWith("-sample")) {
+    return "Using fixture sample pool. Replace with mounted bundle metadata for live universe truth.";
+  }
+  return `Pool source: ${sourceKind}`;
 }
 
 type HistorySession = ObserverSession & {
@@ -263,9 +280,10 @@ function TimeframeSelector({ value, onChange }: { value: ChartTimeframe; onChang
 }
 
 function SessionSelector({ sessions, value, onChange }: { sessions: ObserverSession[]; value: string; onChange: (value: string) => void }) {
+  const isSingleSession = sessions.length <= 1;
   return (
-    <label className="observer-session-selector" htmlFor="observer-session-select">
-      <span className="mini-label">selected live view</span>
+    <label className={`observer-session-selector ${isSingleSession ? "observer-session-selector-single" : ""}`} htmlFor="observer-session-select">
+      <span className="mini-label">mounted symbol session</span>
       <select id="observer-session-select" value={value} onChange={(event) => onChange(event.target.value)}>
         {sessions.map((session) => (
           <option key={session.session_id} value={session.session_id}>
@@ -316,6 +334,17 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
           : state.bootstrap.health.incidents,
     },
   };
+
+  if (event.event_type === "data_gap_detected") {
+    nextBootstrap.health = {
+      ...nextBootstrap.health,
+      feed_freshness_seconds:
+        typeof event.partial_data.gap_seconds === "number"
+          ? event.partial_data.gap_seconds
+          : nextBootstrap.health.feed_freshness_seconds,
+      incidents: [...nextBootstrap.health.incidents, "observer_gap_detected"].slice(-12),
+    };
+  }
 
   if (event.event_type === "candle_bar" && event.partial_data.candle) {
     nextBootstrap.chart = {
@@ -623,16 +652,27 @@ export function ObserverSurface() {
   const bootstrap = state.bootstrap;
   const chartCandles = aggregateCandles(bootstrap.chart.candles, chartTimeframe);
   const chartMarkers = alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
+  const poolSourceLabel = symbolPoolLabel(effectivePool.source_kind);
+  const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
+  const isSingleSession = sessions.length <= 1;
+  const universeSymbols = effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols;
 
   return (
     <main className="observer-surface">
-      <section className="panel observer-hero-panel">
+      <section className="panel observer-status-strip">
         <div className="panel-header">
-          <h3>Live Observer Sidecar</h3>
+          <h3>Observer Status</h3>
           <div className="observer-chip-row">
             <span className={`status-chip status-chip-${state.streamState === "live" ? "accent" : state.streamState === "connecting" || state.streamState === "ended" ? "muted" : "alert"}`}>WS {state.streamState.toUpperCase()}</span>
             <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.freshness_state.toUpperCase()}</span>
+            <span className={`status-chip status-chip-${state.sequenceGaps.length ? "alert" : "muted"}`}>SEQ GAPS {state.sequenceGaps.length}</span>
           </div>
+        </div>
+        <div className="panel-body observer-status-body observer-top-meta">
+          <div><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
+          <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
+          <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+          <div><span className="mini-label">stream note</span><strong>{state.streamNote ?? "none"}</strong></div>
         </div>
         {needsAttention || isStreamDegraded ? (
           <div className="observer-alert-banner">
@@ -644,36 +684,54 @@ export function ObserverSurface() {
             </span>
           </div>
         ) : null}
-        <div className="panel-body observer-hero-body">
-          <div>
-            <div className="observer-title-row">
-              <h2>{bootstrap.session_label}</h2>
-              <span className="pill">{bootstrap.market_mode}</span>
-            </div>
-            <p className="strategy-note">Strategy can execute over a symbol pool; this chart/stream is a selected single-symbol session view (read-only).</p>
+      </section>
+
+      <section className="panel observer-universe-card">
+        <div className="panel-header">
+          <h3>Symbol Universe</h3>
+          <div className="observer-chip-row">
+            <span className="pill">{effectivePool.symbol_count} symbols</span>
+            <span className="status-chip status-chip-muted">{poolSourceLabel}</span>
           </div>
-          <div className="observer-hero-side">
-            <SessionSelector sessions={sessions} value={selectedSessionId ?? state.session.session_id} onChange={(value) => setSelectedSessionId(value)} />
-            <div className="observer-pool-overview">
-              <div className="observer-pool-head">
-                <span className="mini-label">symbol pool context</span>
-                <strong>{effectivePool.symbol_count} symbols</strong>
-              </div>
-              <p className="card-meta">source {symbolPoolLabel(effectivePool.source_kind)} · chart focus {bootstrap.symbol}</p>
-              <div className="observer-symbol-chip-row">
-                {(effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols).map((symbol) => (
-                  <span className="observer-symbol-chip" key={symbol}>{symbol}</span>
-                ))}
-              </div>
+        </div>
+        <div className="panel-body observer-universe-body">
+          <p className="strategy-note observer-universe-copy">{poolSubcopy}</p>
+          <p className="card-meta">source {poolSourceLabel} · focus chart currently on {bootstrap.symbol}</p>
+          <div className="observer-symbol-chip-row">
+            {universeSymbols.map((symbol) => (
+              <span className="observer-symbol-chip" key={symbol}>{symbol}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel observer-focus-card">
+        <div className="panel-header">
+          <h3>Focus Session</h3>
+          <span className="pill">drill-down</span>
+        </div>
+        <div className="panel-body observer-focus-body">
+          <div className="observer-title-row observer-focus-title-row">
+            <h2>{bootstrap.symbol}</h2>
+            <span className="pill">{bootstrap.market_mode}</span>
+          </div>
+          <p className="strategy-note observer-focus-copy">This chart is one selected symbol view, not the full strategy universe.</p>
+          <div className="observer-focus-layout">
+            <div className="observer-focus-selector-block">
+              <SessionSelector sessions={sessions} value={selectedSessionId ?? state.session.session_id} onChange={(value) => setSelectedSessionId(value)} />
+              <p className={`card-meta observer-focus-helper ${isSingleSession ? "observer-focus-helper-single" : ""}`}>
+                {isSingleSession
+                  ? "Only one mounted session is available. Universe context may still cover more symbols than this chart."
+                  : "Choose which mounted symbol session to inspect."}
+              </p>
             </div>
-            <div className="observer-top-meta observer-top-meta-live">
+            <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
+              <div><span className="mini-label">session label</span><strong>{bootstrap.session_label}</strong></div>
+              <div><span className="mini-label">session id</span><strong>{state.session.session_id}</strong></div>
               <div><span className="mini-label">symbol</span><strong>{bootstrap.symbol}</strong></div>
-              <div><span className="mini-label">session</span><strong>{state.session.session_id}</strong></div>
               <div><span className="mini-label">timeframe</span><strong>{bootstrap.timeframe}</strong></div>
               <div><span className="mini-label">engine</span><strong>{bootstrap.engine_id}</strong></div>
-              <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
               <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
-              <div><span className="mini-label">seq gaps</span><strong>{state.sequenceGaps.length}</strong></div>
             </div>
           </div>
         </div>
@@ -689,7 +747,7 @@ export function ObserverSurface() {
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>Chart + Markers</h3>
+            <h3>Focus Chart</h3>
             <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div>
           </div>
           <div className="panel-body observer-chart-wrap">
