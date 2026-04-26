@@ -2,6 +2,9 @@ import { CandlestickSeries, createChart, createSeriesMarkers, type IChartApi, ty
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type FreshnessState = "fresh" | "lagging" | "stale" | "degraded";
+type StreamState = "idle" | "connecting" | "live" | "ended" | "closed" | "error";
+
+const MARKER_LIMIT = 80;
 
 type ObserverSession = {
   session_id: string;
@@ -115,6 +118,9 @@ type ObserverState = {
   timeline: TimelineEntry[];
   events: ObserverEvent[];
   latestSeq: number;
+  streamState: StreamState;
+  streamNote: string | null;
+  sequenceGaps: Array<{ expected: number; received: number }>;
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -154,6 +160,8 @@ function tone(value: FreshnessState) {
 
 function applyObserverEvent(state: ObserverState, event: ObserverEvent): ObserverState {
   if (event.seq <= state.latestSeq || !state.bootstrap) return state;
+  const expectedSeq = state.latestSeq + 1;
+  const sequenceGaps = event.seq > expectedSeq ? [...state.sequenceGaps, { expected: expectedSeq, received: event.seq }].slice(-8) : state.sequenceGaps;
 
   const timelineEntry: TimelineEntry = {
     seq: event.seq,
@@ -209,7 +217,7 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
             text: `${String(order.side).toUpperCase()} SUBMIT`,
             event_id: event.event_id,
           },
-        ],
+        ].slice(-MARKER_LIMIT),
       };
     }
   }
@@ -230,7 +238,7 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
             text: `FILL ${fill.quantity}`,
             event_id: event.event_id,
           },
-        ],
+        ].slice(-MARKER_LIMIT),
       };
     }
   }
@@ -246,6 +254,9 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
     timeline: [timelineEntry, ...state.timeline].slice(0, 20),
     events: [...state.events, event],
     latestSeq: event.seq,
+    streamState: "live",
+    streamNote: null,
+    sequenceGaps,
   };
 }
 
@@ -334,9 +345,19 @@ function InfoCard({ label, value, subvalue }: { label: string; value: string; su
 }
 
 export function ObserverSurface() {
-  const [state, setState] = useState<ObserverState>({ session: null, bootstrap: null, timeline: [], events: [], latestSeq: 0 });
+  const [state, setState] = useState<ObserverState>({
+    session: null,
+    bootstrap: null,
+    timeline: [],
+    events: [],
+    latestSeq: 0,
+    streamState: "idle",
+    streamNote: null,
+    sequenceGaps: [],
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasNoSession, setHasNoSession] = useState(false);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -346,21 +367,52 @@ export function ObserverSurface() {
       try {
         const sessions = await getJson<{ items: ObserverSession[] }>("/api/observer/sessions");
         const session = sessions.items[0];
+        if (!session) {
+          if (!cancelled) setHasNoSession(true);
+          return;
+        }
         const bootstrap = await getJson<ObserverBootstrap>(`/api/observer/sessions/${session.session_id}/bootstrap`);
         if (cancelled) return;
+        setHasNoSession(false);
         setState({
           session,
-          bootstrap,
+          bootstrap: { ...bootstrap, chart: { ...bootstrap.chart, markers: bootstrap.chart.markers.slice(-MARKER_LIMIT) } },
           timeline: bootstrap.timeline,
           events: [],
           latestSeq: bootstrap.latest_seq,
+          streamState: "connecting",
+          streamNote: null,
+          sequenceGaps: [],
         });
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         socket = new WebSocket(`${protocol}://${window.location.host}/api/observer/sessions/${session.session_id}/stream?after_seq=${bootstrap.latest_seq}`);
+        socket.onopen = () => {
+          if (!cancelled) setState((current) => ({ ...current, streamState: "live", streamNote: null }));
+        };
         socket.onmessage = (message) => {
-          const payload = JSON.parse(message.data);
-          if (payload.type === "stream_end") return;
-          setState((current) => applyObserverEvent(current, payload as ObserverEvent));
+          try {
+            const payload = JSON.parse(message.data) as { type?: string } | ObserverEvent;
+            if ("type" in payload && payload.type === "stream_end") {
+              setState((current) => ({ ...current, streamState: "ended", streamNote: "stream_end received from observer API" }));
+              return;
+            }
+            if (typeof (payload as ObserverEvent).seq !== "number") {
+              throw new Error("stream payload missing numeric seq");
+            }
+            setState((current) => applyObserverEvent(current, payload as ObserverEvent));
+          } catch (reason) {
+            setState((current) => ({
+              ...current,
+              streamState: "error",
+              streamNote: `Malformed stream payload ignored: ${reason instanceof Error ? reason.message : String(reason)}`,
+            }));
+          }
+        };
+        socket.onerror = () => {
+          if (!cancelled) setState((current) => ({ ...current, streamState: "error", streamNote: "websocket error" }));
+        };
+        socket.onclose = () => {
+          if (!cancelled) setState((current) => (current.streamState === "ended" ? current : { ...current, streamState: "closed", streamNote: "websocket closed" }));
         };
       } catch (reason) {
         setError(String(reason));
@@ -377,9 +429,12 @@ export function ObserverSurface() {
   }, []);
 
   const freshnessClass = useMemo(() => tone(state.bootstrap?.freshness_state ?? "fresh"), [state.bootstrap?.freshness_state]);
+  const needsAttention = state.bootstrap?.freshness_state && state.bootstrap.freshness_state !== "fresh";
+  const isStreamDegraded = state.streamState === "error" || state.streamState === "closed" || state.sequenceGaps.length > 0;
 
   if (loading) return <div className="state-block">Loading observer sidecar…</div>;
   if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
+  if (hasNoSession) return <div className="state-block observer-empty-state"><strong>No observer session mounted.</strong><span>Set STEAMER_OBSERVER_BUNDLE_JSON or enable a mock session, then refresh this read-only surface.</span></div>;
   if (!state.bootstrap || !state.session) return <div className="state-block">Observer bootstrap unavailable.</div>;
 
   const bootstrap = state.bootstrap;
@@ -389,8 +444,21 @@ export function ObserverSurface() {
       <section className="panel observer-hero-panel">
         <div className="panel-header">
           <h3>Live Observer Sidecar</h3>
-          <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.freshness_state.toUpperCase()}</span>
+          <div className="observer-chip-row">
+            <span className={`status-chip status-chip-${state.streamState === "live" ? "accent" : state.streamState === "connecting" || state.streamState === "ended" ? "muted" : "alert"}`}>WS {state.streamState.toUpperCase()}</span>
+            <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.freshness_state.toUpperCase()}</span>
+          </div>
         </div>
+        {needsAttention || isStreamDegraded ? (
+          <div className="observer-alert-banner">
+            <strong>Observer attention needed</strong>
+            <span>
+              freshness={bootstrap.freshness_state}; websocket={state.streamState}
+              {state.sequenceGaps[0] ? `; sequence gap expected ${state.sequenceGaps[0].expected}, received ${state.sequenceGaps[0].received}` : ""}
+              {state.streamNote ? `; ${state.streamNote}` : ""}
+            </span>
+          </div>
+        ) : null}
         <div className="panel-body observer-hero-body">
           <div>
             <div className="observer-title-row">
@@ -404,6 +472,8 @@ export function ObserverSurface() {
             <div><span className="mini-label">timeframe</span><strong>{bootstrap.timeframe}</strong></div>
             <div><span className="mini-label">engine</span><strong>{bootstrap.engine_id}</strong></div>
             <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+            <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
+            <div><span className="mini-label">seq gaps</span><strong>{state.sequenceGaps.length}</strong></div>
           </div>
         </div>
       </section>
@@ -422,7 +492,7 @@ export function ObserverSurface() {
             <span className="pill">snapshot + stream reconcile</span>
           </div>
           <div className="panel-body observer-chart-wrap">
-            <ObserverChart candles={bootstrap.chart.candles} markers={bootstrap.chart.markers} />
+            <ObserverChart candles={bootstrap.chart.candles} markers={bootstrap.chart.markers.slice(-MARKER_LIMIT)} />
           </div>
         </section>
 
@@ -466,7 +536,11 @@ export function ObserverSurface() {
                 <div className="kv-item"><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
                 <div className="kv-item"><span className="mini-label">incidents</span><strong>{bootstrap.health.incidents.length}</strong></div>
                 <div className="kv-item"><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
+                <div className="kv-item"><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
+                <div className="kv-item"><span className="mini-label">seq gaps</span><strong>{state.sequenceGaps.length}</strong></div>
               </div>
+              {state.streamNote ? <div className="observer-incident">{state.streamNote}</div> : null}
+              {state.sequenceGaps.map((gap) => <div className="observer-incident" key={`${gap.expected}-${gap.received}`}>sequence gap: expected {gap.expected}, received {gap.received}</div>)}
               {bootstrap.health.incidents.map((incident) => <div className="observer-incident" key={incident}>{incident}</div>)}
             </div>
           </section>

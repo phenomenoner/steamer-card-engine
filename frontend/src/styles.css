@@ -705,6 +705,14 @@ button {
   gap: 24px;
 }
 
+.observer-only-shell {
+  max-width: 1600px;
+}
+
+.observer-only-hero {
+  display: block;
+}
+
 .observer-hero-panel h2 {
   margin: 0;
   font-size: 1.4rem;
@@ -722,6 +730,43 @@ button {
   gap: 12px;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.observer-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.observer-alert-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 18px 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--text);
+}
+
+.observer-alert-banner strong {
+  color: var(--alert);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.observer-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.observer-empty-state strong {
+  color: var(--text);
+  font-style: normal;
 }
 
 .observer-top-meta {

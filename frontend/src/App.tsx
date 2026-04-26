@@ -1364,7 +1364,23 @@ function StrategyPipelineSurface({ view }: { view: StrategyPipelineView }) {
   );
 }
 
-function App() {
+function ObserverOnlyApp() {
+  return (
+    <div className="page-shell observer-only-shell">
+      <header className="hero observer-only-hero">
+        <div className="hero-copy">
+          <div className="hero-info">
+            <h1>Steamer Observer</h1>
+            <p>Browser-openable read-only monitor for one sanitized engine session.</p>
+          </div>
+        </div>
+      </header>
+      <ObserverSurface />
+    </div>
+  );
+}
+
+function DashboardApp() {
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("observer");
   const [dates, setDates] = useState<DateItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -1704,6 +1720,13 @@ function App() {
       {error ? <div className="state-block text-alert">ERROR: {error}</div> : null}
     </div>
   );
+}
+
+function App() {
+  if (import.meta.env.VITE_STEAMER_SURFACE === "observer") {
+    return <ObserverOnlyApp />;
+  }
+  return <DashboardApp />;
 }
 
 export default App;

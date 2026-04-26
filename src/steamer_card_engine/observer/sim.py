@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from .bridge import ObserverProjector, ObserverSessionMetadata
@@ -267,4 +269,31 @@ def write_sim_observer_bundle_json(*, bundle: ObserverSessionBundle, output_path
         "events": [event.to_dict() for event in bundle.events],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(serialized)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, output_path)
+        try:
+            dir_fd = os.open(output_path.parent, os.O_RDONLY)
+        except OSError:
+            dir_fd = None
+        if dir_fd is not None:
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
