@@ -5,6 +5,8 @@ type FreshnessState = "fresh" | "lagging" | "stale" | "degraded";
 type StreamState = "idle" | "connecting" | "live" | "ended" | "closed" | "error";
 
 const MARKER_LIMIT = 80;
+const CHART_TIMEFRAMES = ["auto", "1m", "5m", "15m"] as const;
+type ChartTimeframe = typeof CHART_TIMEFRAMES[number];
 
 type ObserverSession = {
   session_id: string;
@@ -173,6 +175,61 @@ function toUtcTimestamp(value: string): UTCTimestamp {
 
 function toBarTime(value: string): string {
   return `${value.slice(0, 16)}:00Z`;
+}
+
+function timeframeMinutes(timeframe: ChartTimeframe): number {
+  if (timeframe === "5m") return 5;
+  if (timeframe === "15m") return 15;
+  return 1;
+}
+
+function bucketTime(value: string, timeframe: ChartTimeframe): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return toBarTime(value);
+  const minutes = timeframeMinutes(timeframe);
+  date.setUTCSeconds(0, 0);
+  date.setUTCMinutes(Math.floor(date.getUTCMinutes() / minutes) * minutes);
+  return date.toISOString().replace(".000Z", "Z");
+}
+
+function aggregateCandles(candles: Candle[], timeframe: ChartTimeframe): Candle[] {
+  const buckets = new Map<string, Candle[]>();
+  [...candles]
+    .sort((left, right) => new Date(left.time).getTime() - new Date(right.time).getTime())
+    .forEach((candle) => {
+      const key = bucketTime(candle.time, timeframe);
+      buckets.set(key, [...(buckets.get(key) ?? []), candle]);
+    });
+
+  return [...buckets.entries()].map(([time, values]) => ({
+    time,
+    open: values[0].open,
+    high: Math.max(...values.map((item) => item.high)),
+    low: Math.min(...values.map((item) => item.low)),
+    close: values[values.length - 1].close,
+    volume: values.reduce((total, item) => total + item.volume, 0),
+  }));
+}
+
+function alignMarkers(markers: ChartMarker[], timeframe: ChartTimeframe): ChartMarker[] {
+  return markers.map((marker) => ({ ...marker, time: bucketTime(marker.time, timeframe) }));
+}
+
+function TimeframeSelector({ value, onChange }: { value: ChartTimeframe; onChange: (value: ChartTimeframe) => void }) {
+  return (
+    <div className="timeframe-selector" aria-label="Chart timeframe">
+      {CHART_TIMEFRAMES.map((timeframe) => (
+        <button
+          key={timeframe}
+          type="button"
+          className={value === timeframe ? "active" : ""}
+          onClick={() => onChange(timeframe)}
+        >
+          {timeframe === "auto" ? "Auto" : timeframe}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function tone(value: FreshnessState) {
@@ -368,6 +425,7 @@ function InfoCard({ label, value, subvalue }: { label: string; value: string; su
 }
 
 export function ObserverSurface() {
+  const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("auto");
   const [state, setState] = useState<ObserverState>({
     session: null,
     bootstrap: null,
@@ -512,10 +570,10 @@ export function ObserverSurface() {
         <section className="panel observer-chart-panel">
           <div className="panel-header">
             <h3>Chart + Markers</h3>
-            <span className="pill">snapshot + stream reconcile</span>
+            <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div>
           </div>
           <div className="panel-body observer-chart-wrap">
-            <ObserverChart candles={bootstrap.chart.candles} markers={bootstrap.chart.markers.slice(-MARKER_LIMIT)} />
+            <ObserverChart candles={chartCandles} markers={chartMarkers} />
           </div>
         </section>
 
@@ -595,6 +653,7 @@ export function ObserverSurface() {
 }
 
 export function ReplayHistorySurface() {
+  const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("auto");
   const [sessions, setSessions] = useState<HistorySession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bootstrap, setBootstrap] = useState<ObserverBootstrap | null>(null);

@@ -9,6 +9,7 @@ from pathlib import Path
 from .bridge import ObserverProjector, ObserverSessionMetadata
 from .mock import build_mock_observer_session
 from .schema import CandleBar, ObserverBootstrap, ObserverEvent, ObserverSessionBundle
+from .timeframe import aggregate_candles, bootstrap_with_timeframe_chart, normalize_timeframe
 
 
 class ObserverRepositoryError(RuntimeError):
@@ -183,15 +184,19 @@ class ObserverSessionRepository:
         except KeyError as error:
             raise KeyError(f"unknown observer session: {session_id}") from error
 
-    def bootstrap_payload(self, session_id: str) -> dict:
-        return self.require_bundle(session_id).bootstrap.to_dict()
-
-    def candles_payload(self, session_id: str, limit: int = 500) -> dict:
+    def bootstrap_payload(self, session_id: str, timeframe: str = "auto") -> dict:
         bundle = self.require_bundle(session_id)
+        return bootstrap_with_timeframe_chart(bundle.bootstrap.to_dict(), bundle.candles, timeframe)
+
+    def candles_payload(self, session_id: str, limit: int = 500, timeframe: str = "auto") -> dict:
+        bundle = self.require_bundle(session_id)
+        normalized_timeframe = normalize_timeframe(timeframe)
+        candles = aggregate_candles(bundle.candles, normalized_timeframe)
         limit = max(1, min(limit, 1000))
         return {
             "session_id": session_id,
-            "items": [asdict(item) for item in bundle.candles[-limit:]],
+            "timeframe": normalized_timeframe,
+            "items": [asdict(item) for item in candles[-limit:]],
         }
 
     def timeline_payload(self, session_id: str, limit: int = 200) -> dict:

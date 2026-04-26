@@ -602,3 +602,32 @@ def test_observer_history_skips_artifacts_outside_repo_root(tmp_path: Path) -> N
     )
 
     assert _build_record(fixture, root) is None
+
+
+def test_observer_history_candles_support_timeframe_aggregation() -> None:
+    client = TestClient(create_app())
+    sessions = client.get("/api/observer/history/sessions?limit=1").json()["items"]
+    assert sessions
+    session_id = sessions[0]["session_id"]
+
+    response = client.get(f"/api/observer/history/sessions/{session_id}/candles", params={"timeframe": "5m", "limit": 50})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["timeframe"] == "5m"
+    items = payload["items"]
+    assert items
+    assert len({item["time"] for item in items}) == len(items)
+    assert all(int(item["time"][14:16]) % 5 == 0 for item in items)
+
+
+def test_observer_history_rejects_invalid_timeframe() -> None:
+    client = TestClient(create_app())
+    sessions = client.get("/api/observer/history/sessions?limit=1").json()["items"]
+    assert sessions
+
+    response = client.get(
+        f"/api/observer/history/sessions/{sessions[0]['session_id']}/candles",
+        params={"timeframe": "2m"},
+    )
+    assert response.status_code == 400
+    assert "invalid timeframe" in response.json()["detail"]

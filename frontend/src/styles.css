@@ -937,3 +937,37 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+.observer-chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.timeframe-selector {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.18rem;
+  border: 1px solid rgba(141, 170, 186, 0.22);
+  border-radius: 999px;
+  background: rgba(10, 16, 22, 0.62);
+}
+
+.timeframe-selector button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.28rem 0.58rem;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.timeframe-selector button.active {
+  color: #061018;
+  background: var(--accent);
+  box-shadow: 0 0 18px rgba(94, 243, 177, 0.2);
+}

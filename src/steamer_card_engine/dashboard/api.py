@@ -91,18 +91,22 @@ def create_app() -> FastAPI:
         return {"items": observer_repo.list_sessions()}
 
     @app.get("/api/observer/sessions/{session_id}/bootstrap")
-    def observer_bootstrap(session_id: str) -> dict:
+    def observer_bootstrap(session_id: str, timeframe: str = "auto") -> dict:
         try:
-            return observer_repo.bootstrap_payload(session_id)
+            return observer_repo.bootstrap_payload(session_id, timeframe=timeframe)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @app.get("/api/observer/sessions/{session_id}/candles")
-    def observer_candles(session_id: str, limit: int = 500) -> dict:
+    def observer_candles(session_id: str, limit: int = 500, timeframe: str = "auto") -> dict:
         try:
-            return observer_repo.candles_payload(session_id, limit=limit)
+            return observer_repo.candles_payload(session_id, limit=limit, timeframe=timeframe)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @app.get("/api/observer/sessions/{session_id}/timeline")
     def observer_timeline(session_id: str, limit: int = 200) -> dict:
@@ -119,16 +123,18 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(error)) from error
 
     @app.get("/api/observer/history/sessions/{session_id}/bootstrap")
-    def observer_history_bootstrap(session_id: str) -> dict:
+    def observer_history_bootstrap(session_id: str, timeframe: str = "auto") -> dict:
         try:
-            return observer_history_repo.bootstrap_payload(session_id)
+            return observer_history_repo.bootstrap_payload(session_id, timeframe=timeframe)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @app.get("/api/observer/history/sessions/{session_id}/candles")
-    def observer_history_candles(session_id: str, limit: int = 500, cursor: str | None = None) -> dict:
+    def observer_history_candles(session_id: str, limit: int = 500, cursor: str | None = None, timeframe: str = "auto") -> dict:
         try:
-            return observer_history_repo.candles_payload(session_id, limit=limit, cursor=cursor)
+            return observer_history_repo.candles_payload(session_id, limit=limit, cursor=cursor, timeframe=timeframe)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except (ObserverHistoryError, ValueError) as error:

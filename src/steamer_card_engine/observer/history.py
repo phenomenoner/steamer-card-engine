@@ -11,6 +11,7 @@ from steamer_card_engine.dashboard.fixtures import FixtureDay, discover_fixture_
 from .bridge import ObserverProjector, ObserverSessionMetadata
 from .bridge import to_bar_time
 from .schema import CandleBar, ObserverEvent, ObserverSessionBundle
+from .timeframe import aggregate_candles, bootstrap_with_timeframe_chart, normalize_timeframe
 
 
 MAX_HISTORY_SESSIONS = 6
@@ -308,9 +309,9 @@ class ObserverHistoryRepository:
         except KeyError as error:
             raise KeyError(f"unknown observer history session: {session_id}") from error
 
-    def bootstrap_payload(self, session_id: str) -> dict[str, Any]:
+    def bootstrap_payload(self, session_id: str, timeframe: str = "auto") -> dict[str, Any]:
         record = self.require_record(session_id)
-        payload = record.bundle.bootstrap.to_dict()
+        payload = bootstrap_with_timeframe_chart(record.bundle.bootstrap.to_dict(), record.bundle.candles, timeframe)
         payload["provenance"] = {
             "source_kind": record.source_kind,
             "source_path_ref": record.source_path_ref,
@@ -330,13 +331,15 @@ class ObserverHistoryRepository:
             raise ObserverHistoryError(f"invalid cursor: {cursor}")
         return start
 
-    def candles_payload(self, session_id: str, limit: int = 500, cursor: str | None = None) -> dict[str, Any]:
+    def candles_payload(self, session_id: str, limit: int = 500, cursor: str | None = None, timeframe: str = "auto") -> dict[str, Any]:
         record = self.require_record(session_id)
+        normalized_timeframe = normalize_timeframe(timeframe)
+        candles = aggregate_candles(record.bundle.candles, normalized_timeframe)
         limit = max(1, min(limit, 1000))
         start = self._cursor_start(cursor)
         end = start + limit
-        items = record.bundle.candles[start:end]
-        return {"session_id": session_id, "items": [asdict(item) for item in items], "next_cursor": str(end) if end < len(record.bundle.candles) else None}
+        items = candles[start:end]
+        return {"session_id": session_id, "timeframe": normalized_timeframe, "items": [asdict(item) for item in items], "next_cursor": str(end) if end < len(candles) else None}
 
     def timeline_payload(self, session_id: str, limit: int = 200, cursor: str | None = None) -> dict[str, Any]:
         record = self.require_record(session_id)
