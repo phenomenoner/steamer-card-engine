@@ -16,6 +16,25 @@ type ObserverSession = {
   freshness_state: FreshnessState;
 };
 
+type ObserverSymbolPool = {
+  source_kind: string;
+  symbol_count: number;
+  top_symbols: string[];
+  sample_symbols: string[];
+};
+
+type ObserverSessionsPayload = {
+  items: ObserverSession[];
+  default_session_id?: string | null;
+  symbol_pool?: Partial<ObserverSymbolPool>;
+};
+
+function symbolPoolLabel(sourceKind: string) {
+  if (sourceKind === "observer-sessions-fallback") return "mounted observer sessions";
+  if (sourceKind.endsWith("-sample")) return "dashboard fixture sample";
+  return sourceKind;
+}
+
 type HistorySession = ObserverSession & {
   source_kind: string;
   source_path_ref: string;
@@ -243,6 +262,21 @@ function TimeframeSelector({ value, onChange }: { value: ChartTimeframe; onChang
   );
 }
 
+function SessionSelector({ sessions, value, onChange }: { sessions: ObserverSession[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="observer-session-selector" htmlFor="observer-session-select">
+      <span className="mini-label">selected live view</span>
+      <select id="observer-session-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {sessions.map((session) => (
+          <option key={session.session_id} value={session.session_id}>
+            {session.symbol} · {session.session_id}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function tone(value: FreshnessState) {
   if (value === "fresh") return "accent";
   if (value === "lagging") return "muted";
@@ -438,6 +472,9 @@ function InfoCard({ label, value, subvalue }: { label: string; value: string; su
 
 export function ObserverSurface() {
   const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("auto");
+  const [sessions, setSessions] = useState<ObserverSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [symbolPool, setSymbolPool] = useState<ObserverSymbolPool | null>(null);
   const [state, setState] = useState<ObserverState>({
     session: null,
     bootstrap: null,
@@ -453,20 +490,59 @@ export function ObserverSurface() {
   const [hasNoSession, setHasNoSession] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadSessions() {
+      try {
+        const payload = await getJson<ObserverSessionsPayload>("/api/observer/sessions");
+        if (cancelled) return;
+        const loadedSessions = payload.items ?? [];
+        const fallbackSymbols = [...new Set(loadedSessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0))].sort();
+        setSessions(loadedSessions);
+        setSymbolPool({
+          source_kind: payload.symbol_pool?.source_kind ?? "observer-sessions-fallback",
+          symbol_count: payload.symbol_pool?.symbol_count ?? fallbackSymbols.length,
+          top_symbols: payload.symbol_pool?.top_symbols ?? fallbackSymbols.slice(0, 5),
+          sample_symbols: payload.symbol_pool?.sample_symbols ?? fallbackSymbols.slice(0, 8),
+        });
+        if (!loadedSessions.length) {
+          if (!cancelled) setHasNoSession(true);
+          setSelectedSessionId(null);
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        setHasNoSession(false);
+        setSelectedSessionId((current) => {
+          const next = current && loadedSessions.some((session) => session.session_id === current) ? current : payload.default_session_id ?? loadedSessions[0]?.session_id ?? null;
+          return next;
+        });
+        setError(null);
+      } catch (reason) {
+        setError(String(reason));
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const session = sessions.find((item) => item.session_id === selectedSessionId);
+    if (!session) return;
+
     let socket: WebSocket | null = null;
     let cancelled = false;
 
-    async function load() {
+    async function loadSelectedSession() {
+      setLoading(true);
       try {
-        const sessions = await getJson<{ items: ObserverSession[] }>("/api/observer/sessions");
-        const session = sessions.items[0];
-        if (!session) {
-          if (!cancelled) setHasNoSession(true);
-          return;
-        }
         const bootstrap = await getJson<ObserverBootstrap>(`/api/observer/sessions/${session.session_id}/bootstrap`);
         if (cancelled) return;
-        setHasNoSession(false);
+        setError(null);
         setState({
           session,
           bootstrap: { ...bootstrap, chart: { ...bootstrap.chart, markers: bootstrap.chart.markers.slice(-MARKER_LIMIT) } },
@@ -483,17 +559,21 @@ export function ObserverSurface() {
           if (!cancelled) setState((current) => ({ ...current, streamState: "live", streamNote: null }));
         };
         socket.onmessage = (message) => {
+          if (cancelled) return;
           try {
             const payload = JSON.parse(message.data) as { type?: string } | ObserverEvent;
             if ("type" in payload && payload.type === "stream_end") {
+              if (cancelled) return;
               setState((current) => ({ ...current, streamState: "ended", streamNote: "stream_end received from observer API" }));
               return;
             }
             if (typeof (payload as ObserverEvent).seq !== "number") {
               throw new Error("stream payload missing numeric seq");
             }
+            if (cancelled) return;
             setState((current) => applyObserverEvent(current, payload as ObserverEvent));
           } catch (reason) {
+            if (cancelled) return;
             setState((current) => ({
               ...current,
               streamState: "error",
@@ -508,22 +588,32 @@ export function ObserverSurface() {
           if (!cancelled) setState((current) => (current.streamState === "ended" ? current : { ...current, streamState: "closed", streamNote: "websocket closed" }));
         };
       } catch (reason) {
-        setError(String(reason));
+        if (!cancelled) setError(String(reason));
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    void load();
+    void loadSelectedSession();
     return () => {
       cancelled = true;
       socket?.close();
     };
-  }, []);
+  }, [selectedSessionId, sessions]);
 
   const freshnessClass = useMemo(() => tone(state.bootstrap?.freshness_state ?? "fresh"), [state.bootstrap?.freshness_state]);
   const needsAttention = state.bootstrap?.freshness_state && state.bootstrap.freshness_state !== "fresh";
   const isStreamDegraded = state.streamState === "error" || state.streamState === "closed" || state.sequenceGaps.length > 0;
+  const effectivePool = useMemo(() => {
+    const fallbackSymbols = [...new Set(sessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0))].sort();
+    if (symbolPool) return symbolPool;
+    return {
+      source_kind: "observer-sessions-fallback",
+      symbol_count: fallbackSymbols.length,
+      top_symbols: fallbackSymbols.slice(0, 5),
+      sample_symbols: fallbackSymbols.slice(0, 8),
+    };
+  }, [sessions, symbolPool]);
 
   if (loading) return <div className="state-block">Loading observer sidecar…</div>;
   if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
@@ -560,15 +650,31 @@ export function ObserverSurface() {
               <h2>{bootstrap.session_label}</h2>
               <span className="pill">{bootstrap.market_mode}</span>
             </div>
-            <p className="strategy-note">One browser-openable sanitized observer for a single engine instance. Read-only by structure.</p>
+            <p className="strategy-note">Strategy can execute over a symbol pool; this chart/stream is a selected single-symbol session view (read-only).</p>
           </div>
-          <div className="observer-top-meta">
-            <div><span className="mini-label">symbol</span><strong>{bootstrap.symbol}</strong></div>
-            <div><span className="mini-label">timeframe</span><strong>{bootstrap.timeframe}</strong></div>
-            <div><span className="mini-label">engine</span><strong>{bootstrap.engine_id}</strong></div>
-            <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
-            <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
-            <div><span className="mini-label">seq gaps</span><strong>{state.sequenceGaps.length}</strong></div>
+          <div className="observer-hero-side">
+            <SessionSelector sessions={sessions} value={selectedSessionId ?? state.session.session_id} onChange={(value) => setSelectedSessionId(value)} />
+            <div className="observer-pool-overview">
+              <div className="observer-pool-head">
+                <span className="mini-label">symbol pool context</span>
+                <strong>{effectivePool.symbol_count} symbols</strong>
+              </div>
+              <p className="card-meta">source {symbolPoolLabel(effectivePool.source_kind)} · chart focus {bootstrap.symbol}</p>
+              <div className="observer-symbol-chip-row">
+                {(effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols).map((symbol) => (
+                  <span className="observer-symbol-chip" key={symbol}>{symbol}</span>
+                ))}
+              </div>
+            </div>
+            <div className="observer-top-meta observer-top-meta-live">
+              <div><span className="mini-label">symbol</span><strong>{bootstrap.symbol}</strong></div>
+              <div><span className="mini-label">session</span><strong>{state.session.session_id}</strong></div>
+              <div><span className="mini-label">timeframe</span><strong>{bootstrap.timeframe}</strong></div>
+              <div><span className="mini-label">engine</span><strong>{bootstrap.engine_id}</strong></div>
+              <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+              <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
+              <div><span className="mini-label">seq gaps</span><strong>{state.sequenceGaps.length}</strong></div>
+            </div>
           </div>
         </div>
       </section>

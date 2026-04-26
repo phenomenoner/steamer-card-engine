@@ -108,7 +108,8 @@ def test_written_sim_observer_bundle_mounts_via_dashboard(monkeypatch, tmp_path:
     client = TestClient(create_app())
     sessions = client.get("/api/observer/sessions")
     assert sessions.status_code == 200
-    assert sessions.json()["items"] == [
+    sessions_payload = sessions.json()
+    assert sessions_payload["items"] == [
         {
             "session_id": "sim-2026-03-13-2330",
             "engine_id": "steamer-card-engine.sim",
@@ -117,6 +118,8 @@ def test_written_sim_observer_bundle_mounts_via_dashboard(monkeypatch, tmp_path:
             "freshness_state": "fresh",
         }
     ]
+    assert sessions_payload["default_session_id"] == "sim-2026-03-13-2330"
+    assert sessions_payload["symbol_pool"]["symbol_count"] >= 1
 
     bootstrap = client.get("/api/observer/sessions/sim-2026-03-13-2330/bootstrap")
     assert bootstrap.status_code == 200

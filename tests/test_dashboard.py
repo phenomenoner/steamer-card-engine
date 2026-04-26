@@ -73,6 +73,9 @@ def test_observer_api_defaults_to_mock_session() -> None:
     payload = sessions.json()
     assert payload["items"]
     assert payload["items"][0]["session_id"] == "aws-live-sim-demo"
+    assert payload["default_session_id"] == "aws-live-sim-demo"
+    assert payload["symbol_pool"]["symbol_count"] >= 1
+    assert isinstance(payload["symbol_pool"]["source_kind"], str)
 
 
 def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) -> None:
@@ -115,6 +118,9 @@ def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) 
         "market_mode": "live(sim)",
         "freshness_state": "degraded",
     }]
+    assert payload["default_session_id"] == "aws-live-sim-private"
+    assert payload["symbol_pool"]["symbol_count"] >= 1
+    assert isinstance(payload["symbol_pool"]["sample_symbols"], list)
 
     bootstrap = client.get("/api/observer/sessions/aws-live-sim-private/bootstrap")
     assert bootstrap.status_code == 200
@@ -478,9 +484,12 @@ def test_observer_api_seed_routes_and_stream_reconcile_contract() -> None:
 
     sessions_response = client.get("/api/observer/sessions")
     assert sessions_response.status_code == 200
-    sessions = sessions_response.json()["items"]
+    sessions_payload = sessions_response.json()
+    sessions = sessions_payload["items"]
     assert sessions
     session_id = sessions[0]["session_id"]
+    assert sessions_payload["default_session_id"] == session_id
+    assert sessions_payload["symbol_pool"]["symbol_count"] >= 1
 
     bootstrap_response = client.get(f"/api/observer/sessions/{session_id}/bootstrap")
     assert bootstrap_response.status_code == 200
@@ -519,6 +528,24 @@ def test_observer_api_seed_routes_and_stream_reconcile_contract() -> None:
 
     assert error_payload["type"] == "error"
     assert "invalid after_seq" in error_payload["detail"]
+
+
+def test_observer_sessions_symbol_pool_falls_back_to_live_sessions(monkeypatch, tmp_path: Path) -> None:
+    from steamer_card_engine.dashboard import fixtures as dashboard_fixtures
+
+    monkeypatch.setattr(dashboard_fixtures, "discover_fixture_days", lambda _root=None: [])
+    monkeypatch.setattr(dashboard_fixtures, "repo_root", lambda: tmp_path)
+
+    reset_observer_repository_cache()
+    client = TestClient(create_app())
+
+    payload = client.get("/api/observer/sessions").json()
+    symbols = sorted({item["symbol"] for item in payload["items"]})
+
+    assert payload["symbol_pool"]["source_kind"] == "observer-sessions-fallback"
+    assert payload["symbol_pool"]["symbol_count"] == len(symbols)
+    assert payload["symbol_pool"]["top_symbols"] == symbols[:5]
+    reset_observer_repository_cache()
 
 
 def test_observer_history_api_projects_sanitized_fixture_sessions() -> None:

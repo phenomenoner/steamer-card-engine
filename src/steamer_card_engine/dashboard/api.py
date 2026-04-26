@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/observer/sessions")
     def observer_sessions() -> dict:
-        return {"items": observer_repo.list_sessions()}
+        return observer_repo.list_sessions_payload()
 
     @app.get("/api/observer/sessions/{session_id}/bootstrap")
     def observer_bootstrap(session_id: str, timeframe: str = "auto") -> dict:

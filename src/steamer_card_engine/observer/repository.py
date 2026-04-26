@@ -5,11 +5,83 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
+import tomllib
+from typing import Any
 
 from .bridge import ObserverProjector, ObserverSessionMetadata
 from .mock import build_mock_observer_session
 from .schema import CandleBar, ObserverBootstrap, ObserverEvent, ObserverSessionBundle
 from .timeframe import aggregate_candles, bootstrap_with_timeframe_chart, normalize_timeframe
+
+
+def _coerce_symbol_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    seen: set[str] = set()
+    symbols: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        symbol = item.strip()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        symbols.append(symbol)
+    return symbols
+
+
+def _load_fixture_or_deck_symbol_pool() -> tuple[list[str], str]:
+    try:
+        from steamer_card_engine.dashboard.fixtures import discover_fixture_days, repo_root
+    except Exception:
+        return ([], "observer-sessions-fallback")
+
+    root = repo_root()
+    fixtures = discover_fixture_days(root)
+    for fixture in fixtures:
+        scenario_spec_path = fixture.candidate_dir / "scenario-spec.json"
+        if scenario_spec_path.exists():
+            try:
+                scenario_spec = json.loads(scenario_spec_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                scenario_spec = None
+            if isinstance(scenario_spec, dict):
+                symbol_set = scenario_spec.get("symbol_set")
+                if isinstance(symbol_set, dict):
+                    symbols = _coerce_symbol_list(symbol_set.get("symbols"))
+                    if symbols:
+                        return (symbols, "dashboard-fixture-symbol-set-sample")
+                legacy_symbols = _coerce_symbol_list(scenario_spec.get("symbols"))
+                if legacy_symbols:
+                    return (legacy_symbols, "dashboard-fixture-symbol-list-sample")
+
+        config_snapshot_path = fixture.candidate_dir / "config-snapshot.json"
+        if not config_snapshot_path.exists():
+            continue
+        try:
+            config_snapshot = json.loads(config_snapshot_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(config_snapshot, dict):
+            continue
+        deck_id = str(config_snapshot.get("deck_id") or "").strip()
+        if not deck_id:
+            continue
+        deck_path = root / "examples" / "decks" / f"{deck_id}.toml"
+        if not deck_path.exists():
+            continue
+        try:
+            with deck_path.open("rb") as file:
+                deck_payload = tomllib.load(file)
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        if not isinstance(deck_payload, dict):
+            continue
+        deck_symbols = _coerce_symbol_list(deck_payload.get("symbol_scope"))
+        if deck_symbols:
+            return (deck_symbols, "dashboard-deck-symbol-scope-sample")
+
+    return ([], "observer-sessions-fallback")
 
 
 class ObserverRepositoryError(RuntimeError):
@@ -165,6 +237,7 @@ def load_bundle_from_json(path: Path) -> ObserverSessionBundle:
 class ObserverSessionRepository:
     def __init__(self, bundles: dict[str, ObserverSessionBundle]):
         self._bundles = bundles
+        self._pool_symbols, self._pool_source = _load_fixture_or_deck_symbol_pool()
 
     def list_sessions(self) -> list[dict[str, str]]:
         return [
@@ -177,6 +250,22 @@ class ObserverSessionRepository:
             }
             for bundle in self._bundles.values()
         ]
+
+    def list_sessions_payload(self) -> dict[str, Any]:
+        items = self.list_sessions()
+        fallback_symbols = sorted({item["symbol"] for item in items if isinstance(item.get("symbol"), str) and item["symbol"].strip()})
+        pool_symbols = self._pool_symbols or fallback_symbols
+        source_kind = self._pool_source if self._pool_symbols else "observer-sessions-fallback"
+        return {
+            "items": items,
+            "default_session_id": items[0]["session_id"] if items else None,
+            "symbol_pool": {
+                "source_kind": source_kind,
+                "symbol_count": len(pool_symbols),
+                "top_symbols": pool_symbols[:5],
+                "sample_symbols": pool_symbols[:8],
+            },
+        }
 
     def require_bundle(self, session_id: str) -> ObserverSessionBundle:
         try:
