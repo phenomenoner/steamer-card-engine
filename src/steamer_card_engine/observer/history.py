@@ -47,6 +47,14 @@ class HistorySessionRecord:
     compare_ref: str | None
 
     def summary(self) -> dict[str, Any]:
+        strategy_id, strategy_label, strategy_source_kind = _history_strategy_identity(self)
+        metadata = self.bundle.metadata
+        symbols = [symbol for symbol in (metadata.symbol_pool if metadata else [self.symbol]) if isinstance(symbol, str) and symbol.strip()]
+        if not symbols and self.symbol.strip():
+            symbols = [self.symbol]
+        symbols_source_kind = (
+            _coerce_optional_text(metadata.symbol_pool_source) if metadata else None
+        ) or "history-primary-symbol"
         return {
             "session_id": self.session_id,
             "source_kind": self.source_kind,
@@ -67,6 +75,11 @@ class HistorySessionRecord:
             "candle_count": self.candle_count,
             "has_compare": self.has_compare,
             "tags": self.tags,
+            "strategy_id": strategy_id,
+            "strategy_label": strategy_label,
+            "strategy_source_kind": strategy_source_kind,
+            "symbols": symbols,
+            "symbols_source_kind": symbols_source_kind,
         }
 
 
@@ -117,6 +130,52 @@ def _fixture_is_repo_local(fixture: FixtureDay, root: Path) -> bool:
         and _resolved_under(fixture.baseline_dir, runs_root)
         and _resolved_under(fixture.comparison_dir, comparisons_root)
     )
+
+
+def _coerce_optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _history_strategy_identity(record: HistorySessionRecord) -> tuple[str, str, str]:
+    scenario_id = _coerce_optional_text(record.scenario_id)
+    deck_id = _coerce_optional_text(record.deck_id)
+    run_type = _coerce_optional_text(record.run_type)
+
+    if scenario_id:
+        strategy_id = scenario_id
+        strategy_source_kind = "history-scenario-id"
+    elif deck_id and run_type:
+        strategy_id = f"{record.date}:{deck_id}:{run_type}"
+        strategy_source_kind = "history-date-deck-run-type"
+    elif deck_id:
+        strategy_id = f"{record.date}:{deck_id}"
+        strategy_source_kind = "history-date-deck"
+    elif run_type:
+        strategy_id = f"{record.date}:{run_type}"
+        strategy_source_kind = "history-date-run-type"
+    else:
+        strategy_id = record.session_id
+        strategy_source_kind = "history-session-id"
+
+    if scenario_id:
+        strategy_label = f"{record.date} · {record.run_type} · scenario"
+    elif deck_id:
+        strategy_label = f"{record.date} · {deck_id} · {record.run_type}"
+    elif run_type:
+        strategy_label = f"{record.date} · {run_type}"
+    else:
+        strategy_label = f"{record.date} · session-derived"
+
+    return strategy_id, strategy_label, strategy_source_kind
+
+
+def _append_symbol_session(mapping: dict[str, list[str]], symbol: str, session_id: str) -> None:
+    session_ids = mapping.setdefault(symbol, [])
+    if session_id not in session_ids:
+        session_ids.append(session_id)
 
 
 def _pick_symbol_and_ticks(event_log: Path) -> tuple[str, list[dict[str, Any]]]:
@@ -242,6 +301,11 @@ def _build_record(fixture: FixtureDay, root: Path) -> HistorySessionRecord | Non
         )
     )
 
+    deck_id_raw = config.get("deck_id")
+    scenario_id_raw = scenario_spec.get("scenario_id") or run_manifest.get("scenario_id")
+    deck_id = str(deck_id_raw) if deck_id_raw is not None else None
+    scenario_id = str(scenario_id_raw) if scenario_id_raw is not None else None
+
     metadata = ObserverSessionMetadata(
         session_id=session_id,
         engine_id=engine_id,
@@ -251,14 +315,17 @@ def _build_record(fixture: FixtureDay, root: Path) -> HistorySessionRecord | Non
         timeframe="tick-projection",
         symbol_pool=[symbol],
         symbol_pool_source="history-static-tick-projection",
+        scenario_id=scenario_id,
+        deck_id=deck_id,
+        run_type=run_type,
+        run_id=fixture.candidate_run_id,
+        source_kind="dashboard-fixture-static-projection",
     )
     projector = ObserverProjector(timeline_limit=20, candle_limit=MAX_PROJECTED_CANDLES)
     bootstrap = projector.bootstrap_from_events(metadata, events)
     bundle = ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events, metadata=metadata)
 
     event_count = _count_jsonl(bundle_dir / "event-log.jsonl")
-    deck_id = config.get("deck_id")
-    scenario_id = scenario_spec.get("scenario_id")
     return HistorySessionRecord(
         session_id=session_id,
         source_kind="dashboard-fixture-static-projection",
@@ -270,8 +337,8 @@ def _build_record(fixture: FixtureDay, root: Path) -> HistorySessionRecord | Non
         market_mode=metadata.market_mode,
         symbol=symbol,
         timeframe=metadata.timeframe,
-        scenario_id=str(scenario_id) if scenario_id is not None else None,
-        deck_id=str(deck_id) if deck_id is not None else None,
+        scenario_id=scenario_id,
+        deck_id=deck_id,
         run_type=run_type,
         freshness_state=bootstrap.freshness_state,
         latest_seq=bootstrap.latest_seq,
@@ -299,7 +366,59 @@ class ObserverHistoryRepository:
                 raise ObserverHistoryError(f"invalid cursor: {cursor}") from error
         end = start + limit
         items = [record.summary() for record in self._records[start:end]]
-        return {"items": items, "next_cursor": str(end) if end < len(self._records) else None, "count": len(items), "total": len(self._records)}
+
+        strategy_runs: dict[str, dict[str, Any]] = {}
+        session_ids_by_symbol: dict[str, list[str]] = {}
+        for record in self._records:
+            summary = record.summary()
+            strategy_id = str(summary.get("strategy_id") or "").strip()
+            session_id = str(summary.get("session_id") or "").strip()
+            symbols = [
+                symbol
+                for symbol in (summary.get("symbols") or [])
+                if isinstance(symbol, str) and symbol.strip()
+            ]
+
+            for symbol in symbols:
+                _append_symbol_session(session_ids_by_symbol, symbol, session_id)
+
+            if not strategy_id or not session_id:
+                continue
+
+            run = strategy_runs.get(strategy_id)
+            if run is None:
+                run = {
+                    "strategy_id": strategy_id,
+                    "strategy_label": summary.get("strategy_label") or strategy_id,
+                    "strategy_source_kind": summary.get("strategy_source_kind") or "history-session-id",
+                    "run_type": summary.get("run_type"),
+                    "scenario_id": summary.get("scenario_id"),
+                    "deck_id": summary.get("deck_id"),
+                    "symbols": [],
+                    "symbols_source_kind": summary.get("symbols_source_kind") or "history-primary-symbol",
+                    "session_ids": [],
+                    "session_ids_by_symbol": {},
+                    "default_session_id": session_id,
+                }
+                strategy_runs[strategy_id] = run
+
+            if session_id not in run["session_ids"]:
+                run["session_ids"].append(session_id)
+            for symbol in symbols:
+                if symbol not in run["symbols"]:
+                    run["symbols"].append(symbol)
+                _append_symbol_session(run["session_ids_by_symbol"], symbol, session_id)
+
+        strategy_run_items = list(strategy_runs.values())
+        strategy_run_items.sort(key=lambda item: str(item.get("strategy_label") or item.get("strategy_id") or ""))
+        return {
+            "items": items,
+            "next_cursor": str(end) if end < len(self._records) else None,
+            "count": len(items),
+            "total": len(self._records),
+            "strategy_runs": strategy_run_items,
+            "session_ids_by_symbol": session_ids_by_symbol,
+        }
 
     def require_record(self, session_id: str) -> HistorySessionRecord:
         try:

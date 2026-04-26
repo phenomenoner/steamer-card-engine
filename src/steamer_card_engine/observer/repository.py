@@ -37,6 +37,14 @@ def _coerce_optional_text(value: object) -> str | None:
     return text or None
 
 
+def _first_present_text(*values: object) -> str | None:
+    for value in values:
+        text = _coerce_optional_text(value)
+        if text:
+            return text
+    return None
+
+
 def _bundle_pool_source_label(raw_source: str | None) -> str:
     if raw_source is None:
         return "observer-bundle-metadata"
@@ -126,9 +134,70 @@ def _metadata_from_payload(payload: dict, path: Path) -> ObserverSessionMetadata
             timeframe=str(metadata["timeframe"]),
             symbol_pool=_coerce_symbol_list(metadata.get("symbol_pool")),
             symbol_pool_source=_coerce_optional_text(metadata.get("symbol_pool_source")),
+            strategy_id=_first_present_text(
+                metadata.get("strategy_id"),
+                metadata.get("strategy", {}).get("id") if isinstance(metadata.get("strategy"), dict) else None,
+            ),
+            strategy_label=_first_present_text(
+                metadata.get("strategy_label"),
+                metadata.get("strategy", {}).get("label") if isinstance(metadata.get("strategy"), dict) else None,
+            ),
+            strategy_source_kind=_first_present_text(
+                metadata.get("strategy_source_kind"),
+                metadata.get("strategy", {}).get("source_kind") if isinstance(metadata.get("strategy"), dict) else None,
+            ),
+            scenario_id=_coerce_optional_text(metadata.get("scenario_id")),
+            deck_id=_coerce_optional_text(metadata.get("deck_id")),
+            run_id=_coerce_optional_text(metadata.get("run_id")),
+            run_type=_coerce_optional_text(metadata.get("run_type")),
+            source_kind=_coerce_optional_text(metadata.get("source_kind")),
         )
     except KeyError as error:
         raise ObserverRepositoryError(f"observer bundle metadata missing field {error.args[0]!r}: {path}") from error
+
+
+def _strategy_identity(bundle: ObserverSessionBundle) -> dict[str, str]:
+    metadata = bundle.metadata
+    session_id = bundle.bootstrap.session_id
+    session_label = bundle.bootstrap.session_label
+
+    strategy_id = _first_present_text(
+        metadata.strategy_id if metadata else None,
+        metadata.scenario_id if metadata else None,
+        metadata.deck_id if metadata else None,
+        metadata.run_id if metadata else None,
+    )
+    if strategy_id:
+        if metadata and metadata.strategy_id == strategy_id:
+            source_kind = _first_present_text(metadata.strategy_source_kind, "observer-bundle-metadata:strategy_id")
+        elif metadata and metadata.scenario_id == strategy_id:
+            source_kind = "observer-bundle-metadata:scenario_id"
+        elif metadata and metadata.deck_id == strategy_id:
+            source_kind = "observer-bundle-metadata:deck_id"
+        else:
+            source_kind = "observer-bundle-metadata:run_id"
+    else:
+        strategy_id = f"session:{session_id}"
+        source_kind = "observer-session-derived"
+
+    strategy_label = _first_present_text(
+        metadata.strategy_label if metadata else None,
+        metadata.session_label if metadata else None,
+        session_label,
+        strategy_id,
+    ) or strategy_id
+
+    return {
+        "strategy_id": strategy_id,
+        "strategy_label": strategy_label,
+        "strategy_source_kind": source_kind,
+    }
+
+
+def _append_symbol_session(mapping: dict[str, list[str]], symbol: str, session_id: str) -> None:
+    symbol_ids = mapping.setdefault(symbol, [])
+    if session_id not in symbol_ids:
+        symbol_ids.append(session_id)
 
 
 def _events_from_payload(payload: dict, path: Path) -> list[ObserverEvent]:
@@ -281,17 +350,28 @@ class ObserverSessionRepository:
             return merged_symbols, source_kinds[0]
         return merged_symbols, "observer-bundle-metadata:mixed"
 
-    def list_sessions(self) -> list[dict[str, str]]:
-        return [
-            {
-                "session_id": bundle.bootstrap.session_id,
-                "engine_id": bundle.bootstrap.engine_id,
-                "symbol": bundle.bootstrap.symbol,
-                "market_mode": bundle.bootstrap.market_mode,
-                "freshness_state": bundle.bootstrap.freshness_state,
-            }
-            for bundle in self._bundles.values()
-        ]
+    def list_sessions(self) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for bundle in self._bundles.values():
+            metadata = bundle.metadata
+            strategy = _strategy_identity(bundle)
+            items.append(
+                {
+                    "session_id": bundle.bootstrap.session_id,
+                    "engine_id": bundle.bootstrap.engine_id,
+                    "symbol": bundle.bootstrap.symbol,
+                    "market_mode": bundle.bootstrap.market_mode,
+                    "freshness_state": bundle.bootstrap.freshness_state,
+                    "strategy_id": strategy["strategy_id"],
+                    "strategy_label": strategy["strategy_label"],
+                    "strategy_source_kind": strategy["strategy_source_kind"],
+                    "run_type": metadata.run_type if metadata else None,
+                    "scenario_id": metadata.scenario_id if metadata else None,
+                    "deck_id": metadata.deck_id if metadata else None,
+                    "run_id": metadata.run_id if metadata else None,
+                }
+            )
+        return items
 
     def list_sessions_payload(self) -> dict[str, Any]:
         items = self.list_sessions()
@@ -307,6 +387,51 @@ class ObserverSessionRepository:
             pool_symbols = fallback_symbols
             source_kind = "observer-sessions-fallback"
 
+        session_ids_by_symbol: dict[str, list[str]] = {}
+        for item in items:
+            symbol = str(item.get("symbol") or "").strip()
+            session_id = str(item.get("session_id") or "").strip()
+            if not symbol or not session_id:
+                continue
+            _append_symbol_session(session_ids_by_symbol, symbol, session_id)
+
+        strategy_runs: dict[str, dict[str, Any]] = {}
+        for item in items:
+            strategy_id = str(item.get("strategy_id") or "").strip()
+            session_id = str(item.get("session_id") or "").strip()
+            symbol = str(item.get("symbol") or "").strip()
+            if not strategy_id or not session_id:
+                continue
+
+            run = strategy_runs.get(strategy_id)
+            if run is None:
+                run = {
+                    "strategy_id": strategy_id,
+                    "strategy_label": item.get("strategy_label") or strategy_id,
+                    "strategy_source_kind": item.get("strategy_source_kind") or "observer-session-derived",
+                    "symbols": [],
+                    "symbols_source_kind": source_kind,
+                    "session_ids": [],
+                    "session_ids_by_symbol": {},
+                    "default_session_id": session_id,
+                }
+                strategy_runs[strategy_id] = run
+
+            if session_id not in run["session_ids"]:
+                run["session_ids"].append(session_id)
+            if symbol:
+                if symbol not in run["symbols"]:
+                    run["symbols"].append(symbol)
+                _append_symbol_session(run["session_ids_by_symbol"], symbol, session_id)
+
+        if len(strategy_runs) == 1 and pool_symbols:
+            only_run = next(iter(strategy_runs.values()))
+            only_run["symbols"] = [symbol for symbol in pool_symbols if isinstance(symbol, str) and symbol]
+            only_run["symbols_source_kind"] = source_kind
+
+        strategy_run_items = list(strategy_runs.values())
+        strategy_run_items.sort(key=lambda item: str(item.get("strategy_label") or item.get("strategy_id") or ""))
+
         return {
             "items": items,
             "default_session_id": items[0]["session_id"] if items else None,
@@ -315,7 +440,10 @@ class ObserverSessionRepository:
                 "symbol_count": len(pool_symbols),
                 "top_symbols": pool_symbols[:5],
                 "sample_symbols": pool_symbols[:8],
+                "symbols": pool_symbols,
             },
+            "session_ids_by_symbol": session_ids_by_symbol,
+            "strategy_runs": strategy_run_items,
         }
 
     def require_bundle(self, session_id: str) -> ObserverSessionBundle:

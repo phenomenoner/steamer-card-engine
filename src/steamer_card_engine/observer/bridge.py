@@ -32,6 +32,14 @@ class ObserverSessionMetadata:
     timeframe: str
     symbol_pool: list[str] = field(default_factory=list)
     symbol_pool_source: str | None = None
+    strategy_id: str | None = None
+    strategy_label: str | None = None
+    strategy_source_kind: str | None = None
+    scenario_id: str | None = None
+    deck_id: str | None = None
+    run_id: str | None = None
+    run_type: str | None = None
+    source_kind: str | None = None
 
 
 @dataclass

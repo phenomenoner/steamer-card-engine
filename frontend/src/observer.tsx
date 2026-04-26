@@ -14,19 +14,43 @@ type ObserverSession = {
   symbol: string;
   market_mode: string;
   freshness_state: FreshnessState;
+  strategy_id?: string;
+  strategy_label?: string;
+  strategy_source_kind?: string;
+  run_type?: string | null;
+  scenario_id?: string | null;
+  deck_id?: string | null;
+  run_id?: string | null;
 };
 
 type ObserverSymbolPool = {
   source_kind: string;
   symbol_count: number;
+  symbols: string[];
   top_symbols: string[];
   sample_symbols: string[];
+};
+
+type StrategyRun = {
+  strategy_id: string;
+  strategy_label: string;
+  strategy_source_kind: string;
+  symbols: string[];
+  symbols_source_kind: string;
+  session_ids: string[];
+  session_ids_by_symbol: Record<string, string[]>;
+  default_session_id?: string | null;
+  run_type?: string | null;
+  scenario_id?: string | null;
+  deck_id?: string | null;
 };
 
 type ObserverSessionsPayload = {
   items: ObserverSession[];
   default_session_id?: string | null;
   symbol_pool?: Partial<ObserverSymbolPool>;
+  session_ids_by_symbol?: Record<string, string[]>;
+  strategy_runs?: StrategyRun[];
 };
 
 function symbolPoolLabel(sourceKind: string) {
@@ -52,6 +76,35 @@ function symbolPoolSubcopy(sourceKind: string) {
   return `Pool source: ${sourceKind}`;
 }
 
+function normalizeSymbolList(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  values.forEach((value) => {
+    if (typeof value !== "string") return;
+    const symbol = value.trim();
+    if (!symbol || seen.has(symbol)) return;
+    seen.add(symbol);
+    out.push(symbol);
+  });
+  return out;
+}
+
+function normalizeSymbolSessionMap(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const entries = Object.entries(value as Record<string, unknown>);
+  const normalized: Record<string, string[]> = {};
+  entries.forEach(([symbol, sessionIds]) => {
+    const key = typeof symbol === "string" ? symbol.trim() : "";
+    if (!key) return;
+    const ids = normalizeSymbolList(sessionIds);
+    if (ids.length) normalized[key] = ids;
+  });
+  return normalized;
+}
+
+const OVERVIEW_VIEW_ID = "__overview__";
+
 type HistorySession = ObserverSession & {
   source_kind: string;
   source_path_ref: string;
@@ -67,6 +120,17 @@ type HistorySession = ObserverSession & {
   candle_count: number;
   has_compare: boolean;
   tags: string[];
+  strategy_id?: string;
+  strategy_label?: string;
+  strategy_source_kind?: string;
+  symbols?: string[];
+  symbols_source_kind?: string;
+};
+
+type HistorySessionsPayload = {
+  items: HistorySession[];
+  strategy_runs?: StrategyRun[];
+  session_ids_by_symbol?: Record<string, string[]>;
 };
 
 type Candle = {
@@ -279,15 +343,46 @@ function TimeframeSelector({ value, onChange }: { value: ChartTimeframe; onChang
   );
 }
 
-function SessionSelector({ sessions, value, onChange }: { sessions: ObserverSession[]; value: string; onChange: (value: string) => void }) {
-  const isSingleSession = sessions.length <= 1;
+function StrategySelector({
+  strategies,
+  value,
+  onChange,
+}: {
+  strategies: StrategyRun[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <label className={`observer-session-selector ${isSingleSession ? "observer-session-selector-single" : ""}`} htmlFor="observer-session-select">
-      <span className="mini-label">mounted symbol session</span>
-      <select id="observer-session-select" value={value} onChange={(event) => onChange(event.target.value)}>
-        {sessions.map((session) => (
-          <option key={session.session_id} value={session.session_id}>
-            {session.symbol} · {session.session_id}
+    <label className="observer-session-selector" htmlFor="observer-strategy-select">
+      <span className="mini-label">strategy</span>
+      <select id="observer-strategy-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {strategies.map((strategy) => (
+          <option key={strategy.strategy_id} value={strategy.strategy_id}>
+            {strategy.strategy_label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ViewSelector({
+  symbols,
+  value,
+  onChange,
+}: {
+  symbols: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="observer-session-selector" htmlFor="observer-view-select">
+      <span className="mini-label">view</span>
+      <select id="observer-view-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value={OVERVIEW_VIEW_ID}>Overview (portfolio)</option>
+        {symbols.map((symbol) => (
+          <option key={symbol} value={symbol}>
+            {symbol}
           </option>
         ))}
       </select>
@@ -502,8 +597,11 @@ function InfoCard({ label, value, subvalue }: { label: string; value: string; su
 export function ObserverSurface() {
   const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("auto");
   const [sessions, setSessions] = useState<ObserverSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [strategies, setStrategies] = useState<StrategyRun[]>([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState<string>(OVERVIEW_VIEW_ID);
   const [symbolPool, setSymbolPool] = useState<ObserverSymbolPool | null>(null);
+  const [sessionIdsBySymbol, setSessionIdsBySymbol] = useState<Record<string, string[]>>({});
   const [state, setState] = useState<ObserverState>({
     session: null,
     bootstrap: null,
@@ -526,25 +624,102 @@ export function ObserverSurface() {
         const payload = await getJson<ObserverSessionsPayload>("/api/observer/sessions");
         if (cancelled) return;
         const loadedSessions = payload.items ?? [];
-        const fallbackSymbols = [...new Set(loadedSessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0))].sort();
+        const fallbackSymbols = normalizeSymbolList(
+          loadedSessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0),
+        ).sort();
+        const poolSymbols = normalizeSymbolList(payload.symbol_pool?.symbols ?? fallbackSymbols);
+        const normalizedSessionMap = normalizeSymbolSessionMap(payload.session_ids_by_symbol);
+
         setSessions(loadedSessions);
         setSymbolPool({
           source_kind: payload.symbol_pool?.source_kind ?? "observer-sessions-fallback",
-          symbol_count: payload.symbol_pool?.symbol_count ?? fallbackSymbols.length,
+          symbol_count: payload.symbol_pool?.symbol_count ?? poolSymbols.length,
+          symbols: poolSymbols,
           top_symbols: payload.symbol_pool?.top_symbols ?? fallbackSymbols.slice(0, 5),
           sample_symbols: payload.symbol_pool?.sample_symbols ?? fallbackSymbols.slice(0, 8),
         });
+        setSessionIdsBySymbol(normalizedSessionMap);
+
+        const strategyRunsFromApi = Array.isArray(payload.strategy_runs)
+          ? payload.strategy_runs
+              .map((run) => {
+                const strategyId = typeof run.strategy_id === "string" ? run.strategy_id.trim() : "";
+                if (!strategyId) return null;
+                return {
+                  strategy_id: strategyId,
+                  strategy_label: typeof run.strategy_label === "string" && run.strategy_label.trim() ? run.strategy_label.trim() : strategyId,
+                  strategy_source_kind:
+                    typeof run.strategy_source_kind === "string" && run.strategy_source_kind.trim()
+                      ? run.strategy_source_kind.trim()
+                      : "observer-session-derived",
+                  symbols: normalizeSymbolList(run.symbols),
+                  symbols_source_kind:
+                    typeof run.symbols_source_kind === "string" && run.symbols_source_kind.trim()
+                      ? run.symbols_source_kind.trim()
+                      : payload.symbol_pool?.source_kind ?? "observer-sessions-fallback",
+                  session_ids: normalizeSymbolList(run.session_ids),
+                  session_ids_by_symbol: normalizeSymbolSessionMap(run.session_ids_by_symbol),
+                  default_session_id: typeof run.default_session_id === "string" ? run.default_session_id : null,
+                } satisfies StrategyRun;
+              })
+              .filter((run): run is StrategyRun => Boolean(run))
+          : [];
+
+        const fallbackStrategies: StrategyRun[] = strategyRunsFromApi.length
+          ? strategyRunsFromApi
+          : (() => {
+              const grouped = new Map<string, StrategyRun>();
+              loadedSessions.forEach((session) => {
+                const strategyId = (session.strategy_id && session.strategy_id.trim()) || `session:${session.session_id}`;
+                if (!grouped.has(strategyId)) {
+                  grouped.set(strategyId, {
+                    strategy_id: strategyId,
+                    strategy_label: (session.strategy_label && session.strategy_label.trim()) || `Session-derived (${session.session_id})`,
+                    strategy_source_kind: (session.strategy_source_kind && session.strategy_source_kind.trim()) || "observer-session-derived",
+                    symbols: [],
+                    symbols_source_kind: payload.symbol_pool?.source_kind ?? "observer-sessions-fallback",
+                    session_ids: [],
+                    session_ids_by_symbol: {},
+                    default_session_id: session.session_id,
+                  });
+                }
+                const run = grouped.get(strategyId);
+                if (!run) return;
+                if (!run.session_ids.includes(session.session_id)) run.session_ids.push(session.session_id);
+                const symbol = typeof session.symbol === "string" ? session.symbol.trim() : "";
+                if (symbol) {
+                  if (!run.symbols.includes(symbol)) run.symbols.push(symbol);
+                  const ids = run.session_ids_by_symbol[symbol] ?? [];
+                  if (!ids.includes(session.session_id)) run.session_ids_by_symbol[symbol] = [...ids, session.session_id];
+                }
+              });
+              return [...grouped.values()];
+            })();
+
+        const normalizedStrategies = fallbackStrategies.map((run) => {
+          const symbols = run.symbols.length ? run.symbols : (fallbackStrategies.length === 1 ? poolSymbols : []);
+          return {
+            ...run,
+            symbols,
+          };
+        });
+        setStrategies(normalizedStrategies);
+
         if (!loadedSessions.length) {
           if (!cancelled) setHasNoSession(true);
-          setSelectedSessionId(null);
+          setSelectedStrategyId(null);
           if (!cancelled) setLoading(false);
           return;
         }
         setHasNoSession(false);
-        setSelectedSessionId((current) => {
-          const next = current && loadedSessions.some((session) => session.session_id === current) ? current : payload.default_session_id ?? loadedSessions[0]?.session_id ?? null;
-          return next;
+        setSelectedStrategyId((current) => {
+          if (current && normalizedStrategies.some((strategy) => strategy.strategy_id === current)) return current;
+          const strategyForDefaultSession = normalizedStrategies.find((strategy) =>
+            strategy.session_ids.includes(payload.default_session_id ?? ""),
+          );
+          return strategyForDefaultSession?.strategy_id ?? normalizedStrategies[0]?.strategy_id ?? null;
         });
+        setSelectedView(OVERVIEW_VIEW_ID);
         setError(null);
       } catch (reason) {
         setError(String(reason));
@@ -558,9 +733,44 @@ export function ObserverSurface() {
     };
   }, []);
 
+  const selectedStrategy = useMemo(
+    () => strategies.find((strategy) => strategy.strategy_id === selectedStrategyId) ?? null,
+    [strategies, selectedStrategyId],
+  );
+
   useEffect(() => {
-    if (!selectedSessionId) return;
-    const session = sessions.find((item) => item.session_id === selectedSessionId);
+    if (selectedView === OVERVIEW_VIEW_ID) return;
+    if (selectedStrategy?.symbols.includes(selectedView)) return;
+    setSelectedView(OVERVIEW_VIEW_ID);
+  }, [selectedStrategy, selectedView]);
+
+  const strategySummarySessionId = selectedStrategy?.default_session_id ?? selectedStrategy?.session_ids[0] ?? null;
+  const selectedSymbol = selectedView === OVERVIEW_VIEW_ID ? null : selectedView;
+  const mountedSymbolSessionId = selectedSymbol
+    ? selectedStrategy?.session_ids_by_symbol[selectedSymbol]?.[0] ?? sessionIdsBySymbol[selectedSymbol]?.[0] ?? null
+    : null;
+  const hasMountedSymbolSession = Boolean(selectedSymbol && mountedSymbolSessionId);
+  const isOverviewMode = selectedView === OVERVIEW_VIEW_ID;
+  const activeSessionId = hasMountedSymbolSession ? mountedSymbolSessionId : strategySummarySessionId;
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      setState((current) => ({
+        ...current,
+        session: null,
+        bootstrap: null,
+        timeline: [],
+        events: [],
+        latestSeq: 0,
+        streamState: "idle",
+        streamNote: null,
+        sequenceGaps: [],
+      }));
+      setLoading(false);
+      return;
+    }
+
+    const session = sessions.find((item) => item.session_id === activeSessionId);
     if (!session) return;
 
     let socket: WebSocket | null = null;
@@ -628,34 +838,41 @@ export function ObserverSurface() {
       cancelled = true;
       socket?.close();
     };
-  }, [selectedSessionId, sessions]);
+  }, [activeSessionId, sessions]);
 
   const freshnessClass = useMemo(() => tone(state.bootstrap?.freshness_state ?? "fresh"), [state.bootstrap?.freshness_state]);
   const needsAttention = state.bootstrap?.freshness_state && state.bootstrap.freshness_state !== "fresh";
   const isStreamDegraded = state.streamState === "error" || state.streamState === "closed" || state.sequenceGaps.length > 0;
   const effectivePool = useMemo(() => {
-    const fallbackSymbols = [...new Set(sessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0))].sort();
+    const fallbackSymbols = normalizeSymbolList(
+      sessions.map((item) => item.symbol).filter((item) => typeof item === "string" && item.length > 0),
+    ).sort();
     if (symbolPool) return symbolPool;
     return {
       source_kind: "observer-sessions-fallback",
       symbol_count: fallbackSymbols.length,
+      symbols: fallbackSymbols,
       top_symbols: fallbackSymbols.slice(0, 5),
       sample_symbols: fallbackSymbols.slice(0, 8),
     };
   }, [sessions, symbolPool]);
 
-  if (loading) return <div className="state-block">Loading observer sidecar…</div>;
+  const viewSymbols = selectedStrategy?.symbols.length ? selectedStrategy.symbols : effectivePool.symbols;
+  const activeSession = state.session;
+
+  if (loading && !state.bootstrap) return <div className="state-block">Loading observer sidecar…</div>;
   if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
   if (hasNoSession) return <div className="state-block observer-empty-state"><strong>No observer session mounted.</strong><span>Set STEAMER_OBSERVER_BUNDLE_JSON or enable a mock session, then refresh this read-only surface.</span></div>;
-  if (!state.bootstrap || !state.session) return <div className="state-block">Observer bootstrap unavailable.</div>;
+  if (!selectedStrategy) return <div className="state-block">Strategy selector unavailable.</div>;
+  if (!state.bootstrap) return <div className="state-block">Observer bootstrap unavailable.</div>;
 
   const bootstrap = state.bootstrap;
   const chartCandles = aggregateCandles(bootstrap.chart.candles, chartTimeframe);
   const chartMarkers = alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
   const poolSourceLabel = symbolPoolLabel(effectivePool.source_kind);
   const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
-  const isSingleSession = sessions.length <= 1;
-  const universeSymbols = effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols;
+  const universeSymbols = effectivePool.symbols.length ? effectivePool.symbols : (effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols);
+  const missingSymbolSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
 
   return (
     <main className="observer-surface">
@@ -707,55 +924,75 @@ export function ObserverSurface() {
 
       <section className="panel observer-focus-card">
         <div className="panel-header">
-          <h3>Focus Session</h3>
-          <span className="pill">drill-down</span>
+          <h3>Strategy + View</h3>
+          <span className="pill">selector shell</span>
         </div>
         <div className="panel-body observer-focus-body">
           <div className="observer-title-row observer-focus-title-row">
-            <h2>{bootstrap.symbol}</h2>
-            <span className="pill">{bootstrap.market_mode}</span>
+            <h2>{selectedStrategy.strategy_label}</h2>
+            <span className="pill">{selectedStrategy.strategy_source_kind}</span>
           </div>
-          <p className="strategy-note observer-focus-copy">This chart is one selected symbol view, not the full strategy universe.</p>
+          <p className="strategy-note observer-focus-copy">Strategy picks the strategy run. View picks portfolio overview or one symbol chart.</p>
           <div className="observer-focus-layout">
             <div className="observer-focus-selector-block">
-              <SessionSelector sessions={sessions} value={selectedSessionId ?? state.session.session_id} onChange={(value) => setSelectedSessionId(value)} />
-              <p className={`card-meta observer-focus-helper ${isSingleSession ? "observer-focus-helper-single" : ""}`}>
-                {isSingleSession
-                  ? "Only one mounted session is available. Universe context may still cover more symbols than this chart."
-                  : "Choose which mounted symbol session to inspect."}
-              </p>
+              <StrategySelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} />
+              <ViewSelector symbols={viewSymbols} value={selectedView} onChange={setSelectedView} />
+              <p className="card-meta observer-focus-helper">Overview means portfolio-level behavior. Symbol means chart-level execution detail.</p>
             </div>
             <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
-              <div><span className="mini-label">session label</span><strong>{bootstrap.session_label}</strong></div>
-              <div><span className="mini-label">session id</span><strong>{state.session.session_id}</strong></div>
-              <div><span className="mini-label">symbol</span><strong>{bootstrap.symbol}</strong></div>
-              <div><span className="mini-label">timeframe</span><strong>{bootstrap.timeframe}</strong></div>
-              <div><span className="mini-label">engine</span><strong>{bootstrap.engine_id}</strong></div>
+              <div><span className="mini-label">strategy id</span><strong>{selectedStrategy.strategy_id}</strong></div>
+              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Overview (portfolio)" : selectedView}</strong></div>
+              <div><span className="mini-label">mounted session</span><strong>{activeSession?.session_id ?? "none"}</strong></div>
+              <div><span className="mini-label">symbol source</span><strong>{selectedStrategy.symbols_source_kind}</strong></div>
+              <div><span className="mini-label">symbols in view selector</span><strong>{viewSymbols.length}</strong></div>
               <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="metrics-row observer-metrics-row">
-        <InfoCard label="engine state" value={bootstrap.health.engine_state.toUpperCase()} subvalue={`freshness ${bootstrap.health.feed_freshness_seconds}s`} />
-        <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue={`avg ${bootstrap.position.avg_price ?? "—"}`} />
-        <InfoCard label="last fill" value={bootstrap.last_fill ? `${bootstrap.last_fill.side.toUpperCase()} ${bootstrap.last_fill.quantity}` : "NONE"} subvalue={bootstrap.last_fill ? `${bootstrap.last_fill.price} @ ${formatTimestamp(bootstrap.last_fill.filled_at)}` : "No fills yet"} />
-        <InfoCard label="open orders" value={String(bootstrap.open_orders.length)} subvalue={bootstrap.open_orders[0] ? `${bootstrap.open_orders[0].status} · ${bootstrap.open_orders[0].side}` : "No working orders"} />
-      </div>
+      {!isOverviewMode && !missingSymbolSelection ? (
+        <div className="metrics-row observer-metrics-row">
+          <InfoCard label="engine state" value={bootstrap.health.engine_state.toUpperCase()} subvalue={`freshness ${bootstrap.health.feed_freshness_seconds}s`} />
+          <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue={`avg ${bootstrap.position.avg_price ?? "—"}`} />
+          <InfoCard label="last fill" value={bootstrap.last_fill ? `${bootstrap.last_fill.side.toUpperCase()} ${bootstrap.last_fill.quantity}` : "NONE"} subvalue={bootstrap.last_fill ? `${bootstrap.last_fill.price} @ ${formatTimestamp(bootstrap.last_fill.filled_at)}` : "No fills yet"} />
+          <InfoCard label="open orders" value={String(bootstrap.open_orders.length)} subvalue={bootstrap.open_orders[0] ? `${bootstrap.open_orders[0].status} · ${bootstrap.open_orders[0].side}` : "No working orders"} />
+        </div>
+      ) : null}
 
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>Focus Chart</h3>
-            <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div>
+            <h3>{isOverviewMode ? "Portfolio Overview" : "Symbol Focus Chart"}</h3>
+            {!isOverviewMode ? <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div> : null}
           </div>
           <div className="panel-body observer-chart-wrap">
-            <ObserverChart candles={chartCandles} markers={chartMarkers} />
+            {isOverviewMode ? (
+              <div className="observer-pool-overview">
+                <div className="observer-pool-head">
+                  <strong>Portfolio projection pending</strong>
+                  <span className="status-chip status-chip-muted">truthful placeholder</span>
+                </div>
+                <p className="card-meta">Portfolio-level PnL projection is not mounted yet. This overview only shows currently available universe and health context.</p>
+                <div className="observer-top-meta">
+                  <div><span className="mini-label">strategy sessions</span><strong>{selectedStrategy.session_ids.length}</strong></div>
+                  <div><span className="mini-label">symbol universe</span><strong>{viewSymbols.length}</strong></div>
+                  <div><span className="mini-label">latest seq</span><strong>{bootstrap.latest_seq}</strong></div>
+                  <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
+                </div>
+              </div>
+            ) : missingSymbolSelection ? (
+              <div className="state-block observer-empty-state">
+                <strong>No mounted symbol session for {selectedSymbol}.</strong>
+                <span>View selector includes full universe symbols, but this symbol does not have a mounted observer session yet.</span>
+              </div>
+            ) : (
+              <ObserverChart candles={chartCandles} markers={chartMarkers} />
+            )}
           </div>
         </section>
 
-        <aside className="observer-right-rail">
+        {!isOverviewMode && !missingSymbolSelection ? <aside className="observer-right-rail">
           <section className="panel">
             <div className="panel-header"><h3>Position</h3><span className="pill">live(sim)</span></div>
             <div className="panel-body">
@@ -788,8 +1025,11 @@ export function ObserverSurface() {
             </div>
           </section>
 
-          <section className="panel">
-            <div className="panel-header"><h3>Health Strip</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span></div>
+          <details className="panel">
+            <summary className="panel-header" style={{ cursor: "pointer", listStyle: "none" }}>
+              <h3>Technical diagnostics</h3>
+              <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span>
+            </summary>
             <div className="panel-body observer-list-panel">
               <div className="kv-grid observer-kv-grid observer-health-grid">
                 <div className="kv-item"><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
@@ -802,14 +1042,14 @@ export function ObserverSurface() {
               {state.sequenceGaps.map((gap) => <div className="observer-incident" key={`${gap.expected}-${gap.received}`}>sequence gap: expected {gap.expected}, received {gap.received}</div>)}
               {bootstrap.health.incidents.map((incident) => <div className="observer-incident" key={incident}>{incident}</div>)}
             </div>
-          </section>
-        </aside>
+          </details>
+        </aside> : null}
       </div>
 
       <section className="panel">
         <div className="panel-header">
-          <h3>Decision / Event Timeline</h3>
-          <span className="pill">append only</span>
+          <h3>Strategy Timeline</h3>
+          <span className="pill">selected mounted session</span>
         </div>
         <div className="panel-body observer-timeline-grid">
           {state.timeline.map((item) => (
@@ -833,7 +1073,10 @@ export function ObserverSurface() {
 export function ReplayHistorySurface() {
   const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("auto");
   const [sessions, setSessions] = useState<HistorySession[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [strategies, setStrategies] = useState<StrategyRun[]>([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState<string>(OVERVIEW_VIEW_ID);
+  const [sessionIdsBySymbol, setSessionIdsBySymbol] = useState<Record<string, string[]>>({});
   const [bootstrap, setBootstrap] = useState<ObserverBootstrap | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -842,11 +1085,80 @@ export function ReplayHistorySurface() {
   useEffect(() => {
     let cancelled = false;
     setLoadingList(true);
-    getJson<{ items: HistorySession[] }>("/api/observer/history/sessions?limit=20")
+    getJson<HistorySessionsPayload>("/api/observer/history/sessions?limit=20")
       .then((payload) => {
         if (cancelled) return;
-        setSessions(payload.items);
-        if (payload.items[0]) setSelectedId(payload.items[0].session_id);
+        const loadedSessions = payload.items ?? [];
+        setSessions(loadedSessions);
+        setSessionIdsBySymbol(normalizeSymbolSessionMap(payload.session_ids_by_symbol));
+
+        const strategyRunsFromApi = Array.isArray(payload.strategy_runs)
+          ? payload.strategy_runs
+              .map((run) => {
+                const strategyId = typeof run.strategy_id === "string" ? run.strategy_id.trim() : "";
+                if (!strategyId) return null;
+                return {
+                  strategy_id: strategyId,
+                  strategy_label: typeof run.strategy_label === "string" && run.strategy_label.trim() ? run.strategy_label.trim() : strategyId,
+                  strategy_source_kind:
+                    typeof run.strategy_source_kind === "string" && run.strategy_source_kind.trim()
+                      ? run.strategy_source_kind.trim()
+                      : "history-session-id",
+                  symbols: normalizeSymbolList(run.symbols),
+                  symbols_source_kind:
+                    typeof run.symbols_source_kind === "string" && run.symbols_source_kind.trim()
+                      ? run.symbols_source_kind.trim()
+                      : "history-primary-symbol",
+                  session_ids: normalizeSymbolList(run.session_ids),
+                  session_ids_by_symbol: normalizeSymbolSessionMap(run.session_ids_by_symbol),
+                  default_session_id: typeof run.default_session_id === "string" ? run.default_session_id : null,
+                  run_type: typeof run.run_type === "string" ? run.run_type : null,
+                  scenario_id: typeof run.scenario_id === "string" ? run.scenario_id : null,
+                  deck_id: typeof run.deck_id === "string" ? run.deck_id : null,
+                } satisfies StrategyRun;
+              })
+              .filter((run): run is StrategyRun => Boolean(run))
+          : [];
+
+        const fallbackStrategies: StrategyRun[] = strategyRunsFromApi.length
+          ? strategyRunsFromApi
+          : (() => {
+              const grouped = new Map<string, StrategyRun>();
+              loadedSessions.forEach((session) => {
+                const strategyId = (session.strategy_id && session.strategy_id.trim()) || session.session_id;
+                if (!grouped.has(strategyId)) {
+                  grouped.set(strategyId, {
+                    strategy_id: strategyId,
+                    strategy_label: (session.strategy_label && session.strategy_label.trim()) || `${session.date} · ${session.run_type}`,
+                    strategy_source_kind: (session.strategy_source_kind && session.strategy_source_kind.trim()) || "history-session-id",
+                    symbols: [],
+                    symbols_source_kind: (session.symbols_source_kind && session.symbols_source_kind.trim()) || "history-primary-symbol",
+                    session_ids: [],
+                    session_ids_by_symbol: {},
+                    default_session_id: session.session_id,
+                    run_type: session.run_type,
+                    scenario_id: session.scenario_id,
+                    deck_id: session.deck_id,
+                  });
+                }
+                const run = grouped.get(strategyId);
+                if (!run) return;
+                if (!run.session_ids.includes(session.session_id)) run.session_ids.push(session.session_id);
+                normalizeSymbolList(session.symbols ?? [session.symbol]).forEach((symbol) => {
+                  if (!run.symbols.includes(symbol)) run.symbols.push(symbol);
+                  const ids = run.session_ids_by_symbol[symbol] ?? [];
+                  if (!ids.includes(session.session_id)) run.session_ids_by_symbol[symbol] = [...ids, session.session_id];
+                });
+              });
+              return [...grouped.values()];
+            })();
+
+        setStrategies(fallbackStrategies);
+        setSelectedStrategyId((current) => {
+          if (current && fallbackStrategies.some((strategy) => strategy.strategy_id === current)) return current;
+          return fallbackStrategies[0]?.strategy_id ?? null;
+        });
+        setSelectedView(OVERVIEW_VIEW_ID);
       })
       .catch((reason) => setError(String(reason)))
       .finally(() => {
@@ -857,14 +1169,34 @@ export function ReplayHistorySurface() {
     };
   }, []);
 
+  const selectedStrategy = useMemo(
+    () => strategies.find((strategy) => strategy.strategy_id === selectedStrategyId) ?? null,
+    [strategies, selectedStrategyId],
+  );
+
   useEffect(() => {
-    if (!selectedId) {
+    if (selectedView === OVERVIEW_VIEW_ID) return;
+    if (selectedStrategy?.symbols.includes(selectedView)) return;
+    setSelectedView(OVERVIEW_VIEW_ID);
+  }, [selectedStrategy, selectedView]);
+
+  const selectedSymbol = selectedView === OVERVIEW_VIEW_ID ? null : selectedView;
+  const isOverviewMode = selectedView === OVERVIEW_VIEW_ID;
+  const summarySessionId = selectedStrategy?.default_session_id ?? selectedStrategy?.session_ids[0] ?? null;
+  const symbolSessionId = selectedSymbol
+    ? selectedStrategy?.session_ids_by_symbol[selectedSymbol]?.[0] ?? sessionIdsBySymbol[selectedSymbol]?.[0] ?? null
+    : null;
+  const hasMountedSymbolSession = Boolean(selectedSymbol && symbolSessionId);
+  const activeSessionId = hasMountedSymbolSession ? symbolSessionId : summarySessionId;
+
+  useEffect(() => {
+    if (!activeSessionId) {
       setBootstrap(null);
       return;
     }
     let cancelled = false;
     setLoadingDetail(true);
-    getJson<ObserverBootstrap>(`/api/observer/history/sessions/${selectedId}/bootstrap`)
+    getJson<ObserverBootstrap>(`/api/observer/history/sessions/${activeSessionId}/bootstrap`)
       .then((payload) => {
         if (!cancelled) setBootstrap(payload);
       })
@@ -875,12 +1207,13 @@ export function ReplayHistorySurface() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [activeSessionId]);
 
-  const selected = sessions.find((item) => item.session_id === selectedId) ?? null;
+  const selected = sessions.find((item) => item.session_id === activeSessionId) ?? null;
   const freshnessClass = tone(bootstrap?.freshness_state ?? selected?.freshness_state ?? "stale");
   const replayChartCandles = aggregateCandles(bootstrap?.chart.candles ?? [], chartTimeframe);
   const replayChartMarkers = alignMarkers(bootstrap?.chart.markers.slice(-MARKER_LIMIT) ?? [], chartTimeframe);
+  const viewSymbols = selectedStrategy?.symbols ?? [];
 
   if (loadingList) return <div className="state-block">Loading sanitized observer history…</div>;
   if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
@@ -910,38 +1243,37 @@ export function ReplayHistorySurface() {
               <h2>Historical observer bundles</h2>
               <span className="pill">{sessions.length} sessions</span>
             </div>
-            <p className="strategy-note">Static replay browser built from sanitized repo-local dashboard artifacts. No websocket, trading, approval, or runtime-control actions are available here.</p>
+            <p className="strategy-note">Strategy picks the replay run. View picks portfolio overview or symbol detail. No synthetic portfolio PnL is generated in this slice.</p>
           </div>
         </div>
       </section>
 
-      <div className="replay-history-grid">
-        <section className="panel">
-          <div className="panel-header"><h3>Session Library</h3><span className="pill">curated fixtures</span></div>
-          <div className="panel-body observer-list-panel replay-session-list">
-            {sessions.map((session) => (
-              <button
-                className={`history-item replay-session-button ${selectedId === session.session_id ? "history-item-highlight" : ""}`}
-                key={session.session_id}
-                onClick={() => setSelectedId(session.session_id)}
-                type="button"
-              >
-                <div className="history-item-head">
-                  <div>
-                    <div className="card-title history-title">{session.date} · {session.symbol}</div>
-                    <div className="card-meta">{session.run_type} · {session.timeframe}</div>
-                  </div>
-                  <span className={`status-chip status-chip-${tone(session.freshness_state)}`}>{session.freshness_state}</span>
-                </div>
-                <p className="card-meta">events {session.event_count} · candles {session.candle_count} · seq {session.latest_seq}</p>
-                <p className="card-meta">{session.source_kind}</p>
-              </button>
-            ))}
+      <section className="panel observer-focus-card">
+        <div className="panel-header">
+          <h3>Strategy + View</h3>
+          <span className="pill">replay selector shell</span>
+        </div>
+        <div className="panel-body observer-focus-body">
+          <div className="observer-focus-layout">
+            <div className="observer-focus-selector-block">
+              {selectedStrategy ? <StrategySelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} /> : null}
+              <ViewSelector symbols={viewSymbols} value={selectedView} onChange={setSelectedView} />
+              <p className="card-meta observer-focus-helper">Overview means portfolio-level replay behavior. Symbol means chart-level replay execution detail.</p>
+            </div>
+            <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
+              <div><span className="mini-label">strategy id</span><strong>{selectedStrategy?.strategy_id ?? "—"}</strong></div>
+              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Overview (portfolio)" : selectedView}</strong></div>
+              <div><span className="mini-label">run type</span><strong>{selectedStrategy?.run_type ?? "—"}</strong></div>
+              <div><span className="mini-label">scenario</span><strong>{selectedStrategy?.scenario_id ?? "—"}</strong></div>
+              <div><span className="mini-label">deck</span><strong>{selectedStrategy?.deck_id ?? "—"}</strong></div>
+              <div><span className="mini-label">mounted replay session</span><strong>{activeSessionId ?? "none"}</strong></div>
+            </div>
           </div>
+        </div>
         </section>
 
-        <section className="panel replay-detail-panel">
-          <div className="panel-header"><h3>Replay Detail</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap?.freshness_state ?? selected?.freshness_state}</span></div>
+      <section className="panel replay-detail-panel">
+          <div className="panel-header"><h3>{isOverviewMode ? "Portfolio Replay Overview" : "Replay Detail"}</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap?.freshness_state ?? selected?.freshness_state}</span></div>
           {loadingDetail ? (
             <div className="state-block">Loading sanitized observer bundle…</div>
           ) : bootstrap && selected ? (
@@ -956,28 +1288,51 @@ export function ReplayHistorySurface() {
                 <div><span className="mini-label">receipt ref</span><strong>{bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</strong></div>
                 <div><span className="mini-label">compare</span><strong>{selected.has_compare ? "artifact ref" : "unavailable"}</strong></div>
               </div>
-              <div className="metrics-row observer-metrics-row replay-metrics-row">
-                <InfoCard label="symbol" value={bootstrap.symbol} subvalue={selected.scenario_id ?? "scenario unavailable"} />
-                <InfoCard label="events" value={String(selected.event_count)} subvalue={`latest seq ${bootstrap.latest_seq}`} />
-                <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue="state at replay end" />
-                <InfoCard label="labels" value="STATIC" subvalue={(bootstrap.provenance?.labels ?? selected.tags).join(" · ")} />
-              </div>
-              <div className="observer-grid replay-observer-grid">
-                <section className="panel observer-chart-panel">
-                  <div className="panel-header"><h3>Static Chart</h3><div className="observer-chart-controls"><span className="pill">no websocket</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div></div>
-                  <div className="panel-body observer-chart-wrap"><ObserverChart candles={replayChartCandles} markers={replayChartMarkers} /></div>
-                </section>
+              {isOverviewMode ? (
+                <div className="observer-pool-overview">
+                  <div className="observer-pool-head">
+                    <strong>Portfolio replay projection pending</strong>
+                    <span className="status-chip status-chip-muted">truthful placeholder</span>
+                  </div>
+                  <p className="card-meta">Portfolio-level replay projection is not implemented yet. This overview reports strategy/run context only.</p>
+                  <div className="observer-top-meta">
+                    <div><span className="mini-label">strategy sessions</span><strong>{selectedStrategy?.session_ids.length ?? 0}</strong></div>
+                    <div><span className="mini-label">view symbols</span><strong>{viewSymbols.length}</strong></div>
+                    <div><span className="mini-label">latest seq</span><strong>{bootstrap.latest_seq}</strong></div>
+                    <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+                  </div>
+                </div>
+              ) : !hasMountedSymbolSession ? (
+                <div className="state-block observer-empty-state">
+                  <strong>No mounted symbol session for {selectedSymbol}.</strong>
+                  <span>This replay strategy exposes the symbol in metadata, but no replay session is mounted for it yet.</span>
+                </div>
+              ) : (
+                <>
+                  <div className="metrics-row observer-metrics-row replay-metrics-row">
+                    <InfoCard label="symbol" value={bootstrap.symbol} subvalue={selected.scenario_id ?? "scenario unavailable"} />
+                    <InfoCard label="events" value={String(selected.event_count)} subvalue={`latest seq ${bootstrap.latest_seq}`} />
+                    <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue="state at replay end" />
+                    <InfoCard label="labels" value="STATIC" subvalue={(bootstrap.provenance?.labels ?? selected.tags).join(" · ")} />
+                  </div>
+                  <div className="observer-grid replay-observer-grid">
+                    <section className="panel observer-chart-panel">
+                      <div className="panel-header"><h3>Static Chart</h3><div className="observer-chart-controls"><span className="pill">no websocket</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div></div>
+                      <div className="panel-body observer-chart-wrap"><ObserverChart candles={replayChartCandles} markers={replayChartMarkers} /></div>
+                    </section>
                 <aside className="observer-right-rail">
-                  <section className="panel">
-                    <div className="panel-header"><h3>Provenance</h3><span className="pill">sanitized</span></div>
-                    <div className="panel-body observer-list-panel">
-                      <div className="observer-incident">source_ref={bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</div>
-                      {bootstrap.provenance?.compare_ref ? <div className="observer-incident">compare_ref={bootstrap.provenance.compare_ref}</div> : null}
-                      <div className="observer-incident">deck={selected.deck_id ?? "—"}</div>
-                    </div>
-                  </section>
+                    <details className="panel" open>
+                      <summary className="panel-header" style={{ cursor: "pointer", listStyle: "none" }}><h3>Provenance diagnostics</h3><span className="pill">sanitized</span></summary>
+                      <div className="panel-body observer-list-panel">
+                        <div className="observer-incident">source_ref={bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</div>
+                        {bootstrap.provenance?.compare_ref ? <div className="observer-incident">compare_ref={bootstrap.provenance.compare_ref}</div> : null}
+                        <div className="observer-incident">deck={selected.deck_id ?? "—"}</div>
+                      </div>
+                    </details>
                 </aside>
               </div>
+                </>
+              )}
               <section className="panel replay-timeline-panel">
                 <div className="panel-header"><h3>Event Timeline</h3><span className="pill">static order</span></div>
                 <div className="panel-body observer-timeline-grid">
@@ -997,10 +1352,9 @@ export function ReplayHistorySurface() {
               </section>
             </div>
           ) : (
-            <div className="state-block">Select a historical session to open replay detail.</div>
+            <div className="state-block">Select a strategy run to open replay detail.</div>
           )}
-        </section>
-      </div>
+      </section>
     </main>
   );
 }

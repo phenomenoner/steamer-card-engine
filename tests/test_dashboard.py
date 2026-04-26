@@ -76,6 +76,10 @@ def test_observer_api_defaults_to_mock_session() -> None:
     assert payload["default_session_id"] == "aws-live-sim-demo"
     assert payload["symbol_pool"]["symbol_count"] >= 1
     assert isinstance(payload["symbol_pool"]["source_kind"], str)
+    assert isinstance(payload["symbol_pool"]["symbols"], list)
+    assert payload["strategy_runs"]
+    assert payload["strategy_runs"][0]["strategy_id"]
+    assert payload["session_ids_by_symbol"]
 
 
 def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) -> None:
@@ -111,16 +115,21 @@ def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) 
     sessions = client.get("/api/observer/sessions")
     assert sessions.status_code == 200
     payload = sessions.json()
-    assert payload["items"] == [{
-        "session_id": "aws-live-sim-private",
-        "engine_id": "steamer-card-engine.live-sim.private",
-        "symbol": "2330.TW",
-        "market_mode": "live(sim)",
-        "freshness_state": "degraded",
-    }]
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["session_id"] == "aws-live-sim-private"
+    assert payload["items"][0]["engine_id"] == "steamer-card-engine.live-sim.private"
+    assert payload["items"][0]["symbol"] == "2330.TW"
+    assert payload["items"][0]["market_mode"] == "live(sim)"
+    assert payload["items"][0]["freshness_state"] == "degraded"
+    assert payload["items"][0]["strategy_id"].startswith("session:")
+    assert payload["items"][0]["strategy_source_kind"] == "observer-session-derived"
     assert payload["default_session_id"] == "aws-live-sim-private"
     assert payload["symbol_pool"]["symbol_count"] >= 1
     assert isinstance(payload["symbol_pool"]["sample_symbols"], list)
+    assert isinstance(payload["symbol_pool"]["symbols"], list)
+    assert payload["strategy_runs"]
+    assert payload["strategy_runs"][0]["strategy_id"] == payload["items"][0]["strategy_id"]
+    assert payload["strategy_runs"][0]["session_ids_by_symbol"]["2330.TW"] == ["aws-live-sim-private"]
 
     bootstrap = client.get("/api/observer/sessions/aws-live-sim-private/bootstrap")
     assert bootstrap.status_code == 200
@@ -577,6 +586,8 @@ def test_observer_sessions_symbol_pool_prefers_bundle_metadata_over_fixture_samp
     assert payload["symbol_pool"]["symbol_count"] == len(metadata_symbols)
     assert payload["symbol_pool"]["top_symbols"] == metadata_symbols[:5]
     assert payload["symbol_pool"]["sample_symbols"] == metadata_symbols[:8]
+    assert payload["symbol_pool"]["symbols"] == metadata_symbols
+    assert payload["strategy_runs"][0]["symbols"] == metadata_symbols
 
     monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
     monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
@@ -626,6 +637,7 @@ def test_observer_sessions_symbol_pool_uses_fixture_sample_when_bundle_metadata_
     assert payload["symbol_pool"]["source_kind"] == "dashboard-fixture-symbol-set-sample"
     assert payload["symbol_pool"]["symbol_count"] == len(fixture_symbols)
     assert payload["symbol_pool"]["top_symbols"] == fixture_symbols[:5]
+    assert payload["symbol_pool"]["symbols"] == fixture_symbols
 
     monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
     monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
@@ -647,6 +659,8 @@ def test_observer_sessions_symbol_pool_falls_back_to_live_sessions(monkeypatch, 
     assert payload["symbol_pool"]["source_kind"] == "observer-sessions-fallback"
     assert payload["symbol_pool"]["symbol_count"] == len(symbols)
     assert payload["symbol_pool"]["top_symbols"] == symbols[:5]
+    assert payload["symbol_pool"]["symbols"] == symbols
+    assert payload["session_ids_by_symbol"]
     reset_observer_repository_cache()
 
 
@@ -666,6 +680,12 @@ def test_observer_history_api_projects_sanitized_fixture_sessions() -> None:
     assert first["source_path_ref"].startswith("runs/steamer-card-engine/")
     assert "workspace" not in first["source_path_ref"]
     assert {"historical", "static", "generated"}.issubset(set(first["tags"]))
+    assert first["strategy_id"]
+    assert first["strategy_label"]
+    assert first["strategy_source_kind"]
+    assert first["symbols"]
+    assert isinstance(first["symbols_source_kind"], str)
+    assert payload["strategy_runs"]
 
     bootstrap = client.get(f"/api/observer/history/sessions/{first['session_id']}/bootstrap")
     assert bootstrap.status_code == 200

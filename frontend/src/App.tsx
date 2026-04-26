@@ -1372,7 +1372,7 @@ function ObserverOnlyApp() {
         <div className="hero-copy">
           <div className="hero-info">
             <h1>Steamer Observer</h1>
-            <p>{observerTab === "live" ? "Browser-openable read-only monitor for one sanitized engine session." : "Read-only browser for sanitized historical replay bundles."}</p>
+            <p>{observerTab === "live" ? "Read-only live monitor with strategy and view selectors (overview or symbol)." : "Read-only replay browser with strategy and view selectors (overview or symbol)."}</p>
           </div>
           <nav className="dashboard-tabs observer-mode-tabs">
             <button className={`dashboard-tab ${observerTab === "live" ? "dashboard-tab-active" : ""}`} onClick={() => setObserverTab("live")} type="button">
@@ -1503,7 +1503,7 @@ function DashboardApp() {
             <h1>Steamer Dashboard</h1>
             <p>
               {dashboardTab === "observer"
-                ? "Browser-openable live observer sidecar for one sanitized engine session. Chart, markers, orders, fills, position, and freshness all reconcile from one sequence."
+                ? "Browser-openable observer sidecar with strategy + view selectors. Overview is portfolio-level placeholder, symbol mode shows chart-level execution detail."
                 : dashboardTab === "live-sim"
                   ? liveSimSubtitle
                   : dashboardTab === "strategy-powerhouse"
