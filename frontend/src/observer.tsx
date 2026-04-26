@@ -173,6 +173,17 @@ function toUtcTimestamp(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
 }
 
+function formatChartTime(timestamp: UTCTimestamp | number): string {
+  return new Date(Number(timestamp) * 1000).toLocaleString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Taipei",
+  });
+}
+
 function toBarTime(value: string): string {
   return `${value.slice(0, 16)}:00Z`;
 }
@@ -353,7 +364,8 @@ function ObserverChart({ candles, markers }: { candles: Candle[]; markers: Chart
         autoSize: true,
         layout: { background: { color: "#0a1016" }, textColor: "#8ba8bb" },
         grid: { vertLines: { color: "rgba(141,170,186,0.08)" }, horzLines: { color: "rgba(141,170,186,0.08)" } },
-        timeScale: { timeVisible: true, secondsVisible: true, borderColor: "rgba(141,170,186,0.2)" },
+        timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time) => formatChartTime(time as number) },
+        localization: { timeFormatter: (time) => formatChartTime(time as number) },
         rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
         crosshair: { vertLine: { color: "rgba(94,243,177,0.3)" }, horzLine: { color: "rgba(94,243,177,0.3)" } },
       });

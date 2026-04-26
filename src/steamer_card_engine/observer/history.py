@@ -15,7 +15,7 @@ from .timeframe import aggregate_candles, bootstrap_with_timeframe_chart, normal
 
 
 MAX_HISTORY_SESSIONS = 6
-MAX_PROJECTED_TICKS = 80
+MAX_PROJECTED_CANDLES = 500
 
 
 class ObserverHistoryError(RuntimeError):
@@ -120,8 +120,7 @@ def _fixture_is_repo_local(fixture: FixtureDay, root: Path) -> bool:
 
 
 def _pick_symbol_and_ticks(event_log: Path) -> tuple[str, list[dict[str, Any]]]:
-    ticks: list[dict[str, Any]] = []
-    preferred_symbol = "UNKNOWN"
+    by_symbol: dict[str, list[dict[str, Any]]] = {}
     for row in _iter_jsonl(event_log) or []:
         if row.get("event_type") != "market_tick":
             continue
@@ -130,13 +129,10 @@ def _pick_symbol_and_ticks(event_log: Path) -> tuple[str, list[dict[str, Any]]]:
         symbol = str(row.get("symbol") or payload.get("symbol") or "").strip()
         if not symbol or not isinstance(price, (int, float)):
             continue
-        if preferred_symbol == "UNKNOWN":
-            preferred_symbol = symbol
-        if symbol != preferred_symbol:
-            continue
-        ticks.append(row)
-        if len(ticks) >= MAX_PROJECTED_TICKS:
-            break
+        by_symbol.setdefault(symbol, []).append(row)
+    if not by_symbol:
+        return "UNKNOWN", []
+    preferred_symbol, ticks = max(by_symbol.items(), key=lambda item: len(item[1]))
     return preferred_symbol, ticks
 
 
@@ -254,7 +250,7 @@ def _build_record(fixture: FixtureDay, root: Path) -> HistorySessionRecord | Non
         symbol=symbol,
         timeframe="tick-projection",
     )
-    projector = ObserverProjector(timeline_limit=20, candle_limit=MAX_PROJECTED_TICKS)
+    projector = ObserverProjector(timeline_limit=20, candle_limit=MAX_PROJECTED_CANDLES)
     bootstrap = projector.bootstrap_from_events(metadata, events)
     bundle = ObserverSessionBundle(bootstrap=bootstrap, candles=candles, events=events)
 
