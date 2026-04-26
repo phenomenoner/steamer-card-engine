@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from steamer_card_engine.dashboard.aggregator import _count_jsonl  # bounded repo-local fixture helper
 from steamer_card_engine.dashboard.fixtures import FixtureDay, discover_fixture_days, repo_root
 
 from .bridge import ObserverProjector, ObserverSessionMetadata
@@ -73,6 +72,13 @@ class HistorySessionRecord:
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+def _count_jsonl(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as file:
+        return sum(1 for line in file if line.strip())
 
 
 def _iter_jsonl(path: Path):
