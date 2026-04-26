@@ -519,6 +519,8 @@ export function ObserverSurface() {
   if (!state.bootstrap || !state.session) return <div className="state-block">Observer bootstrap unavailable.</div>;
 
   const bootstrap = state.bootstrap;
+  const chartCandles = aggregateCandles(bootstrap.chart.candles, chartTimeframe);
+  const chartMarkers = alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
 
   return (
     <main className="observer-surface">
@@ -701,6 +703,8 @@ export function ReplayHistorySurface() {
 
   const selected = sessions.find((item) => item.session_id === selectedId) ?? null;
   const freshnessClass = tone(bootstrap?.freshness_state ?? selected?.freshness_state ?? "stale");
+  const replayChartCandles = aggregateCandles(bootstrap?.chart.candles ?? [], chartTimeframe);
+  const replayChartMarkers = alignMarkers(bootstrap?.chart.markers.slice(-MARKER_LIMIT) ?? [], chartTimeframe);
 
   if (loadingList) return <div className="state-block">Loading sanitized observer history…</div>;
   if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
@@ -784,8 +788,8 @@ export function ReplayHistorySurface() {
               </div>
               <div className="observer-grid replay-observer-grid">
                 <section className="panel observer-chart-panel">
-                  <div className="panel-header"><h3>Static Chart</h3><span className="pill">no websocket</span></div>
-                  <div className="panel-body observer-chart-wrap"><ObserverChart candles={bootstrap.chart.candles} markers={bootstrap.chart.markers.slice(-MARKER_LIMIT)} /></div>
+                  <div className="panel-header"><h3>Static Chart</h3><div className="observer-chart-controls"><span className="pill">no websocket</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div></div>
+                  <div className="panel-body observer-chart-wrap"><ObserverChart candles={replayChartCandles} markers={replayChartMarkers} /></div>
                 </section>
                 <aside className="observer-right-rail">
                   <section className="panel">
