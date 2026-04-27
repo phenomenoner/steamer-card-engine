@@ -154,7 +154,56 @@ def test_observer_api_accepts_attached_bundle_json(monkeypatch, tmp_path: Path) 
 
     assert first["seq"] == 15
     assert second["seq"] == 16
-    assert third == {"type": "stream_end", "after_seq": 14}
+    assert third == {"type": "stream_end", "after_seq": 16}
+
+    monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
+    monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)
+    reset_observer_repository_cache()
+
+
+def test_observer_api_reloads_attached_bundle_json_when_file_changes(monkeypatch, tmp_path: Path) -> None:
+    bundle = build_mock_observer_session()
+    attachment_path = tmp_path / "observer-attachment.json"
+
+    def write_attachment(symbol: str, label: str) -> None:
+        attachment = {
+            "metadata": {
+                "session_id": "aws-live-sim-private",
+                "engine_id": "steamer-card-engine.live-sim.private",
+                "session_label": label,
+                "market_mode": "live-sim",
+                "symbol": symbol,
+                "timeframe": "1m",
+            },
+            "events": [
+                {
+                    **event.to_dict(),
+                    "session_id": "aws-live-sim-private",
+                    "engine_id": "steamer-card-engine.live-sim.private",
+                    "event_id": f"private-{event.event_id}",
+                }
+                for event in bundle.events
+            ],
+        }
+        attachment_path.write_text(json.dumps(attachment), encoding="utf-8")
+
+    write_attachment("2330.TW", "first snapshot")
+    monkeypatch.setenv("STEAMER_OBSERVER_BUNDLE_JSON", str(attachment_path))
+    monkeypatch.setenv("STEAMER_OBSERVER_INCLUDE_MOCK", "0")
+    reset_observer_repository_cache()
+
+    client = TestClient(create_app())
+    first = client.get("/api/observer/sessions").json()
+    assert first["items"][0]["symbol"] == "2330.TW"
+
+    write_attachment("2317.TW", "second snapshot with a longer label")
+
+    second = client.get("/api/observer/sessions").json()
+    assert second["items"][0]["symbol"] == "2317.TW"
+
+    bootstrap = client.get("/api/observer/sessions/aws-live-sim-private/bootstrap")
+    assert bootstrap.status_code == 200
+    assert bootstrap.json()["symbol"] == "2317.TW"
 
     monkeypatch.delenv("STEAMER_OBSERVER_BUNDLE_JSON", raising=False)
     monkeypatch.delenv("STEAMER_OBSERVER_INCLUDE_MOCK", raising=False)

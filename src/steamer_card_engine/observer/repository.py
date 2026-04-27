@@ -321,9 +321,28 @@ def load_bundle_from_json(path: Path) -> ObserverSessionBundle:
 
 
 class ObserverSessionRepository:
-    def __init__(self, bundles: dict[str, ObserverSessionBundle]):
+    def __init__(
+        self,
+        bundles: dict[str, ObserverSessionBundle],
+        *,
+        bundle_paths: tuple[Path, ...] = (),
+        include_mock: bool = False,
+        bundle_mtime_key: tuple[tuple[str, int | None, int | None], ...] = (),
+    ):
         self._bundles = bundles
+        self._bundle_paths = bundle_paths
+        self._include_mock = include_mock
+        self._bundle_mtime_key = bundle_mtime_key
         self._fixture_pool_symbols, self._fixture_pool_source = _load_fixture_or_deck_symbol_pool()
+
+    def _maybe_reload(self) -> None:
+        if not self._bundle_paths:
+            return
+        current_key = _bundle_mtime_key(self._bundle_paths)
+        if current_key == self._bundle_mtime_key:
+            return
+        self._bundles = _load_env_bundles(self._include_mock, self._bundle_paths)
+        self._bundle_mtime_key = current_key
 
     def _bundle_metadata_symbol_pool(self) -> tuple[list[str], str] | None:
         seen: set[str] = set()
@@ -351,6 +370,7 @@ class ObserverSessionRepository:
         return merged_symbols, "observer-bundle-metadata:mixed"
 
     def list_sessions(self) -> list[dict[str, Any]]:
+        self._maybe_reload()
         items: list[dict[str, Any]] = []
         for bundle in self._bundles.values():
             metadata = bundle.metadata
@@ -447,6 +467,7 @@ class ObserverSessionRepository:
         }
 
     def require_bundle(self, session_id: str) -> ObserverSessionBundle:
+        self._maybe_reload()
         try:
             return self._bundles[session_id]
         except KeyError as error:
@@ -482,20 +503,41 @@ class ObserverSessionRepository:
 
 @lru_cache(maxsize=1)
 def observer_repository_from_env() -> ObserverSessionRepository:
-    bundles: dict[str, ObserverSessionBundle] = {}
-
     include_mock = os.environ.get("STEAMER_OBSERVER_INCLUDE_MOCK", "1").strip().lower() not in {"0", "false", "no"}
+    bundle_paths = tuple(Path(item.strip()) for item in os.environ.get("STEAMER_OBSERVER_BUNDLE_JSON", "").split(os.pathsep) if item.strip())
+    bundles = _load_env_bundles(include_mock, bundle_paths)
+
+    return ObserverSessionRepository(
+        bundles,
+        bundle_paths=bundle_paths,
+        include_mock=include_mock,
+        bundle_mtime_key=_bundle_mtime_key(bundle_paths),
+    )
+
+
+def _bundle_mtime_key(bundle_paths: tuple[Path, ...]) -> tuple[tuple[str, int | None, int | None], ...]:
+    keys: list[tuple[str, int | None, int | None]] = []
+    for path in bundle_paths:
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            keys.append((str(path), None, None))
+        else:
+            keys.append((str(path), stat.st_mtime_ns, stat.st_size))
+    return tuple(keys)
+
+
+def _load_env_bundles(include_mock: bool, bundle_paths: tuple[Path, ...]) -> dict[str, ObserverSessionBundle]:
+    bundles: dict[str, ObserverSessionBundle] = {}
     if include_mock:
         mock_bundle = build_mock_observer_session()
         bundles[mock_bundle.bootstrap.session_id] = mock_bundle
 
-    raw_paths = os.environ.get("STEAMER_OBSERVER_BUNDLE_JSON", "").strip()
-    for raw_path in [item.strip() for item in raw_paths.split(os.pathsep) if item.strip()]:
-        path = Path(raw_path)
+    for path in bundle_paths:
         bundle = load_bundle_from_json(path)
         bundles[bundle.bootstrap.session_id] = bundle
 
-    return ObserverSessionRepository(bundles)
+    return bundles
 
 
 def reset_observer_repository_cache() -> None:

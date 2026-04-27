@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import os
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -174,9 +177,21 @@ def create_app() -> FastAPI:
             return
 
         try:
-            for event in observer_repo.stream_events(session_id, after_seq=after_seq):
-                await websocket.send_json(event)
-            await websocket.send_json({"type": "stream_end", "after_seq": after_seq})
+            poll_seconds = float(os.environ.get("STEAMER_OBSERVER_STREAM_POLL_SECONDS", "0") or "0")
+        except ValueError:
+            poll_seconds = 0.0
+
+        try:
+            while True:
+                sent = False
+                for event in observer_repo.stream_events(session_id, after_seq=after_seq):
+                    await websocket.send_json(event)
+                    after_seq = max(after_seq, int(event.get("seq") or after_seq))
+                    sent = True
+                if poll_seconds <= 0:
+                    await websocket.send_json({"type": "stream_end", "after_seq": after_seq})
+                    break
+                await asyncio.sleep(max(0.25, min(poll_seconds, 30.0)))
         except WebSocketDisconnect:
             return
         await websocket.close()
