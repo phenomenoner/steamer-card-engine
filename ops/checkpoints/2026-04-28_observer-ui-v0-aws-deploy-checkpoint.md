@@ -51,6 +51,9 @@ account_id, routing_id, bearer, aws_secret, aws_access_key,
 - Instance: `i-037aa8c8a534e878f`
 - Current public IP during deploy: `43.213.18.125`
 - URL: `http://43.213.18.125/`
+- Code commit deployed: `e0ab4e0`
+- Release path: `/opt/trading/releases/steamer-card-engine-observer-ui-v0-20260428T051549Z-e0ab4e0`
+- Staged bundle: `s3://lyria-trading-ops-975050019139-ap-east-2/staging/steamer-card-engine-observer-ui-v0-20260428T051549Z-e0ab4e0.tar.gz`
 - Runtime env:
 
 ```text
@@ -87,7 +90,7 @@ External smoke from operator host:
 GET http://43.213.18.125/api/health -> {"status":"ok"}
 GET http://43.213.18.125/ -> <title>Steamer Observer Monitor</title>
 GET http://43.213.18.125/api/observer/sessions -> 1 session, sim-2026-03-13-2330, freshness=fresh
-remote frontend bundle required text -> State Reconciliation / Receipt Drawer / Trust Anchor / GAPS: / NO BROKER CONTROL present
+remote frontend bundle required text -> State Reconciliation / Receipt Drawer / Trust Anchor / GAPS: / NO BROKER CONTROL / derived · not trust anchor present
 remote frontend forbidden scan -> pass
 remote /api/openapi.json mutation spot scan -> pass
 observer payload leak spot scan -> pass
