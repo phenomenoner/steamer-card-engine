@@ -185,3 +185,4 @@ Current sprint read:
 - 2026-04-23 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed and the market-phase backlog remains a bounded follow-up rather than a milestone re-cut (no topology change).
 - 2026-04-24 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; committed the observer lifecycle source blocker note to keep reportability honest (no topology change).
 - 2026-04-27 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-04-28 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
