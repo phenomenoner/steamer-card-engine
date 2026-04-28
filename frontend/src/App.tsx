@@ -1372,16 +1372,29 @@ function ObserverOnlyApp() {
         <div className="hero-copy">
           <div className="hero-info">
             <h1>Steamer Observer</h1>
-            <p>{observerTab === "live" ? "Read-only live monitor with strategy and view selectors (overview or symbol)." : "Read-only replay browser with strategy and view selectors (overview or symbol)."}</p>
+            <p>
+              {observerTab === "live"
+                ? "Read-only Monitor for mounted observer sessions. Trust comes from freshness, receipts, and sanitized bundles — not browser controls."
+                : "Replay History for sanitized observer bundles. Historical validity is separate from live freshness. No live stream, no write-back."}
+            </p>
           </div>
-          <nav className="dashboard-tabs observer-mode-tabs">
+          <nav className="dashboard-tabs observer-mode-tabs" aria-label="Steamer Observer modes">
             <button className={`dashboard-tab ${observerTab === "live" ? "dashboard-tab-active" : ""}`} onClick={() => setObserverTab("live")} type="button">
-              Live Monitor
+              Monitor
             </button>
             <button className={`dashboard-tab ${observerTab === "history" ? "dashboard-tab-active" : ""}`} onClick={() => setObserverTab("history")} type="button">
               Replay History
             </button>
+            <button className="dashboard-tab dashboard-tab-disabled" type="button" disabled title="Compare is planned for v0.1/v0.5">
+              Compare <span className="tab-badge">unavailable</span>
+            </button>
           </nav>
+        </div>
+        <div className="observer-trust-strip" aria-label="Observer authority boundary">
+          <span className="status-chip status-chip-muted">READ ONLY</span>
+          <span className="status-chip status-chip-muted">NO BROKER CONTROL</span>
+          <span className="status-chip status-chip-muted">SANITIZED</span>
+          <span className="status-chip status-chip-muted">NO RUNTIME WRITE-BACK</span>
         </div>
       </header>
       {observerTab === "live" ? <ObserverSurface /> : <ReplayHistorySurface />}

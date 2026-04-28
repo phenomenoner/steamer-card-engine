@@ -396,6 +396,46 @@ function tone(value: FreshnessState) {
   return "alert";
 }
 
+function streamTone(value: StreamState, hasSequenceGaps: boolean) {
+  if (value === "live") return hasSequenceGaps ? "alert" : "accent";
+  if (value === "connecting" || value === "idle" || value === "ended") return "muted";
+  return "alert";
+}
+
+function streamLabel(value: StreamState, gapCount = 0) {
+  const gapSuffix = gapCount > 0 ? ` · GAPS: ${gapCount}` : "";
+  if (value === "ended") return `STREAM CLOSED · CLEAN${gapSuffix}`;
+  if (value === "closed") return `STREAM CLOSED · UNEXPECTED${gapSuffix}`;
+  if (value === "error") return `STREAM ERROR${gapSuffix}`;
+  if (value === "connecting") return `STREAM CONNECTING${gapSuffix}`;
+  if (value === "idle") return `STREAM IDLE${gapSuffix}`;
+  return `STREAM LIVE${gapSuffix}`;
+}
+
+function ObserverTrustStrip({
+  mode,
+  sessionId,
+  sessionLabel,
+  bundleId,
+  generatedAt,
+}: {
+  mode: "live" | "replay";
+  sessionId?: string | null;
+  sessionLabel?: string | null;
+  bundleId?: string | null;
+  generatedAt?: string | null;
+}) {
+  const sessionText = sessionLabel ? `${sessionId} · ${sessionLabel}` : sessionId;
+  return (
+    <div className="observer-trust-strip observer-trust-strip-inline" aria-label="Observer session identity">
+      <span className="status-chip status-chip-muted">{mode === "replay" ? "NO LIVE STREAM" : "OBSERVER STREAM"}</span>
+      {sessionText ? <span className="pill">session {sessionText}</span> : null}
+      {bundleId ? <span className="pill">bundle {bundleId}</span> : null}
+      {generatedAt ? <span className="pill">generated {formatTimestamp(generatedAt)}</span> : null}
+    </div>
+  );
+}
+
 function applyObserverEvent(state: ObserverState, event: ObserverEvent): ObserverState {
   if (event.seq <= state.latestSeq || !state.bootstrap) return state;
   const expectedSeq = state.latestSeq + 1;
@@ -465,7 +505,7 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
             color: order.side === "sell" ? "#ff6b6b" : "#5ef3b1",
             text: `${String(order.side).toUpperCase()} SUBMIT`,
             event_id: event.event_id,
-          },
+          } satisfies ChartMarker,
         ].slice(-MARKER_LIMIT),
       };
     }
@@ -486,7 +526,7 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
             color: fill.side === "sell" ? "#ffcd81" : "#80c2ff",
             text: `FILL ${fill.quantity}`,
             event_id: event.event_id,
-          },
+          } satisfies ChartMarker,
         ].slice(-MARKER_LIMIT),
       };
     }
@@ -509,7 +549,78 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
   };
 }
 
-function ObserverChart({ candles, markers }: { candles: Candle[]; markers: ChartMarker[] }) {
+
+function ReconciliationStateBlock({
+  label,
+  state,
+  reason,
+}: {
+  label: string;
+  state: "empty" | "degraded" | "stale" | "derived" | "unavailable";
+  reason: string;
+}) {
+  const chipTone = state === "degraded" || state === "stale" ? "alert" : state === "derived" ? "muted" : "muted";
+  return (
+    <div className={`observer-state-block observer-state-${state}`}>
+      <div className="observer-state-block-head">
+        <span className={`status-chip status-chip-${chipTone}`}>{state.toUpperCase()}</span>
+        <strong>{label}</strong>
+      </div>
+      <p className="card-meta">{reason}</p>
+      <span className="observer-state-receipt">receipt lane: {label.toLowerCase()} · trust anchor only</span>
+    </div>
+  );
+}
+
+function displayNumber(value: number | null | undefined) {
+  return value == null ? "unavailable" : String(value);
+}
+
+
+function sanitizeReceiptRef(value: string | null | undefined) {
+  if (!value) return "—";
+  const trimmed = value.trim();
+  if (!trimmed) return "—";
+  const withoutFragment = trimmed.split("#", 1)[0].split("?", 1)[0];
+  const withoutProtocol = withoutFragment.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/^[a-z][a-z0-9+.-]*:/i, "");
+  const last = withoutProtocol.split(/[\/]/).filter(Boolean).pop() ?? withoutProtocol;
+  return last.replace(/[^a-zA-Z0-9._:@-]/g, "•").slice(0, 96);
+}
+
+function ReceiptTrustPanel({ bootstrap, selected }: { bootstrap: ObserverBootstrap; selected?: HistorySession | null }) {
+  const sourceKind = bootstrap.provenance?.source_kind ?? selected?.source_kind ?? "unknown";
+  const sourceRef = sanitizeReceiptRef(bootstrap.provenance?.source_path_ref ?? selected?.source_path_ref);
+  const compareRef = sanitizeReceiptRef(bootstrap.provenance?.compare_ref);
+  const labels = bootstrap.provenance?.labels?.length ? bootstrap.provenance.labels : selected?.tags ?? [];
+  return (
+    <details className="panel receipt-trust-panel" open>
+      <summary className="panel-header" style={{ cursor: "pointer", listStyle: "none" }}>
+        <h3>Receipt Drawer · Trust Anchor</h3>
+        <span className="pill">sanitized</span>
+      </summary>
+      <div className="panel-body observer-list-panel receipt-trust-body">
+        <div className="observer-top-meta receipt-trust-grid">
+          <div><span className="mini-label">session</span><strong>{bootstrap.session_id}</strong></div>
+          <div><span className="mini-label">schema</span><strong>{bootstrap.schema_version}</strong></div>
+          <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
+          <div><span className="mini-label">freshness / validity</span><strong>{bootstrap.freshness_state}</strong></div>
+          <div><span className="mini-label">source kind</span><strong>{sourceKind}</strong></div>
+          <div><span className="mini-label">receipt ref</span><strong>{sourceRef}</strong></div>
+          {compareRef !== "—" ? <div><span className="mini-label">compare ref</span><strong>{compareRef}</strong></div> : null}
+          <div><span className="mini-label">labels</span><strong>{labels.length ? labels.join(" · ") : "—"}</strong></div>
+        </div>
+        <ul className="receipt-authority-list">
+          <li>read-only API surface · no POST / PUT / PATCH / DELETE</li>
+          <li>no broker control in browser · no order submit / cancel / modify</li>
+          <li>sanitized payload only · raw path/key is reduced to a receipt basename</li>
+          <li>degraded or unavailable lanes must remain explicit in the UI</li>
+        </ul>
+      </div>
+    </details>
+  );
+}
+
+function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[]; markers: ChartMarker[]; mode?: "live" | "replay" }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -522,8 +633,8 @@ function ObserverChart({ candles, markers }: { candles: Candle[]; markers: Chart
         autoSize: true,
         layout: { background: { color: "#0a1016" }, textColor: "#8ba8bb" },
         grid: { vertLines: { color: "rgba(141,170,186,0.08)" }, horzLines: { color: "rgba(141,170,186,0.08)" } },
-        timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time) => formatChartTime(time as number) },
-        localization: { timeFormatter: (time) => formatChartTime(time as number) },
+        timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
+        localization: { timeFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
         rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
         crosshair: { vertLine: { color: "rgba(94,243,177,0.3)" }, horzLine: { color: "rgba(94,243,177,0.3)" } },
       });
@@ -581,7 +692,18 @@ function ObserverChart({ candles, markers }: { candles: Candle[]; markers: Chart
     return <div className="state-block text-alert">CHART ERROR: {chartError}</div>;
   }
 
-  return <div className="observer-chart" ref={hostRef} />;
+  return (
+    <div className="observer-chart-shell">
+      <div className="observer-chart-legend" aria-label="Chart marker legend">
+        <span className="mini-label">{mode === "replay" ? "replay markers" : "live markers"}</span>
+        <span><i className="legend-dot legend-buy" />buy/order</span>
+        <span><i className="legend-dot legend-sell" />sell/order</span>
+        <span><i className="legend-dot legend-fill" />fill</span>
+        <span><i className="legend-dot legend-derived" />derived · not trust anchor</span>
+      </div>
+      <div className="observer-chart" ref={hostRef} />
+    </div>
+  );
 }
 
 function InfoCard({ label, value, subvalue }: { label: string; value: string; subvalue?: string }) {
@@ -642,7 +764,7 @@ export function ObserverSurface() {
 
         const strategyRunsFromApi = Array.isArray(payload.strategy_runs)
           ? payload.strategy_runs
-              .map((run) => {
+              .map((run): StrategyRun | null => {
                 const strategyId = typeof run.strategy_id === "string" ? run.strategy_id.trim() : "";
                 if (!strategyId) return null;
                 return {
@@ -653,6 +775,9 @@ export function ObserverSurface() {
                       ? run.strategy_source_kind.trim()
                       : "observer-session-derived",
                   symbols: normalizeSymbolList(run.symbols),
+                  run_type: typeof run.run_type === "string" ? run.run_type : null,
+                  scenario_id: typeof run.scenario_id === "string" ? run.scenario_id : null,
+                  deck_id: typeof run.deck_id === "string" ? run.deck_id : null,
                   symbols_source_kind:
                     typeof run.symbols_source_kind === "string" && run.symbols_source_kind.trim()
                       ? run.symbols_source_kind.trim()
@@ -662,7 +787,7 @@ export function ObserverSurface() {
                   default_session_id: typeof run.default_session_id === "string" ? run.default_session_id : null,
                 } satisfies StrategyRun;
               })
-              .filter((run): run is StrategyRun => Boolean(run))
+              .filter((run): run is StrategyRun => run !== null)
           : [];
 
         const fallbackStrategies: StrategyRun[] = strategyRunsFromApi.length
@@ -772,6 +897,7 @@ export function ObserverSurface() {
 
     const session = sessions.find((item) => item.session_id === activeSessionId);
     if (!session) return;
+    const selectedSession: ObserverSession = session;
 
     let socket: WebSocket | null = null;
     let cancelled = false;
@@ -779,11 +905,11 @@ export function ObserverSurface() {
     async function loadSelectedSession() {
       setLoading(true);
       try {
-        const bootstrap = await getJson<ObserverBootstrap>(`/api/observer/sessions/${session.session_id}/bootstrap`);
+        const bootstrap = await getJson<ObserverBootstrap>(`/api/observer/sessions/${selectedSession.session_id}/bootstrap`);
         if (cancelled) return;
         setError(null);
         setState({
-          session,
+          session: selectedSession,
           bootstrap: { ...bootstrap, chart: { ...bootstrap.chart, markers: bootstrap.chart.markers.slice(-MARKER_LIMIT) } },
           timeline: bootstrap.timeline,
           events: [],
@@ -793,7 +919,7 @@ export function ObserverSurface() {
           sequenceGaps: [],
         });
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        socket = new WebSocket(`${protocol}://${window.location.host}/api/observer/sessions/${session.session_id}/stream?after_seq=${bootstrap.latest_seq}`);
+        socket = new WebSocket(`${protocol}://${window.location.host}/api/observer/sessions/${selectedSession.session_id}/stream?after_seq=${bootstrap.latest_seq}`);
         socket.onopen = () => {
           if (!cancelled) setState((current) => ({ ...current, streamState: "live", streamNote: null }));
         };
@@ -880,16 +1006,20 @@ export function ObserverSurface() {
         <div className="panel-header">
           <h3>Observer Status</h3>
           <div className="observer-chip-row">
-            <span className={`status-chip status-chip-${state.streamState === "live" ? "accent" : state.streamState === "connecting" || state.streamState === "ended" ? "muted" : "alert"}`}>WS {state.streamState.toUpperCase()}</span>
-            <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.freshness_state.toUpperCase()}</span>
+            <span className={`status-chip status-chip-${freshnessClass}`}>LIVE FRESHNESS · {bootstrap.freshness_state.toUpperCase()}</span>
+            <span className={`status-chip status-chip-${streamTone(state.streamState, state.sequenceGaps.length > 0)}`}>{streamLabel(state.streamState, state.sequenceGaps.length)}</span>
             <span className={`status-chip status-chip-${state.sequenceGaps.length ? "alert" : "muted"}`}>SEQ GAPS {state.sequenceGaps.length}</span>
           </div>
         </div>
         <div className="panel-body observer-status-body observer-top-meta">
+          <div><span className="mini-label">session id</span><strong>{bootstrap.session_id}</strong></div>
           <div><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
           <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
           <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
           <div><span className="mini-label">stream note</span><strong>{state.streamNote ?? "none"}</strong></div>
+        </div>
+        <div className="panel-body observer-status-trust-body">
+          <ObserverTrustStrip mode="live" sessionId={bootstrap.session_id} sessionLabel={bootstrap.session_label} bundleId={sanitizeReceiptRef(bootstrap.provenance?.source_path_ref ?? bootstrap.provenance?.compare_ref ?? bootstrap.provenance?.source_kind)} generatedAt={bootstrap.generated_at} />
         </div>
         {needsAttention || isStreamDegraded ? (
           <div className="observer-alert-banner">
@@ -954,9 +1084,9 @@ export function ObserverSurface() {
       {!isOverviewMode && !missingSymbolSelection ? (
         <div className="metrics-row observer-metrics-row">
           <InfoCard label="engine state" value={bootstrap.health.engine_state.toUpperCase()} subvalue={`freshness ${bootstrap.health.feed_freshness_seconds}s`} />
-          <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue={`avg ${bootstrap.position.avg_price ?? "—"}`} />
-          <InfoCard label="last fill" value={bootstrap.last_fill ? `${bootstrap.last_fill.side.toUpperCase()} ${bootstrap.last_fill.quantity}` : "NONE"} subvalue={bootstrap.last_fill ? `${bootstrap.last_fill.price} @ ${formatTimestamp(bootstrap.last_fill.filled_at)}` : "No fills yet"} />
-          <InfoCard label="open orders" value={String(bootstrap.open_orders.length)} subvalue={bootstrap.open_orders[0] ? `${bootstrap.open_orders[0].status} · ${bootstrap.open_orders[0].side}` : "No working orders"} />
+          <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue={`avg ${bootstrap.position.avg_price ?? "unavailable"}`} />
+          <InfoCard label="last fill" value={bootstrap.last_fill ? `${bootstrap.last_fill.side.toUpperCase()} ${bootstrap.last_fill.quantity}` : "EMPTY"} subvalue={bootstrap.last_fill ? `${bootstrap.last_fill.price} @ ${formatTimestamp(bootstrap.last_fill.filled_at)}` : "intentional empty · no fills yet"} />
+          <InfoCard label="open orders" value={String(bootstrap.open_orders.length)} subvalue={bootstrap.open_orders[0] ? `${bootstrap.open_orders[0].status} · ${bootstrap.open_orders[0].side}` : "intentional empty · no working orders"} />
         </div>
       ) : null}
 
@@ -987,41 +1117,71 @@ export function ObserverSurface() {
                 <span>View selector includes full universe symbols, but this symbol does not have a mounted observer session yet.</span>
               </div>
             ) : (
-              <ObserverChart candles={chartCandles} markers={chartMarkers} />
+              <ObserverChart candles={chartCandles} markers={chartMarkers} mode="live" />
             )}
           </div>
         </section>
 
         {!isOverviewMode && !missingSymbolSelection ? <aside className="observer-right-rail">
-          <section className="panel">
-            <div className="panel-header"><h3>Position</h3><span className="pill">live(sim)</span></div>
-            <div className="panel-body">
-              <div className="kv-grid observer-kv-grid">
-                <div className="kv-item"><span className="mini-label">side</span><strong>{bootstrap.position.side}</strong></div>
-                <div className="kv-item"><span className="mini-label">qty</span><strong>{bootstrap.position.quantity}</strong></div>
-                <div className="kv-item"><span className="mini-label">avg</span><strong>{bootstrap.position.avg_price ?? "—"}</strong></div>
-                <div className="kv-item"><span className="mini-label">mark</span><strong>{bootstrap.position.market_price ?? "—"}</strong></div>
-                <div className="kv-item"><span className="mini-label">uPnL</span><strong>{bootstrap.position.unrealized_pnl ?? "—"}</strong></div>
-                <div className="kv-item"><span className="mini-label">rPnL</span><strong>{bootstrap.position.realized_pnl ?? "—"}</strong></div>
+          <section className="panel observer-reconciliation-panel">
+            <div className="panel-header">
+              <h3>State Reconciliation</h3>
+              <div className="observer-chip-row">
+                <span className="pill">orders ↔ fills ↔ position</span>
+                <span className="status-chip status-chip-muted">DERIVED PRESENTATION</span>
               </div>
+            </div>
+            <div className="panel-body observer-reconciliation-body">
+              <ReconciliationStateBlock
+                label="derived"
+                state="derived"
+                reason="This panel presents the latest API snapshot plus observer stream updates. Treat it as presentation state; receipt/provenance remains the trust anchor."
+              />
             </div>
           </section>
 
           <section className="panel">
-            <div className="panel-header"><h3>Orders / Fill</h3><span className="pill">sanitized</span></div>
+            <div className="panel-header"><h3>Position</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span></div>
+            <div className="panel-body">
+              <div className="kv-grid observer-kv-grid">
+                <div className="kv-item"><span className="mini-label">side</span><strong>{bootstrap.position.side}</strong></div>
+                <div className="kv-item"><span className="mini-label">qty</span><strong>{displayNumber(bootstrap.position.quantity)}</strong></div>
+                <div className="kv-item"><span className="mini-label">avg</span><strong>{displayNumber(bootstrap.position.avg_price)}</strong></div>
+                <div className="kv-item"><span className="mini-label">mark</span><strong>{displayNumber(bootstrap.position.market_price)}</strong></div>
+                <div className="kv-item"><span className="mini-label">uPnL</span><strong>{displayNumber(bootstrap.position.unrealized_pnl)}</strong></div>
+                <div className="kv-item"><span className="mini-label">rPnL</span><strong>{displayNumber(bootstrap.position.realized_pnl)}</strong></div>
+              </div>
+              {bootstrap.position.unrealized_pnl == null && bootstrap.position.realized_pnl == null ? (
+                <ReconciliationStateBlock label="position" state="unavailable" reason="PnL is not present in the sanitized observer bundle; UI does not synthesize a fake zero." />
+              ) : null}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><h3>Open Orders</h3><span className="pill">sanitized lane</span></div>
             <div className="panel-body observer-list-panel">
-              {bootstrap.open_orders.map((order) => (
+              {bootstrap.open_orders.length ? bootstrap.open_orders.map((order) => (
                 <div className="history-item" key={order.order_id}>
                   <div className="history-item-head"><div><div className="card-title history-title">{order.order_id}</div><div className="card-meta">{order.side} · qty {order.quantity}</div></div><span className="status-chip status-chip-muted">{order.status}</span></div>
                   <p className="card-meta">limit {order.limit_price ?? "mkt"} · filled {order.filled_quantity}</p>
                 </div>
-              ))}
+              )) : (
+                <ReconciliationStateBlock label="orders" state="empty" reason="No open orders at this observer point. This is an intentional empty state, not a missing table." />
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><h3>Last Fill</h3><span className="pill">sanitized lane</span></div>
+            <div className="panel-body observer-list-panel">
               {bootstrap.last_fill ? (
                 <div className="history-item history-item-highlight">
                   <div className="history-item-head"><div><div className="card-title history-title">{bootstrap.last_fill.fill_id}</div><div className="card-meta">{formatTimestamp(bootstrap.last_fill.filled_at)}</div></div><span className="status-chip status-chip-accent">fill</span></div>
                   <p className="card-meta">{bootstrap.last_fill.side} · {bootstrap.last_fill.quantity} @ {bootstrap.last_fill.price}</p>
                 </div>
-              ) : null}
+              ) : (
+                <ReconciliationStateBlock label="fills" state="empty" reason="No fill has been observed for this mounted session yet." />
+              )}
             </div>
           </section>
 
@@ -1049,7 +1209,11 @@ export function ObserverSurface() {
       <section className="panel">
         <div className="panel-header">
           <h3>Strategy Timeline</h3>
-          <span className="pill">selected mounted session</span>
+          <div className="observer-chip-row">
+            <span className="pill">selected mounted session</span>
+            <span className="status-chip status-chip-muted">append-only order</span>
+            <span className="status-chip status-chip-muted">cursor follows chart time</span>
+          </div>
         </div>
         <div className="panel-body observer-timeline-grid">
           {state.timeline.map((item) => (
@@ -1062,6 +1226,7 @@ export function ObserverSurface() {
                 <span className={`status-chip status-chip-${tone(item.freshness_state)}`}>{item.status}</span>
               </div>
               <p className="card-meta">{item.summary}</p>
+              <span className="observer-timeline-cursor">cursor {formatTimestamp(item.event_time)} · seq {item.seq}</span>
             </article>
           ))}
         </div>
@@ -1094,7 +1259,7 @@ export function ReplayHistorySurface() {
 
         const strategyRunsFromApi = Array.isArray(payload.strategy_runs)
           ? payload.strategy_runs
-              .map((run) => {
+              .map((run): StrategyRun | null => {
                 const strategyId = typeof run.strategy_id === "string" ? run.strategy_id.trim() : "";
                 if (!strategyId) return null;
                 return {
@@ -1117,7 +1282,7 @@ export function ReplayHistorySurface() {
                   deck_id: typeof run.deck_id === "string" ? run.deck_id : null,
                 } satisfies StrategyRun;
               })
-              .filter((run): run is StrategyRun => Boolean(run))
+              .filter((run): run is StrategyRun => run !== null)
           : [];
 
         const fallbackStrategies: StrategyRun[] = strategyRunsFromApi.length
@@ -1233,8 +1398,8 @@ export function ReplayHistorySurface() {
           <h3>Replay History</h3>
           <div className="observer-chip-row">
             <span className="status-chip status-chip-muted">READ ONLY</span>
-            <span className="status-chip status-chip-muted">STATIC</span>
-            <span className="status-chip status-chip-muted">GENERATED</span>
+            <span className="status-chip status-chip-muted">BUNDLE VALIDITY</span>
+            <span className="status-chip status-chip-muted">NO LIVE STREAM</span>
           </div>
         </div>
         <div className="panel-body observer-hero-body">
@@ -1243,8 +1408,11 @@ export function ReplayHistorySurface() {
               <h2>Historical observer bundles</h2>
               <span className="pill">{sessions.length} sessions</span>
             </div>
-            <p className="strategy-note">Strategy picks the replay run. View picks portfolio overview or symbol detail. No synthetic portfolio PnL is generated in this slice.</p>
+            <p className="strategy-note">Strategy picks the replay run. View picks portfolio overview or symbol detail. Historical bundle validity is separate from live freshness. No synthetic portfolio PnL is generated in this slice.</p>
           </div>
+        </div>
+        <div className="panel-body observer-status-trust-body">
+          <ObserverTrustStrip mode="replay" sessionId={selected?.session_id ?? activeSessionId} sessionLabel={selected?.session_label} bundleId={sanitizeReceiptRef(selected?.source_path_ref)} generatedAt={selected?.generated_at} />
         </div>
       </section>
 
@@ -1278,14 +1446,19 @@ export function ReplayHistorySurface() {
             <div className="state-block">Loading sanitized observer bundle…</div>
           ) : bootstrap && selected ? (
             <div className="panel-body replay-detail-body">
-              <div className="observer-title-row">
+              <div className="observer-title-row replay-frame-title">
                 <h2>{bootstrap.session_label}</h2>
                 <span className="pill">replay-static</span>
+                <span className="status-chip status-chip-muted">BUNDLE VALID @ {formatTimestamp(bootstrap.generated_at)}</span>
+              </div>
+              <div className="replay-frame-banner">
+                <strong>Replay frame</strong>
+                <span>Historical bundle playback. No websocket, no broker controls, no frontend-synthesized portfolio PnL.</span>
               </div>
               <div className="observer-top-meta replay-top-meta">
                 <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
                 <div><span className="mini-label">source</span><strong>{bootstrap.provenance?.source_kind ?? selected.source_kind}</strong></div>
-                <div><span className="mini-label">receipt ref</span><strong>{bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</strong></div>
+                <div><span className="mini-label">receipt ref</span><strong>{sanitizeReceiptRef(bootstrap.provenance?.source_path_ref ?? selected.source_path_ref)}</strong></div>
                 <div><span className="mini-label">compare</span><strong>{selected.has_compare ? "artifact ref" : "unavailable"}</strong></div>
               </div>
               {isOverviewMode ? (
@@ -1318,23 +1491,16 @@ export function ReplayHistorySurface() {
                   <div className="observer-grid replay-observer-grid">
                     <section className="panel observer-chart-panel">
                       <div className="panel-header"><h3>Static Chart</h3><div className="observer-chart-controls"><span className="pill">no websocket</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div></div>
-                      <div className="panel-body observer-chart-wrap"><ObserverChart candles={replayChartCandles} markers={replayChartMarkers} /></div>
+                      <div className="panel-body observer-chart-wrap"><ObserverChart candles={replayChartCandles} markers={replayChartMarkers} mode="replay" /></div>
                     </section>
                 <aside className="observer-right-rail">
-                    <details className="panel" open>
-                      <summary className="panel-header" style={{ cursor: "pointer", listStyle: "none" }}><h3>Provenance diagnostics</h3><span className="pill">sanitized</span></summary>
-                      <div className="panel-body observer-list-panel">
-                        <div className="observer-incident">source_ref={bootstrap.provenance?.source_path_ref ?? selected.source_path_ref}</div>
-                        {bootstrap.provenance?.compare_ref ? <div className="observer-incident">compare_ref={bootstrap.provenance.compare_ref}</div> : null}
-                        <div className="observer-incident">deck={selected.deck_id ?? "—"}</div>
-                      </div>
-                    </details>
+                    <ReceiptTrustPanel bootstrap={bootstrap} selected={selected} />
                 </aside>
               </div>
                 </>
               )}
               <section className="panel replay-timeline-panel">
-                <div className="panel-header"><h3>Event Timeline</h3><span className="pill">static order</span></div>
+                <div className="panel-header"><h3>Event Timeline</h3><div className="observer-chip-row"><span className="pill">static order</span><span className="status-chip status-chip-muted">replay scrub source</span></div></div>
                 <div className="panel-body observer-timeline-grid">
                   {bootstrap.timeline.map((item) => (
                     <article className="history-item" key={item.seq}>
@@ -1346,6 +1512,7 @@ export function ReplayHistorySurface() {
                         <span className={`status-chip status-chip-${tone(item.freshness_state)}`}>{item.status}</span>
                       </div>
                       <p className="card-meta">{item.summary}</p>
+              <span className="observer-timeline-cursor">cursor {formatTimestamp(item.event_time)} · seq {item.seq}</span>
                     </article>
                   ))}
                 </div>
