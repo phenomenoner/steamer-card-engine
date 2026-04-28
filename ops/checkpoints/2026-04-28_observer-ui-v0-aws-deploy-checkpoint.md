@@ -126,3 +126,31 @@ No live execution authority, broker control wiring, auth boundary widening, publ
 - Mounted session is the sanitized sim observer bundle from the existing demo path.
 - Symlinked fixture/context directories preserve current demo compatibility; package contract should be tightened later.
 - Suitable for CK browser review, not broader/public reuse.
+
+## Visual parity follow-up
+
+After CK reviewed the first deployed page, the UI was judged too close to the older engineering dashboard and too far from the design artifact. A visual parity CSS pass was applied and redeployed to the same demo host.
+
+- Commit: `674aa95` (`style(observer): align ui v0 with design console density`)
+- Release path: `/opt/trading/releases/steamer-card-engine-observer-ui-v0-visual-20260428T053753Z-674aa95`
+- Staged bundle: `s3://lyria-trading-ops-975050019139-ap-east-2/staging/steamer-card-engine-observer-ui-v0-visual-20260428T053753Z-674aa95.tar.gz`
+
+Visual pass changed only CSS/layout density and did not alter API/backend behavior:
+
+- warmer v1-style palette
+- sticky compact top navigation
+- full-width operator console layout
+- 340px reconciliation rail
+- reduced card gaps and rounded-card feel
+- chart/rail split closer to design artifact
+
+Remote smoke after visual pass:
+
+```text
+GET /api/health -> {"status":"ok"}
+GET / -> <title>Steamer Observer Monitor</title>
+remote CSS markers -> #d97757 / 340px rail / sticky nav / backdrop-filter / active tab underline present
+remote JS markers -> State Reconciliation / Receipt Drawer / Trust Anchor / GAPS: present
+GET /api/observer/sessions -> 1 session, sim-2026-03-13-2330, freshness=fresh
+forbidden scan -> pass
+```
