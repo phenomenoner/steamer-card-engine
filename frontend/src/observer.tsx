@@ -399,7 +399,7 @@ function StrategySelector({
 }) {
   return (
     <label className="observer-session-selector" htmlFor="observer-strategy-select">
-      <span className="mini-label">strategy</span>
+      <span className="mini-label">Strategy Card selector</span>
       <select id="observer-strategy-select" value={value} onChange={(event) => onChange(event.target.value)}>
         {strategies.map((strategy) => (
           <option key={strategy.strategy_id} value={strategy.strategy_id}>
@@ -422,12 +422,12 @@ function ViewSelector({
 }) {
   return (
     <label className="observer-session-selector" htmlFor="observer-view-select">
-      <span className="mini-label">view</span>
+      <span className="mini-label">Strategy Card view</span>
       <select id="observer-view-select" value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value={OVERVIEW_VIEW_ID}>Overview (portfolio)</option>
+        <option value={OVERVIEW_VIEW_ID}>Overview · trades / position / PnL / receipts</option>
         {symbols.map((symbol) => (
           <option key={symbol} value={symbol}>
-            {symbol}
+            Symbol Detail · {symbol}
           </option>
         ))}
       </select>
@@ -621,6 +621,57 @@ function displayNumber(value: number | null | undefined) {
   return value == null ? "unavailable" : String(value);
 }
 
+function summarizePosition(position: PositionSummary | null | undefined) {
+  if (!position) return "unavailable";
+  return `${position.side.toUpperCase()} ${displayNumber(position.quantity)} · avg ${displayNumber(position.avg_price)} · mark ${displayNumber(position.market_price)}`;
+}
+
+function summarizePnL(position: PositionSummary | null | undefined) {
+  if (!position || (position.unrealized_pnl == null && position.realized_pnl == null)) {
+    return "unavailable · sanitized observer bundle does not provide portfolio PnL";
+  }
+  return `uPnL ${displayNumber(position.unrealized_pnl)} · rPnL ${displayNumber(position.realized_pnl)}`;
+}
+
+function countFillEvents(bootstraps: ObserverBootstrap[]) {
+  const fillIds = new Set<string>();
+  let timelineFillCount = 0;
+  bootstraps.forEach((bootstrap) => {
+    if (bootstrap.last_fill?.fill_id) fillIds.add(bootstrap.last_fill.fill_id);
+    bootstrap.timeline.forEach((entry) => {
+      if (entry.event_type === "fill_received") timelineFillCount += 1;
+    });
+  });
+  return Math.max(fillIds.size, timelineFillCount);
+}
+
+function summarizeReceiptState(bootstraps: ObserverBootstrap[]) {
+  if (!bootstraps.length) return "unavailable · no mounted bootstrap loaded";
+  const degraded = bootstraps.filter((bootstrap) => bootstrap.freshness_state !== "fresh").length;
+  const sourceKinds = normalizeSymbolList(bootstraps.map((bootstrap) => bootstrap.provenance?.source_kind ?? "unknown"));
+  return `${degraded ? `${degraded} degraded · ` : ""}${sourceKinds.join(" / ") || "unknown source"} · sanitized trust anchor`;
+}
+
+function summarizeStrategyOverview(strategy: StrategyRun, viewSymbols: string[], bootstraps: ObserverBootstrap[]) {
+  const loadedSessionIds = new Set(bootstraps.map((bootstrap) => bootstrap.session_id));
+  const mountedSymbols = normalizeSymbolList(bootstraps.map((bootstrap) => bootstrap.symbol));
+  const openOrders = bootstraps.reduce((total, bootstrap) => total + bootstrap.open_orders.length, 0);
+  const positionBootstraps = bootstraps.filter((bootstrap) => bootstrap.position && bootstrap.position.side !== "flat" && bootstrap.position.quantity !== 0);
+  return {
+    sessionsTotal: strategy.session_ids.length,
+    sessionsLoaded: loadedSessionIds.size,
+    mountedSymbols: mountedSymbols.length || viewSymbols.length,
+    openOrders,
+    fillCount: countFillEvents(bootstraps),
+    positionSummary: positionBootstraps.length
+      ? positionBootstraps.map((bootstrap) => `${bootstrap.symbol}: ${summarizePosition(bootstrap.position)}`).join(" · ")
+      : "flat/empty or unavailable from mounted session data",
+    pnlSummary: bootstraps.some((bootstrap) => bootstrap.position?.unrealized_pnl != null || bootstrap.position?.realized_pnl != null)
+      ? bootstraps.map((bootstrap) => `${bootstrap.symbol}: ${summarizePnL(bootstrap.position)}`).join(" · ")
+      : "unavailable · sanitized observer bundle does not provide portfolio PnL",
+    receiptState: summarizeReceiptState(bootstraps),
+  };
+}
 
 function sanitizeReceiptRef(value: string | null | undefined) {
   if (!value) return "—";
@@ -769,6 +820,9 @@ export function ObserverSurface() {
   const [selectedView, setSelectedView] = useState<string>(OVERVIEW_VIEW_ID);
   const [symbolPool, setSymbolPool] = useState<ObserverSymbolPool | null>(null);
   const [sessionIdsBySymbol, setSessionIdsBySymbol] = useState<Record<string, string[]>>({});
+  const [overviewBootstraps, setOverviewBootstraps] = useState<ObserverBootstrap[]>([]);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [state, setState] = useState<ObserverState>({
     session: null,
     bootstrap: null,
@@ -927,6 +981,40 @@ export function ObserverSurface() {
   const activeSessionId = hasMountedSymbolSession ? mountedSymbolSessionId : strategySummarySessionId;
 
   useEffect(() => {
+    let cancelled = false;
+    const sessionIds = selectedStrategy?.session_ids ?? [];
+
+    async function loadOverviewBootstraps() {
+      if (!selectedStrategy || !isOverviewMode || !sessionIds.length) {
+        setOverviewBootstraps([]);
+        setOverviewError(null);
+        setOverviewLoading(false);
+        return;
+      }
+      setOverviewLoading(true);
+      try {
+        const bootstraps = await Promise.all(
+          sessionIds.map((sessionId) => getJson<ObserverBootstrap>(`/api/observer/sessions/${sessionId}/bootstrap`)),
+        );
+        if (cancelled) return;
+        setOverviewBootstraps(bootstraps);
+        setOverviewError(null);
+      } catch (reason) {
+        if (cancelled) return;
+        setOverviewBootstraps([]);
+        setOverviewError(String(reason));
+      } finally {
+        if (!cancelled) setOverviewLoading(false);
+      }
+    }
+
+    void loadOverviewBootstraps();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOverviewMode, selectedStrategy]);
+
+  useEffect(() => {
     if (!activeSessionId) {
       setState((current) => ({
         ...current,
@@ -1047,6 +1135,7 @@ export function ObserverSurface() {
   const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
   const universeSymbols = effectivePool.symbols.length ? effectivePool.symbols : (effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols);
   const missingSymbolSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
+  const overviewSummary = summarizeStrategyOverview(selectedStrategy, viewSymbols, overviewBootstraps.length ? overviewBootstraps : [bootstrap]);
 
   return (
     <main className="observer-surface">
@@ -1102,24 +1191,24 @@ export function ObserverSurface() {
 
       <section className="panel observer-focus-card">
         <div className="panel-header">
-          <h3>Strategy + View</h3>
-          <span className="pill">selector shell</span>
+          <h3>Strategy Card selector</h3>
+          <span className="pill">Overview / Symbol Detail</span>
         </div>
         <div className="panel-body observer-focus-body">
           <div className="observer-title-row observer-focus-title-row">
             <h2>{selectedStrategy.strategy_label}</h2>
             <span className="pill">{selectedStrategy.strategy_source_kind}</span>
           </div>
-          <p className="strategy-note observer-focus-copy">Strategy picks the strategy run. View picks portfolio overview or one symbol chart.</p>
+          <p className="strategy-note observer-focus-copy">Strategy Card picks the strategy run. Overview summarizes strategy-card truth; Symbol Detail opens one mounted chart and execution trace.</p>
           <div className="observer-focus-layout">
             <div className="observer-focus-selector-block">
               <StrategySelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} />
               <ViewSelector symbols={viewSymbols} value={selectedView} onChange={setSelectedView} />
-              <p className="card-meta observer-focus-helper">Overview means portfolio-level behavior. Symbol means chart-level execution detail.</p>
+              <p className="card-meta observer-focus-helper">Overview = trades / position / PnL truth / receipts. Symbol Detail = bar chart / orders / fills / health timeline.</p>
             </div>
             <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
               <div><span className="mini-label">strategy id</span><strong>{selectedStrategy.strategy_id}</strong></div>
-              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Overview (portfolio)" : selectedView}</strong></div>
+              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Strategy Card Overview" : `Symbol Detail · ${selectedView}`}</strong></div>
               <div><span className="mini-label">mounted session</span><strong>{activeSession?.session_id ?? "none"}</strong></div>
               <div><span className="mini-label">symbol source</span><strong>{selectedStrategy.symbols_source_kind}</strong></div>
               <div><span className="mini-label">symbols in view selector</span><strong>{viewSymbols.length}</strong></div>
@@ -1141,22 +1230,28 @@ export function ObserverSurface() {
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>{isOverviewMode ? "Portfolio Overview" : "Symbol Focus Chart"}</h3>
+            <h3>{isOverviewMode ? "Strategy Card Overview" : "Symbol Detail · Bar Chart"}</h3>
             {!isOverviewMode ? <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div> : null}
           </div>
           <div className="panel-body observer-chart-wrap">
             {isOverviewMode ? (
               <div className="observer-pool-overview">
                 <div className="observer-pool-head">
-                  <strong>Portfolio projection pending</strong>
-                  <span className="status-chip status-chip-muted">truthful placeholder</span>
+                  <strong>Strategy Card Overview</strong>
+                  <span className="status-chip status-chip-muted">read-only receipt truth</span>
                 </div>
-                <p className="card-meta">Portfolio-level PnL projection is not mounted yet. This overview only shows currently available universe and health context.</p>
-                <div className="observer-top-meta">
-                  <div><span className="mini-label">strategy sessions</span><strong>{selectedStrategy.session_ids.length}</strong></div>
-                  <div><span className="mini-label">symbol universe</span><strong>{viewSymbols.length}</strong></div>
-                  <div><span className="mini-label">latest seq</span><strong>{bootstrap.latest_seq}</strong></div>
-                  <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
+                <p className="card-meta">Trades, position, PnL, and receipt state are derived only from mounted sanitized observer bootstraps. PnL stays unavailable when the payload does not provide it.</p>
+                {overviewLoading ? <ReconciliationStateBlock label="overview" state="derived" reason="Loading mounted session bootstraps for strategy-card summary." /> : null}
+                {overviewError ? <ReconciliationStateBlock label="overview" state="degraded" reason={`Unable to load every mounted session bootstrap: ${overviewError}`} /> : null}
+                <div className="observer-top-meta observer-overview-grid">
+                  <div><span className="mini-label">strategy sessions</span><strong>{overviewSummary.sessionsLoaded}/{overviewSummary.sessionsTotal}</strong></div>
+                  <div><span className="mini-label">mounted symbols</span><strong>{overviewSummary.mountedSymbols}</strong></div>
+                  <div><span className="mini-label">open orders</span><strong>{overviewSummary.openOrders}</strong></div>
+                  <div><span className="mini-label">fills / trades</span><strong>{overviewSummary.fillCount}</strong></div>
+                  <div><span className="mini-label">position summary</span><strong>{overviewSummary.positionSummary}</strong></div>
+                  <div><span className="mini-label">PnL truth</span><strong>{overviewSummary.pnlSummary}</strong></div>
+                  <div><span className="mini-label">receipt / trust state</span><strong>{overviewSummary.receiptState}</strong></div>
+                  <div><span className="mini-label">active receipt seq</span><strong>{bootstrap.latest_seq}</strong></div>
                 </div>
               </div>
             ) : missingSymbolSelection ? (
@@ -1173,7 +1268,7 @@ export function ObserverSurface() {
         {!isOverviewMode && !missingSymbolSelection ? <aside className="observer-right-rail">
           <section className="panel observer-reconciliation-panel">
             <div className="panel-header">
-              <h3>State Reconciliation</h3>
+              <h3>Symbol Detail · Execution State</h3>
               <div className="observer-chip-row">
                 <span className="pill">orders ↔ fills ↔ position</span>
                 <span className="status-chip status-chip-muted">DERIVED PRESENTATION</span>
@@ -1189,7 +1284,7 @@ export function ObserverSurface() {
           </section>
 
           <section className="panel">
-            <div className="panel-header"><h3>Position</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span></div>
+            <div className="panel-header"><h3>Symbol Detail · Position</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span></div>
             <div className="panel-body">
               <div className="kv-grid observer-kv-grid">
                 <div className="kv-item"><span className="mini-label">side</span><strong>{bootstrap.position.side}</strong></div>
@@ -1206,7 +1301,7 @@ export function ObserverSurface() {
           </section>
 
           <section className="panel">
-            <div className="panel-header"><h3>Open Orders</h3><span className="pill">sanitized lane</span></div>
+            <div className="panel-header"><h3>Symbol Detail · Open Orders</h3><span className="pill">sanitized lane</span></div>
             <div className="panel-body observer-list-panel">
               {bootstrap.open_orders.length ? bootstrap.open_orders.map((order) => (
                 <div className="history-item" key={order.order_id}>
@@ -1220,7 +1315,7 @@ export function ObserverSurface() {
           </section>
 
           <section className="panel">
-            <div className="panel-header"><h3>Last Fill</h3><span className="pill">sanitized lane</span></div>
+            <div className="panel-header"><h3>Symbol Detail · Last Fill / Trade</h3><span className="pill">sanitized lane</span></div>
             <div className="panel-body observer-list-panel">
               {bootstrap.last_fill ? (
                 <div className="history-item history-item-highlight">
@@ -1235,7 +1330,7 @@ export function ObserverSurface() {
 
           <details className="panel">
             <summary className="panel-header" style={{ cursor: "pointer", listStyle: "none" }}>
-              <h3>Technical diagnostics</h3>
+              <h3>Symbol Detail · Timeline / Health</h3>
               <span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap.health.freshness_state}</span>
             </summary>
             <div className="panel-body observer-list-panel">
@@ -1256,7 +1351,7 @@ export function ObserverSurface() {
 
       <section className="panel">
         <div className="panel-header">
-          <h3>Strategy Timeline</h3>
+          <h3>{isOverviewMode ? "Strategy Card Overview · Timeline" : "Symbol Detail · Timeline"}</h3>
           <div className="observer-chip-row">
             <span className="pill">selected mounted session</span>
             <span className="status-chip status-chip-muted">append-only order</span>
@@ -1478,7 +1573,7 @@ export function ReplayHistorySurface() {
             </div>
             <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
               <div><span className="mini-label">strategy id</span><strong>{selectedStrategy?.strategy_id ?? "—"}</strong></div>
-              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Overview (portfolio)" : selectedView}</strong></div>
+              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Strategy Card Overview" : `Symbol Detail · ${selectedView}`}</strong></div>
               <div><span className="mini-label">run type</span><strong>{selectedStrategy?.run_type ?? "—"}</strong></div>
               <div><span className="mini-label">scenario</span><strong>{selectedStrategy?.scenario_id ?? "—"}</strong></div>
               <div><span className="mini-label">deck</span><strong>{selectedStrategy?.deck_id ?? "—"}</strong></div>
