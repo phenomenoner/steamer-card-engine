@@ -95,3 +95,32 @@ Switch service back to previous chartfix release:
 ## Remaining product work
 
 This slice makes the IA visible and truthful. Later slices can enrich the overview if/when the observer bundle includes true portfolio-level PnL or multi-symbol trade aggregates.
+
+## AWS deployment receipt
+
+Deployed after local verifier pass.
+
+```text
+release=/opt/trading/releases/steamer-card-engine-observer-ui-v0-strategy-ia-slice1-20260429T035902Z-75036d2
+s3=s3://lyria-trading-ops-975050019139-ap-east-2/staging/steamer-card-engine-observer-ui-v0-strategy-ia-slice1-20260429T035902Z-75036d2.tar.gz
+service=steamer-observer-dashboard.service
+url=http://43.213.34.167/
+```
+
+Remote smoke:
+
+```text
+GET / -> <title>Steamer Observer Monitor</title>
+frontend asset -> /assets/index-CVxPt2tU.js
+GET /api/health -> 200 OK / {"status":"ok"}
+GET /api/observer/sessions/aws-live-sim-20260427/bootstrap -> symbol=1314.TW, candles=200, latest_seq=229, open_orders=0, position.side=flat
+remote JS markers -> Strategy Card Overview / Strategy Card selector / Symbol Detail / PnL truth present
+```
+
+Live-sim process check after deploy:
+
+```text
+/opt/trading/current/.venv/bin/python -m strategy_async remained running; dashboard sidecar restart only.
+```
+
+Topology statement: read-only dashboard sidecar frontend release changed. Security group, public port, live-sim runtime, broker authority, and bundle path did not change.
