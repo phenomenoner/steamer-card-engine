@@ -98,9 +98,54 @@ function normalizeSymbolSessionMap(value: unknown): Record<string, string[]> {
     const key = typeof symbol === "string" ? symbol.trim() : "";
     if (!key) return;
     const ids = normalizeSymbolList(sessionIds);
-    if (ids.length) normalized[key] = ids;
+    if (!ids.length) return;
+    symbolAliases(key).forEach((alias) => {
+      normalized[alias] = ids;
+    });
   });
   return normalized;
+}
+
+function symbolAliases(symbol: string | null | undefined): string[] {
+  const raw = typeof symbol === "string" ? symbol.trim() : "";
+  if (!raw) return [];
+  const aliases = new Set<string>([raw]);
+  const upper = raw.toUpperCase();
+  aliases.add(upper);
+  if (upper.endsWith(".TW")) aliases.add(upper.slice(0, -3));
+  if (/^\d{4,6}[A-Z]?$/.test(upper)) aliases.add(`${upper}.TW`);
+  return [...aliases].filter(Boolean);
+}
+
+function resolveMountedSymbolSessionId(
+  symbol: string | null | undefined,
+  strategy: StrategyRun | null | undefined,
+  fallbackMap: Record<string, string[]>,
+): string | null {
+  for (const alias of symbolAliases(symbol)) {
+    const strategySession = strategy?.session_ids_by_symbol[alias]?.[0];
+    if (strategySession) return strategySession;
+    const fallbackSession = fallbackMap[alias]?.[0];
+    if (fallbackSession) return fallbackSession;
+  }
+  return null;
+}
+
+function defaultSymbolView(
+  strategy: StrategyRun | null | undefined,
+  loadedSessions: ObserverSession[],
+  fallbackMap: Record<string, string[]>,
+  defaultSessionId?: string | null,
+): string {
+  const defaultSession = loadedSessions.find((session) => session.session_id === defaultSessionId);
+  if (defaultSession?.symbol && resolveMountedSymbolSessionId(defaultSession.symbol, strategy, fallbackMap)) return defaultSession.symbol;
+  for (const session of loadedSessions) {
+    if (session.symbol && resolveMountedSymbolSessionId(session.symbol, strategy, fallbackMap)) return session.symbol;
+  }
+  for (const symbol of strategy?.symbols ?? []) {
+    if (resolveMountedSymbolSessionId(symbol, strategy, fallbackMap)) return symbol;
+  }
+  return OVERVIEW_VIEW_ID;
 }
 
 const OVERVIEW_VIEW_ID = "__overview__";
@@ -837,14 +882,18 @@ export function ObserverSurface() {
           return;
         }
         setHasNoSession(false);
+        const strategyForDefaultSession = normalizedStrategies.find((strategy) =>
+          strategy.session_ids.includes(payload.default_session_id ?? ""),
+        );
+        const fallbackStrategy = strategyForDefaultSession ?? normalizedStrategies[0] ?? null;
         setSelectedStrategyId((current) => {
           if (current && normalizedStrategies.some((strategy) => strategy.strategy_id === current)) return current;
-          const strategyForDefaultSession = normalizedStrategies.find((strategy) =>
-            strategy.session_ids.includes(payload.default_session_id ?? ""),
-          );
-          return strategyForDefaultSession?.strategy_id ?? normalizedStrategies[0]?.strategy_id ?? null;
+          return fallbackStrategy?.strategy_id ?? null;
         });
-        setSelectedView(OVERVIEW_VIEW_ID);
+        setSelectedView((current) => {
+          if (current !== OVERVIEW_VIEW_ID && resolveMountedSymbolSessionId(current, fallbackStrategy, normalizedSessionMap)) return current;
+          return defaultSymbolView(fallbackStrategy, loadedSessions, normalizedSessionMap, payload.default_session_id);
+        });
         setError(null);
       } catch (reason) {
         setError(String(reason));
@@ -865,15 +914,14 @@ export function ObserverSurface() {
 
   useEffect(() => {
     if (selectedView === OVERVIEW_VIEW_ID) return;
+    if (resolveMountedSymbolSessionId(selectedView, selectedStrategy, sessionIdsBySymbol)) return;
     if (selectedStrategy?.symbols.includes(selectedView)) return;
     setSelectedView(OVERVIEW_VIEW_ID);
-  }, [selectedStrategy, selectedView]);
+  }, [selectedStrategy, selectedView, sessionIdsBySymbol]);
 
   const strategySummarySessionId = selectedStrategy?.default_session_id ?? selectedStrategy?.session_ids[0] ?? null;
   const selectedSymbol = selectedView === OVERVIEW_VIEW_ID ? null : selectedView;
-  const mountedSymbolSessionId = selectedSymbol
-    ? selectedStrategy?.session_ids_by_symbol[selectedSymbol]?.[0] ?? sessionIdsBySymbol[selectedSymbol]?.[0] ?? null
-    : null;
+  const mountedSymbolSessionId = selectedSymbol ? resolveMountedSymbolSessionId(selectedSymbol, selectedStrategy, sessionIdsBySymbol) : null;
   const hasMountedSymbolSession = Boolean(selectedSymbol && mountedSymbolSessionId);
   const isOverviewMode = selectedView === OVERVIEW_VIEW_ID;
   const activeSessionId = hasMountedSymbolSession ? mountedSymbolSessionId : strategySummarySessionId;
