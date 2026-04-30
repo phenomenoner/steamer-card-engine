@@ -1,0 +1,67 @@
+{
+  "activation": "plan-only",
+  "blockers": [
+    {
+      "actual_cards": [
+        "real-trade-gate-short-first-cover-v1",
+        "real-trade-gate-short-first-entry-v1"
+      ],
+      "code": "stage1-deck-card-contract-mismatch",
+      "detail": "Stage 1 planner requires the exact ordered short-first entry then cover card sequence",
+      "expected_cards": [
+        "real-trade-gate-short-first-entry-v1",
+        "real-trade-gate-short-first-cover-v1"
+      ]
+    }
+  ],
+  "boundary": "no broker login, no live arm, no order submission",
+  "cli_contract": {
+    "command": "operator plan-real-trade-gate",
+    "exit_class": "operator-refused",
+    "exit_code": 4,
+    "status": "refused",
+    "status_key": "plan_status",
+    "version": "cli-command/v1"
+  },
+  "ok": false,
+  "plan": {
+    "deck_id": "tmp-stage1-reversed",
+    "deck_ref": "/tmp/reversed_stage1.toml",
+    "deck_symbol_scope": [
+      "2330"
+    ],
+    "dispatch_boundary": "plan-only; no broker submission executed",
+    "entry_leg": {
+      "quantity": 1,
+      "side": "sell",
+      "symbol": "2330"
+    },
+    "exit_leg": {
+      "broker_order_side": "buy",
+      "delay_seconds_after_entry_terminal": 10,
+      "quantity": 1,
+      "side": "cover",
+      "symbol": "2330"
+    },
+    "max_entry_orders_per_run": 1,
+    "max_exit_orders_per_run": 1,
+    "max_round_trips_per_day": 1,
+    "real_trade_gate_policy": {
+      "entry_side": "sell",
+      "exit_side": "cover",
+      "max_entry_orders_per_run": 1,
+      "max_exit_orders_per_run": 1,
+      "max_round_trips_per_day": 1,
+      "requires_shortable_symbol_allowlist": true,
+      "stage": "stage1-short-capability-smoke"
+    },
+    "required_cards": [
+      "real-trade-gate-short-first-entry-v1",
+      "real-trade-gate-short-first-cover-v1"
+    ],
+    "stage": "real-trade-gate-stage1-short-capability-smoke"
+  },
+  "plan_status": "refused",
+  "receipt_path": ".state/real_trade_gate_final_smoke/reversed_receipts/20260430T102717Z_plan-real-trade-gate_op-eba00c9cec3.json",
+  "warnings": []
+}

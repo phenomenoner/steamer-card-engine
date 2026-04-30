@@ -18,10 +18,10 @@ OPERATOR_CONFIRMATION_REQUIRED_EXIT = 5
 MIN_ARM_TTL_SECONDS = 30
 MAX_ARM_TTL_SECONDS = 8 * 60 * 60
 
-STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS = {
+STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS = (
     "real-trade-gate-short-first-entry-v1",
     "real-trade-gate-short-first-cover-v1",
-}
+)
 STAGE1_REAL_TRADE_GATE_POLICY = {
     "stage": "stage1-short-capability-smoke",
     "entry_side": "sell",
@@ -810,14 +810,14 @@ def operator_plan_real_trade_gate(
         deck_id, deck_path = _resolve_deck(deck_ref)
         deck = load_deck_manifest(deck_path)
         deck_symbols = list(deck.symbol_scope)
-        actual_cards = set(deck.cards)
-        if actual_cards != STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS:
+        actual_cards = list(deck.cards)
+        if actual_cards != list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS):
             blockers.append(
                 {
                     "code": "stage1-deck-card-contract-mismatch",
-                    "detail": "Stage 1 planner requires exactly the short-first entry and cover cards",
-                    "expected_cards": sorted(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
-                    "actual_cards": sorted(actual_cards),
+                    "detail": "Stage 1 planner requires the exact ordered short-first entry then cover card sequence",
+                    "expected_cards": list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
+                    "actual_cards": actual_cards,
                 }
             )
         real_trade_gate_policy = _load_real_trade_gate_policy(deck_path)
@@ -875,7 +875,7 @@ def operator_plan_real_trade_gate(
             "deck_id": deck_id,
             "deck_ref": deck_path,
             "deck_symbol_scope": sorted(deck_symbols),
-            "required_cards": sorted(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
+            "required_cards": list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
             "real_trade_gate_policy": real_trade_gate_policy,
             "entry_leg": {"side": entry_side, "symbol": symbol, "quantity": quantity},
             "exit_leg": {

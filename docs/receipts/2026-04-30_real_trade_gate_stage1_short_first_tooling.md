@@ -45,8 +45,8 @@ Accepted plan emits:
 
 ## Verifier receipts
 Pytest / lint:
-- command: `uv run ruff check src/steamer_card_engine/operator_control.py tests/test_validation_smoke_operator_lane.py tests/test_manifests.py && uv run pytest tests/test_validation_smoke_cards.py tests/test_validation_smoke_operator_lane.py tests/test_manifests.py -q`
-- result: `All checks passed`; `24 passed in 0.25s`
+- command: `uv run ruff check src/steamer_card_engine/operator_control.py tests/test_validation_smoke_operator_lane.py && uv run pytest tests/test_validation_smoke_operator_lane.py tests/test_manifests.py tests/test_validation_smoke_cards.py -q`
+- result: `All checks passed`; `26 passed in 0.20s`
 
 Counterfactual CLI artifacts:
 - accepted strict stage1 plan: `docs/receipts/artifacts/2026-04-30_real_trade_gate_tighten_accept.json`
@@ -62,9 +62,13 @@ Counterfactual CLI artifacts:
 - non-trade profile refusal: `docs/receipts/artifacts/2026-04-30_real_trade_gate_tighten_non_trade.json`
   - result: `plan_status=refused`
   - blocker: `trade-disabled`
+- reversed deck refusal: `docs/receipts/artifacts/2026-04-30_real_trade_gate_final_reversed_deck.json`
+  - result: `plan_status=refused`
+  - blocker: `stage1-deck-card-contract-mismatch`
 
 ## QA follow-up resolved
-- Stage-1 planner now enforces expected short-first cards and policy fields.
+- Stage-1 planner now enforces the exact ordered short-first card sequence and policy fields.
+- Duplicate card decks refuse through manifest validation; reversed card decks refuse through the Stage-1 card contract.
 - Buy-first no longer gets a soft warning; it is blocked for this Stage 1 gate.
 - Exit semantics now preserve canonical `cover` while exposing `broker_order_side=buy`.
 - Normal planner refusal paths emit JSON + receipt + CLI contract.
