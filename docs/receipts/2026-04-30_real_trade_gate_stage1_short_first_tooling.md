@@ -29,6 +29,7 @@ Hard refusals include:
 - missing or mismatched `[policy.real_trade_gate]`
 - buy-first request (`stage1-requires-sell-first`)
 - sell-first requested but symbol is not in explicit `--shortable-symbol` allowlist
+  - note: this is `shortability_source=operator_allowlist`, not broker-verified proof
 - symbol not in deck scope
 - non-positive quantity or exit delay
 - profile lacks trade/account/marketdata capability
@@ -53,6 +54,8 @@ Counterfactual CLI artifacts:
   - result: `plan_status=planned`
   - blockers: none
   - exit leg: `cover`
+  - required cards: entry -> cover
+  - shortability source: `operator_allowlist` / self-attested, pending Stage0 broker/account proof
 - unrelated deck refusal: `docs/receipts/artifacts/2026-04-30_real_trade_gate_tighten_unrelated_deck.json`
   - result: `plan_status=refused`
   - blockers: `stage1-deck-card-contract-mismatch`, `real-trade-gate-policy-missing`
@@ -76,6 +79,8 @@ Counterfactual CLI artifacts:
 
 ## Deferred note
 Malformed deck manifest JSON-envelope handling is improved for this planner through caught `ManifestValidationError` after deck resolution, but broader CLI-wide manifest error JSON standardization remains a separate CLI contract hardening line.
+
+Before live credentials / live arming, Stage0 must produce broker/account evidence for daytrade/shortability when exposed by the broker. The planner's `--shortable-symbol` flag is only an operator allowlist assertion and must not be described as broker-verified short capability.
 
 ## Topology statement
 Topology unchanged. This is repo-local CLI/card/deck tooling, docs, and receipt artifacts only; no scheduler, runtime config, broker credential, or gateway topology changed.

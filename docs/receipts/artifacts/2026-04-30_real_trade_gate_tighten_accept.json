@@ -44,12 +44,14 @@
       "stage": "stage1-short-capability-smoke"
     },
     "required_cards": [
-      "real-trade-gate-short-first-cover-v1",
-      "real-trade-gate-short-first-entry-v1"
+      "real-trade-gate-short-first-entry-v1",
+      "real-trade-gate-short-first-cover-v1"
     ],
+    "shortability_source": "operator_allowlist",
+    "shortability_source_detail": "--shortable-symbol is operator-supplied/self-attested; broker-verified short/daytrade capability remains a Stage0 live read-only preflight requirement before credentials/live arming.",
     "stage": "real-trade-gate-stage1-short-capability-smoke"
   },
   "plan_status": "planned",
-  "receipt_path": ".state/real_trade_gate_tighten_smoke/accept_receipts/20260430T101607Z_plan-real-trade-gate_op-09d94e76863.json",
+  "receipt_path": ".state/real_trade_gate_final_smoke/accept_receipts/20260430T103916Z_plan-real-trade-gate_op-15a03284f6f.json",
   "warnings": []
 }
