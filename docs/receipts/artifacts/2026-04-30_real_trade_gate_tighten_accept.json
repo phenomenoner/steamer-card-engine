@@ -1,0 +1,55 @@
+{
+  "activation": "plan-only",
+  "blockers": [],
+  "boundary": "no broker login, no live arm, no order submission",
+  "cli_contract": {
+    "command": "operator plan-real-trade-gate",
+    "exit_class": "success",
+    "exit_code": 0,
+    "status": "planned",
+    "status_key": "plan_status",
+    "version": "cli-command/v1"
+  },
+  "ok": true,
+  "plan": {
+    "deck_id": "tw-cash-real-trade-gate-stage1-short-first",
+    "deck_ref": "/root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_real_trade_gate_stage1_short_first.toml",
+    "deck_symbol_scope": [
+      "2330"
+    ],
+    "dispatch_boundary": "plan-only; no broker submission executed",
+    "entry_leg": {
+      "quantity": 1,
+      "side": "sell",
+      "symbol": "2330"
+    },
+    "exit_leg": {
+      "broker_order_side": "buy",
+      "delay_seconds_after_entry_terminal": 10,
+      "quantity": 1,
+      "side": "cover",
+      "symbol": "2330"
+    },
+    "max_entry_orders_per_run": 1,
+    "max_exit_orders_per_run": 1,
+    "max_round_trips_per_day": 1,
+    "real_trade_gate_policy": {
+      "boundary": "requires operator plan-real-trade-gate precheck before live arming",
+      "entry_side": "sell",
+      "exit_side": "cover",
+      "max_entry_orders_per_run": 1,
+      "max_exit_orders_per_run": 1,
+      "max_round_trips_per_day": 1,
+      "requires_shortable_symbol_allowlist": true,
+      "stage": "stage1-short-capability-smoke"
+    },
+    "required_cards": [
+      "real-trade-gate-short-first-cover-v1",
+      "real-trade-gate-short-first-entry-v1"
+    ],
+    "stage": "real-trade-gate-stage1-short-capability-smoke"
+  },
+  "plan_status": "planned",
+  "receipt_path": ".state/real_trade_gate_tighten_smoke/accept_receipts/20260430T101607Z_plan-real-trade-gate_op-09d94e76863.json",
+  "warnings": []
+}

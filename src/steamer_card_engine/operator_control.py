@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
 import os
+import tomllib
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from steamer_card_engine.manifest import load_auth_profile, load_deck_manifest
+from steamer_card_engine.manifest import ManifestValidationError, load_auth_profile, load_deck_manifest
 
 
 OPERATOR_REFUSED_EXIT = 4
@@ -16,6 +17,20 @@ OPERATOR_CONFIRMATION_REQUIRED_EXIT = 5
 
 MIN_ARM_TTL_SECONDS = 30
 MAX_ARM_TTL_SECONDS = 8 * 60 * 60
+
+STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS = {
+    "real-trade-gate-short-first-entry-v1",
+    "real-trade-gate-short-first-cover-v1",
+}
+STAGE1_REAL_TRADE_GATE_POLICY = {
+    "stage": "stage1-short-capability-smoke",
+    "entry_side": "sell",
+    "exit_side": "cover",
+    "max_entry_orders_per_run": 1,
+    "max_exit_orders_per_run": 1,
+    "max_round_trips_per_day": 1,
+    "requires_shortable_symbol_allowlist": True,
+}
 
 
 @dataclass(slots=True)
@@ -704,6 +719,44 @@ def operator_submit_order_smoke(
     )
 
 
+def _load_real_trade_gate_policy(deck_path: str | None) -> dict[str, Any]:
+    if not deck_path:
+        return {}
+    with Path(deck_path).open("rb") as file:
+        payload = tomllib.load(file)
+    policy = payload.get("policy")
+    if not isinstance(policy, dict):
+        return {}
+    real_trade_gate = policy.get("real_trade_gate")
+    if not isinstance(real_trade_gate, dict):
+        return {}
+    return real_trade_gate
+
+
+def _stage1_policy_blockers(policy: dict[str, Any]) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not policy:
+        return [
+            {
+                "code": "real-trade-gate-policy-missing",
+                "detail": "deck must define [policy.real_trade_gate] for Stage 1 planner",
+            }
+        ]
+
+    for key, expected in STAGE1_REAL_TRADE_GATE_POLICY.items():
+        actual = policy.get(key)
+        if actual != expected:
+            blockers.append(
+                {
+                    "code": f"stage1-policy-{key.replace('_', '-')}-mismatch",
+                    "detail": f"policy.real_trade_gate.{key} must be {expected!r}",
+                    "expected": expected,
+                    "actual": actual,
+                }
+            )
+    return blockers
+
+
 def operator_plan_real_trade_gate(
     *,
     state_file: Path,
@@ -737,6 +790,13 @@ def operator_plan_real_trade_gate(
 
     if entry_side not in {"buy", "sell"}:
         blockers.append({"code": "invalid-entry-side", "detail": "entry_side must be buy or sell"})
+    if entry_side != "sell":
+        blockers.append(
+            {
+                "code": "stage1-requires-sell-first",
+                "detail": "Stage 1 real-trade gate requires sell-first to prove short/day-trade capability",
+            }
+        )
     if quantity < 1:
         blockers.append({"code": "invalid-quantity", "detail": "quantity must be >= 1"})
     if exit_delay_seconds < 1:
@@ -745,18 +805,43 @@ def operator_plan_real_trade_gate(
     deck_id: str | None = None
     deck_path: str | None = None
     deck_symbols: list[str] = []
+    real_trade_gate_policy: dict[str, Any] = {}
     try:
         deck_id, deck_path = _resolve_deck(deck_ref)
         deck = load_deck_manifest(deck_path)
         deck_symbols = list(deck.symbol_scope)
+        actual_cards = set(deck.cards)
+        if actual_cards != STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS:
+            blockers.append(
+                {
+                    "code": "stage1-deck-card-contract-mismatch",
+                    "detail": "Stage 1 planner requires exactly the short-first entry and cover cards",
+                    "expected_cards": sorted(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
+                    "actual_cards": sorted(actual_cards),
+                }
+            )
+        real_trade_gate_policy = _load_real_trade_gate_policy(deck_path)
+        blockers.extend(_stage1_policy_blockers(real_trade_gate_policy))
         if symbol not in set(deck.symbol_scope):
-            blockers.append({
-                "code": "symbol-not-in-deck-scope",
-                "detail": f"symbol {symbol} is not in deck symbol_scope",
-                "deck_symbol_scope": sorted(deck.symbol_scope),
-            })
+            blockers.append(
+                {
+                    "code": "symbol-not-in-deck-scope",
+                    "detail": f"symbol {symbol} is not in deck symbol_scope",
+                    "deck_symbol_scope": sorted(deck.symbol_scope),
+                }
+            )
     except FileNotFoundError as error:
         blockers.append({"code": "deck-unresolved", "detail": str(error)})
+    except ManifestValidationError as error:
+        blockers.append(
+            {
+                "code": "deck-manifest-invalid",
+                "detail": str(error),
+                "manifest_type": error.manifest_type,
+                "path": str(error.path),
+                "errors": list(error.errors),
+            }
+        )
 
     if not state["capabilities"].get("trade_enabled"):
         blockers.append({"code": "trade-disabled", "detail": "auth profile trade_enabled=false"})
@@ -765,24 +850,22 @@ def operator_plan_real_trade_gate(
     if not state["capabilities"].get("marketdata_enabled"):
         blockers.append({"code": "marketdata-disabled", "detail": "auth profile marketdata_enabled=false"})
 
-    if entry_side == "sell":
-        if symbol not in set(shortable_symbols):
-            blockers.append({
+    if symbol not in set(shortable_symbols):
+        blockers.append(
+            {
                 "code": "short-capability-unproven",
                 "detail": "sell-first smoke requires an explicit shortable/daytrade-capable symbol allowlist hit",
                 "symbol": symbol,
-            })
-    else:
-        warnings.append({
-            "code": "buy-first-does-not-prove-daytrade-shortability",
-            "detail": "buy-first can pass on a non-daytrade-capable symbol; use sell-first for CK Stage 1 unless explicitly testing long-only",
-        })
+            }
+        )
 
     if state.get("armed_live"):
         blockers.append({"code": "posture-already-armed", "detail": "planning gate refuses while armed_live=true"})
 
     status = "planned" if not blockers else "refused"
-    exit_leg_side = "buy" if entry_side == "sell" else "sell"
+    configured_exit_side = str(real_trade_gate_policy.get("exit_side") or "cover")
+    exit_leg_side = configured_exit_side if configured_exit_side in {"cover", "sell", "buy"} else "cover"
+    broker_order_side = "buy" if exit_leg_side == "cover" else exit_leg_side
     details = {
         "request": request,
         "blockers": blockers,
@@ -792,8 +875,16 @@ def operator_plan_real_trade_gate(
             "deck_id": deck_id,
             "deck_ref": deck_path,
             "deck_symbol_scope": sorted(deck_symbols),
+            "required_cards": sorted(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
+            "real_trade_gate_policy": real_trade_gate_policy,
             "entry_leg": {"side": entry_side, "symbol": symbol, "quantity": quantity},
-            "exit_leg": {"side": exit_leg_side, "symbol": symbol, "quantity": quantity, "delay_seconds_after_entry_terminal": exit_delay_seconds},
+            "exit_leg": {
+                "side": exit_leg_side,
+                "broker_order_side": broker_order_side,
+                "symbol": symbol,
+                "quantity": quantity,
+                "delay_seconds_after_entry_terminal": exit_delay_seconds,
+            },
             "max_entry_orders_per_run": 1,
             "max_exit_orders_per_run": 1,
             "max_round_trips_per_day": 1,

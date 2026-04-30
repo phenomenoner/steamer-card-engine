@@ -45,6 +45,24 @@ def test_validation_smoke_manifests_validate() -> None:
     ]
 
 
+
+def test_real_trade_gate_stage1_manifests_validate() -> None:
+    entry = load_card_manifest(REPO_ROOT / "examples/cards/real_trade_gate_short_first_entry.toml")
+    cover = load_card_manifest(REPO_ROOT / "examples/cards/real_trade_gate_short_first_cover.toml")
+    deck = load_deck_manifest(
+        REPO_ROOT / "examples/decks/tw_cash_real_trade_gate_stage1_short_first.toml"
+    )
+
+    assert entry.card_id == "real-trade-gate-short-first-entry-v1"
+    assert entry.parameters["requires_short_capability"] is True
+    assert cover.card_id == "real-trade-gate-short-first-cover-v1"
+    assert cover.parameters["requires_position_open"] is True
+    assert deck.cards == [
+        "real-trade-gate-short-first-entry-v1",
+        "real-trade-gate-short-first-cover-v1",
+    ]
+    assert deck.policy.live_mode is True
+
 def test_auth_supports_both_login_modes() -> None:
     mode_a = load_auth_profile(REPO_ROOT / "examples/profiles/tw_cash_password_auth.toml")
     mode_b = load_auth_profile(REPO_ROOT / "examples/profiles/tw_cash_agent_assist.toml")
