@@ -59,10 +59,11 @@ Use a dedicated `time_round_trip_smoke` card/deck whose only job is to test the 
 
 Recommended default:
 
-- **Prefer BUY -> SELL**, not sell-first. Sell-first creates short/locate/upper-limit-cover risk and may fail in cash accounts. Use sell-first only if the account/instrument explicitly supports it and the cover path is safer than a long exit.
-- Entry: submit exactly one minimal buy order after arming.
+- **Use SELL -> BUY/COVER as the preferred Stage 1 smoke**, because CK's gate is day-trade capability: a symbol that can be sold first is materially more likely to be eligible for the intended intraday round-trip, while buy-first can accidentally pass on a non-daytrade-capable symbol.
+- Sell-first is only allowed after an explicit shortable/daytrade-capable symbol allowlist check; without that proof the plan gate must refuse before arming.
+- Entry: submit exactly one minimal sell order after arming.
 - Wait condition: start the exit timer only after confirmed fill or partial-fill, not merely after submit.
-- Exit: submit exactly one reduce-only sell for the filled quantity after 10–30 seconds, or a slightly longer operator-approved interval if broker/market latency makes 10 seconds too tight.
+- Exit: submit exactly one buy/cover order for the filled quantity after 10–30 seconds, or a slightly longer operator-approved interval if broker/market latency makes 10 seconds too tight.
 - No-fill branch: cancel at timeout, disarm, record `no-fill terminal`; do **not** force a fill to make the story pretty.
 - Partial-fill branch: exit only the filled quantity; cancel remainder; record partial branch explicitly.
 - End condition: after one round trip or terminal no-fill/cancel branch, halt for review.
@@ -224,7 +225,7 @@ After Stage 1:
 
 ## Tradeoffs / open risks
 - A true “一張” may not be low notional depending on symbol; choose the smallest broker-supported quantity and symbol deliberately.
-- Sell-first is materially riskier than buy-first unless short/day-trade capability and cover path are proven.
+- Sell-first is the correct gate for CK's day-trade-capability proof, but it must be guarded by an explicit shortable/daytrade-capable symbol allowlist and immediate cover/kill path.
 - Ten seconds is useful for gate latency, but too short if broker lifecycle events are slow; the timer should start after fill and be operator-configurable.
 - A successful Stage 1 proves the gate and controls, not strategy quality.
 - Real-time alerts and instant kill reduce risk but do not eliminate exchange/broker latency, limit-lock, partial-fill, or disconnect risk.
@@ -232,7 +233,7 @@ After Stage 1:
 ## Second-brain review notes
 A Claude Opus safety review agreed with the staged shape and highlighted these red flags:
 
-- prefer `BUY -> SELL` over sell-first to avoid short/locate/cover complexity
+- Claude originally warned that `BUY -> SELL` is simpler, but CK's requirement changes the gate: Stage 1 should be `SELL -> BUY/COVER` with explicit short-capability proof because buy-first can pass on the wrong symbol.
 - define explicit soak/success criteria before unlocking dt3
 - use deterministic client order ids and persistent outbox/idempotency
 - reconcile broker open orders/positions on startup before sending

@@ -1,0 +1,26 @@
+deck_id = "tw-cash-real-trade-gate-stage1-short-first"
+market = "TW_CASH"
+session = "intraday"
+
+auth_profile = "profiles/tw_cash_password_auth.toml"
+
+cards = [
+  "real-trade-gate-short-first-entry-v1",
+  "real-trade-gate-short-first-cover-v1",
+]
+
+symbol_scope = ["2330"]
+
+[policy]
+live_mode = true
+allow_card_symbol_pool = true
+
+[policy.real_trade_gate]
+stage = "stage1-short-capability-smoke"
+entry_side = "sell"
+exit_side = "cover"
+max_entry_orders_per_run = 1
+max_exit_orders_per_run = 1
+max_round_trips_per_day = 1
+requires_shortable_symbol_allowlist = true
+boundary = "requires operator plan-real-trade-gate precheck before live arming"

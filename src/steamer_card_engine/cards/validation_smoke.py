@@ -78,3 +78,28 @@ def no_trade_guard() -> Card:
         card_id="smoke-no-trade-guard-v1",
         version="0.1.0",
     )
+
+
+def short_first_entry_once() -> Card:
+    return ValidationSmokeCard(
+        card_id="real-trade-gate-short-first-entry-v1",
+        version="0.1.0",
+        symbol="2330",
+        trigger_tag="short_first_entry_once",
+        side="sell",
+        intent_type="enter",
+        reason="real trade gate short-capability smoke entry triggered",
+    )
+
+
+def short_first_cover_once() -> Card:
+    return ValidationSmokeCard(
+        card_id="real-trade-gate-short-first-cover-v1",
+        version="0.1.0",
+        symbol="2330",
+        trigger_tag="short_first_cover_once",
+        side="cover",
+        intent_type="exit",
+        reason="real trade gate short-capability smoke cover triggered",
+        require_position_open=True,
+    )

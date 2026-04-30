@@ -704,6 +704,128 @@ def operator_submit_order_smoke(
     )
 
 
+def operator_plan_real_trade_gate(
+    *,
+    state_file: Path,
+    receipt_dir: Path,
+    auth_profile_path: str,
+    deck_ref: str,
+    symbol: str,
+    entry_side: str,
+    quantity: int,
+    exit_delay_seconds: int,
+    shortable_symbols: list[str],
+    operator_id: str | None,
+    operator_note: str | None,
+) -> OperatorResult:
+    state = load_operator_state(state_file)
+    _apply_auth_profile(state, auth_profile_path=auth_profile_path, session_id=None)
+    _maybe_auto_disarm(state=state, state_file=state_file, receipt_dir=receipt_dir)
+
+    resolved_operator = _resolve_operator_id(operator_id)
+    request = {
+        "deck": deck_ref,
+        "symbol": symbol,
+        "entry_side": entry_side,
+        "quantity": quantity,
+        "exit_delay_seconds": exit_delay_seconds,
+        "shortable_symbols": sorted(set(shortable_symbols)),
+    }
+
+    blockers: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+
+    if entry_side not in {"buy", "sell"}:
+        blockers.append({"code": "invalid-entry-side", "detail": "entry_side must be buy or sell"})
+    if quantity < 1:
+        blockers.append({"code": "invalid-quantity", "detail": "quantity must be >= 1"})
+    if exit_delay_seconds < 1:
+        blockers.append({"code": "invalid-exit-delay", "detail": "exit_delay_seconds must be >= 1"})
+
+    deck_id: str | None = None
+    deck_path: str | None = None
+    deck_symbols: list[str] = []
+    try:
+        deck_id, deck_path = _resolve_deck(deck_ref)
+        deck = load_deck_manifest(deck_path)
+        deck_symbols = list(deck.symbol_scope)
+        if symbol not in set(deck.symbol_scope):
+            blockers.append({
+                "code": "symbol-not-in-deck-scope",
+                "detail": f"symbol {symbol} is not in deck symbol_scope",
+                "deck_symbol_scope": sorted(deck.symbol_scope),
+            })
+    except FileNotFoundError as error:
+        blockers.append({"code": "deck-unresolved", "detail": str(error)})
+
+    if not state["capabilities"].get("trade_enabled"):
+        blockers.append({"code": "trade-disabled", "detail": "auth profile trade_enabled=false"})
+    if not state["capabilities"].get("account_query_enabled"):
+        blockers.append({"code": "account-query-disabled", "detail": "auth profile account_query_enabled=false"})
+    if not state["capabilities"].get("marketdata_enabled"):
+        blockers.append({"code": "marketdata-disabled", "detail": "auth profile marketdata_enabled=false"})
+
+    if entry_side == "sell":
+        if symbol not in set(shortable_symbols):
+            blockers.append({
+                "code": "short-capability-unproven",
+                "detail": "sell-first smoke requires an explicit shortable/daytrade-capable symbol allowlist hit",
+                "symbol": symbol,
+            })
+    else:
+        warnings.append({
+            "code": "buy-first-does-not-prove-daytrade-shortability",
+            "detail": "buy-first can pass on a non-daytrade-capable symbol; use sell-first for CK Stage 1 unless explicitly testing long-only",
+        })
+
+    if state.get("armed_live"):
+        blockers.append({"code": "posture-already-armed", "detail": "planning gate refuses while armed_live=true"})
+
+    status = "planned" if not blockers else "refused"
+    exit_leg_side = "buy" if entry_side == "sell" else "sell"
+    details = {
+        "request": request,
+        "blockers": blockers,
+        "warnings": warnings,
+        "plan": {
+            "stage": "real-trade-gate-stage1-short-capability-smoke",
+            "deck_id": deck_id,
+            "deck_ref": deck_path,
+            "deck_symbol_scope": sorted(deck_symbols),
+            "entry_leg": {"side": entry_side, "symbol": symbol, "quantity": quantity},
+            "exit_leg": {"side": exit_leg_side, "symbol": symbol, "quantity": quantity, "delay_seconds_after_entry_terminal": exit_delay_seconds},
+            "max_entry_orders_per_run": 1,
+            "max_exit_orders_per_run": 1,
+            "max_round_trips_per_day": 1,
+            "dispatch_boundary": "plan-only; no broker submission executed",
+        },
+    }
+    receipt = _write_receipt(
+        receipt_dir=receipt_dir,
+        action="plan-real-trade-gate",
+        status=status,
+        operator_id=resolved_operator,
+        operator_note=operator_note,
+        state_file=state_file,
+        details=details,
+        state=state,
+    )
+    _append_recent_action(state, receipt)
+    save_operator_state(state_file, state)
+
+    payload = {
+        "ok": not blockers,
+        "plan_status": status,
+        "activation": "plan-only",
+        "boundary": "no broker login, no live arm, no order submission",
+        "blockers": blockers,
+        "warnings": warnings,
+        "plan": details["plan"],
+        "receipt_path": receipt["receipt_path"],
+    }
+    return OperatorResult(payload=payload, exit_code=0 if not blockers else OPERATOR_REFUSED_EXIT)
+
+
 def operator_live_smoke_readiness(
     *,
     state_file: Path,

@@ -1,0 +1,38 @@
+card_id = "real-trade-gate-short-first-entry-v1"
+name = "Real Trade Gate Short First Entry"
+version = "0.1.0"
+strategy_family = "real-trade-gate-smoke"
+instrument_scope = ["TW_EQUITY"]
+status = "operator-approved"
+entry_module = "steamer_card_engine.cards.validation_smoke:short_first_entry_once"
+
+symbol_pool = ["2330"]
+feature_requirements = ["live.order_lifecycle", "operator.shortable_symbol_allowlist", "fixture.signal.short_first_entry_once"]
+
+[parameters]
+trigger = "short_first_entry_once"
+side = "sell"
+max_entries = 1
+requires_short_capability = true
+
+[capital_controls]
+max_order_notional = 50000
+max_daily_notional = 50000
+max_open_positions = 1
+
+[risk_policy.stop_loss]
+mode = "percent_from_entry"
+value = 0.5
+
+[risk_policy.take_profit]
+mode = "timed_exit_seconds"
+value = 10
+
+[risk_policy.forced_exit]
+start_time = "13:18:00"
+end_time = "13:25:00"
+
+[metadata]
+owner = "operator"
+purpose = "Stage 1 real-trade gate smoke: sell-first proves day-trade/short-capable symbol before cover leg"
+boundary = "manifest-only; no broker submission by itself"

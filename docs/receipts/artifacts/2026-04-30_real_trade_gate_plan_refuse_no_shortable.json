@@ -1,0 +1,46 @@
+{
+  "activation": "plan-only",
+  "blockers": [
+    {
+      "code": "short-capability-unproven",
+      "detail": "sell-first smoke requires an explicit shortable/daytrade-capable symbol allowlist hit",
+      "symbol": "2330"
+    }
+  ],
+  "boundary": "no broker login, no live arm, no order submission",
+  "cli_contract": {
+    "command": "operator plan-real-trade-gate",
+    "exit_class": "operator-refused",
+    "exit_code": 4,
+    "status": "refused",
+    "status_key": "plan_status",
+    "version": "cli-command/v1"
+  },
+  "ok": false,
+  "plan": {
+    "deck_id": "tw-cash-real-trade-gate-stage1-short-first",
+    "deck_ref": "/root/.openclaw/workspace/steamer-card-engine/examples/decks/tw_cash_real_trade_gate_stage1_short_first.toml",
+    "deck_symbol_scope": [
+      "2330"
+    ],
+    "dispatch_boundary": "plan-only; no broker submission executed",
+    "entry_leg": {
+      "quantity": 1,
+      "side": "sell",
+      "symbol": "2330"
+    },
+    "exit_leg": {
+      "delay_seconds_after_entry_terminal": 10,
+      "quantity": 1,
+      "side": "buy",
+      "symbol": "2330"
+    },
+    "max_entry_orders_per_run": 1,
+    "max_exit_orders_per_run": 1,
+    "max_round_trips_per_day": 1,
+    "stage": "real-trade-gate-stage1-short-capability-smoke"
+  },
+  "plan_status": "refused",
+  "receipt_path": ".state/real_trade_gate_plan_smoke/refuse_receipts/20260430T091515Z_plan-real-trade-gate_op-2d9c9a55bf9.json",
+  "warnings": []
+}

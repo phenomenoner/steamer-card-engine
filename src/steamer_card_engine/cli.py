@@ -26,6 +26,7 @@ from steamer_card_engine.operator_control import (
     operator_disarm_live,
     operator_flatten,
     operator_live_smoke_readiness,
+    operator_plan_real_trade_gate,
     operator_status,
     operator_submit_order_smoke,
 )
@@ -301,6 +302,29 @@ def build_parser() -> argparse.ArgumentParser:
     submit_order_smoke.add_argument("--state-file", default=".state/operator_posture.json")
     submit_order_smoke.add_argument("--receipt-dir", default=".state/operator_receipts")
     submit_order_smoke.add_argument("--json", action="store_true", dest="as_json")
+
+    plan_real_trade_gate = operator_sub.add_parser(
+        "plan-real-trade-gate",
+        help="Plan the Stage 1 real-trade gate smoke and refuse unsafe short-capability gaps without submitting orders",
+    )
+    plan_real_trade_gate.add_argument("--deck", required=True)
+    plan_real_trade_gate.add_argument("--auth-profile", required=True)
+    plan_real_trade_gate.add_argument("--symbol", required=True)
+    plan_real_trade_gate.add_argument("--entry-side", required=True, choices=("buy", "sell"))
+    plan_real_trade_gate.add_argument("--quantity", required=True, type=int)
+    plan_real_trade_gate.add_argument("--exit-delay-seconds", type=int, default=10)
+    plan_real_trade_gate.add_argument(
+        "--shortable-symbol",
+        action="append",
+        default=[],
+        dest="shortable_symbols",
+        help="Explicit operator allowlist entry proving the symbol can be sell-first/day-trade smoked (repeatable)",
+    )
+    plan_real_trade_gate.add_argument("--operator-id")
+    plan_real_trade_gate.add_argument("--operator-note")
+    plan_real_trade_gate.add_argument("--state-file", default=".state/operator_posture.json")
+    plan_real_trade_gate.add_argument("--receipt-dir", default=".state/operator_receipts")
+    plan_real_trade_gate.add_argument("--json", action="store_true", dest="as_json")
 
     live_smoke = operator_sub.add_parser(
         "live-smoke-readiness",
@@ -1896,6 +1920,33 @@ def main(argv: list[str] | None = None) -> int:
                 quantity=args.quantity,
                 operator_id=args.operator_id,
                 operator_note=args.operator_note,
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "plan-real-trade-gate":
+            result = operator_plan_real_trade_gate(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                deck_ref=args.deck,
+                symbol=args.symbol,
+                entry_side=args.entry_side,
+                quantity=args.quantity,
+                exit_delay_seconds=args.exit_delay_seconds,
+                shortable_symbols=args.shortable_symbols,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            result.payload = _attach_cli_contract(
+                result.payload,
+                command="operator plan-real-trade-gate",
+                exit_code=result.exit_code,
+                status_key="plan_status",
+                status_value=str(result.payload.get("plan_status") or "unknown"),
             )
             if args.as_json:
                 _print_json(result.payload)
