@@ -55,6 +55,9 @@ Counterfactual CLI artifacts:
   - blockers: none
   - exit leg: `cover`
   - required cards: entry -> cover
+  - plan authority: `authoritative_planned`
+  - refused payloads are explicitly `non_authoritative_refused`
+  - max-order / round-trip fields are derived from validated `[policy.real_trade_gate]`
   - shortability source: `operator_allowlist` / self-attested, pending Stage0 broker/account proof
 - unrelated deck refusal: `docs/receipts/artifacts/2026-04-30_real_trade_gate_tighten_unrelated_deck.json`
   - result: `plan_status=refused`
@@ -68,13 +71,20 @@ Counterfactual CLI artifacts:
 - reversed deck refusal: `docs/receipts/artifacts/2026-04-30_real_trade_gate_final_reversed_deck.json`
   - result: `plan_status=refused`
   - blocker: `stage1-deck-card-contract-mismatch`
+- final authoritative accept artifact: `docs/receipts/artifacts/2026-04-30_real_trade_gate_final_accept_authority.json`
+  - result: `plan_status=planned`
+  - plan authority: `authoritative_planned`
+  - shortability source: `operator_allowlist`
+- final non-authoritative refusal artifact: `docs/receipts/artifacts/2026-04-30_real_trade_gate_final_buy_first_non_authoritative.json`
+  - result: `plan_status=refused`
+  - plan authority: `non_authoritative_refused`
 
 ## QA follow-up resolved
 - Stage-1 planner now enforces the exact ordered short-first card sequence and policy fields.
 - Duplicate card decks refuse through manifest validation; reversed card decks refuse through the Stage-1 card contract.
 - Buy-first no longer gets a soft warning; it is blocked for this Stage 1 gate.
 - Exit semantics now preserve canonical `cover` while exposing `broker_order_side=buy`.
-- Normal planner refusal paths emit JSON + receipt + CLI contract.
+- Normal planner refusal paths emit JSON + receipt + CLI contract, and mark computed plan fields non-authoritative.
 - Tests now cover unrelated deck, non-trade profile, already-armed posture, invalid quantity/delay, buy-first rejection, receipt schema, CLI contract, and new manifest validation.
 
 ## Deferred note

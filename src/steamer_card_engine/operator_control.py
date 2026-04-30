@@ -863,9 +863,22 @@ def operator_plan_real_trade_gate(
         blockers.append({"code": "posture-already-armed", "detail": "planning gate refuses while armed_live=true"})
 
     status = "planned" if not blockers else "refused"
+    plan_authority = "authoritative_planned" if status == "planned" else "non_authoritative_refused"
     configured_exit_side = str(real_trade_gate_policy.get("exit_side") or "cover")
     exit_leg_side = configured_exit_side if configured_exit_side in {"cover", "sell", "buy"} else "cover"
     broker_order_side = "buy" if exit_leg_side == "cover" else exit_leg_side
+    max_entry_orders_per_run = int(
+        real_trade_gate_policy.get("max_entry_orders_per_run")
+        or STAGE1_REAL_TRADE_GATE_POLICY["max_entry_orders_per_run"]
+    )
+    max_exit_orders_per_run = int(
+        real_trade_gate_policy.get("max_exit_orders_per_run")
+        or STAGE1_REAL_TRADE_GATE_POLICY["max_exit_orders_per_run"]
+    )
+    max_round_trips_per_day = int(
+        real_trade_gate_policy.get("max_round_trips_per_day")
+        or STAGE1_REAL_TRADE_GATE_POLICY["max_round_trips_per_day"]
+    )
     details = {
         "request": request,
         "blockers": blockers,
@@ -877,6 +890,9 @@ def operator_plan_real_trade_gate(
             "deck_symbol_scope": sorted(deck_symbols),
             "required_cards": list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
             "real_trade_gate_policy": real_trade_gate_policy,
+            "plan_authority": plan_authority,
+            "shortability_source": "operator_allowlist",
+            "shortability_source_detail": "--shortable-symbol is operator-supplied/self-attested; broker-verified short/daytrade capability remains a Stage0 live read-only preflight requirement before credentials/live arming.",
             "entry_leg": {"side": entry_side, "symbol": symbol, "quantity": quantity},
             "exit_leg": {
                 "side": exit_leg_side,
@@ -885,9 +901,9 @@ def operator_plan_real_trade_gate(
                 "quantity": quantity,
                 "delay_seconds_after_entry_terminal": exit_delay_seconds,
             },
-            "max_entry_orders_per_run": 1,
-            "max_exit_orders_per_run": 1,
-            "max_round_trips_per_day": 1,
+            "max_entry_orders_per_run": max_entry_orders_per_run,
+            "max_exit_orders_per_run": max_exit_orders_per_run,
+            "max_round_trips_per_day": max_round_trips_per_day,
             "dispatch_boundary": "plan-only; no broker submission executed",
         },
     }

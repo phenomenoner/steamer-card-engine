@@ -175,6 +175,8 @@ def test_real_trade_gate_plan_accepts_sell_first_with_shortable_allowlist(capsys
     assert payload["plan"]["exit_leg"]["side"] == "cover"
     assert payload["plan"]["exit_leg"]["broker_order_side"] == "buy"
     assert payload["plan"]["max_entry_orders_per_run"] == 1
+    assert payload["plan"]["plan_authority"] == "authoritative_planned"
+    assert payload["plan"]["shortability_source"] == "operator_allowlist"
     assert payload["cli_contract"]["command"] == "operator plan-real-trade-gate"
     assert payload["cli_contract"]["status"] == "planned"
     receipt = json.loads(Path(payload["receipt_path"]).read_text())
@@ -183,6 +185,8 @@ def test_real_trade_gate_plan_accepts_sell_first_with_shortable_allowlist(capsys
     assert receipt["status"] == "planned"
     assert receipt["details"]["request"]["symbol"] == "2330"
     assert receipt["details"]["plan"]["exit_leg"]["side"] == "cover"
+    assert receipt["details"]["plan"]["plan_authority"] == "authoritative_planned"
+    assert receipt["details"]["plan"]["shortability_source"] == "operator_allowlist"
     assert receipt["posture"]["armed_live"] is False
 
 
@@ -417,6 +421,8 @@ def test_real_trade_gate_plan_rejects_buy_first_for_stage1(capsys, tmp_path: Pat
     blocker_codes = {row["code"] for row in payload["blockers"]}
     assert code == 4
     assert "stage1-requires-sell-first" in blocker_codes
+    assert payload["plan"]["plan_authority"] == "non_authoritative_refused"
+    assert payload["plan"]["shortability_source"] == "operator_allowlist"
     assert Path(payload["receipt_path"]).exists()
 
 
