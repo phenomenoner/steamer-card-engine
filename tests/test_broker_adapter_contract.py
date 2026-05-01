@@ -402,3 +402,69 @@ def test_fixture_contract_check_golden_cases_and_sanitized_public_payload() -> N
     assert "broker_native_order" in serialized
     for term in ("super-secret-token", "raw_response", "api_key", "password"):
         assert term not in serialized
+
+
+def test_fixture_replay_payload_is_deterministic_simulation_only() -> None:
+    from pathlib import Path
+
+    from steamer_card_engine.adapters.fixture_exchange import build_fixture_replay_payload
+
+    first, first_exit = build_fixture_replay_payload(
+        adapter_id="fixture-paper-only",
+        fixtures_path=Path("examples/probes/adapter_contract"),
+    )
+    second, second_exit = build_fixture_replay_payload(
+        adapter_id="fixture-paper-only",
+        fixtures_path=Path("examples/probes/adapter_contract"),
+    )
+
+    assert first_exit == second_exit == 0
+    assert first == second
+    assert first["schema_version"] == "adapter-replay/v1"
+    assert first["mode"] == "replay"
+    assert first["execution"] == "simulation-only"
+    assert first["summary"] == {
+        "decision": "pass",
+        "events": 3,
+        "allow": 1,
+        "reject": 1,
+        "noop": 1,
+        "simulation_only_intents": True,
+        "broker_native_order_count": 0,
+    }
+    assert set(first["hashes"]) == {
+        "replay_hash",
+        "replay_range_hash",
+        "fixture_hash",
+        "adapter_hash",
+        "input_hash",
+    }
+    assert first["broker_native_orders"] == []
+    assert first["live_readiness_claim"] is False
+    assert first["topology_changed"] is False
+    assert first["no_network"] is True
+    for decision in first["decisions"]:
+        assert decision["broker_native_orders"] == []
+        intent = decision["simulation_intent"]
+        if intent is not None:
+            assert intent["simulation_only"] is True
+            assert intent["intent_mode"] == "replay-simulation"
+            assert intent["broker_native_order"] is None
+            assert intent["dispatch_suppressed"] is True
+
+
+def test_fixture_replay_unknown_adapter_fails_closed_before_fixture_read() -> None:
+    from pathlib import Path
+
+    from steamer_card_engine.adapters.fixture_exchange import build_fixture_replay_payload
+
+    payload, exit_code = build_fixture_replay_payload(
+        adapter_id="live-broker",
+        fixtures_path=Path("/path/that/must/not/be/read"),
+    )
+
+    assert exit_code == 4
+    assert payload["decision"] == "reject"
+    assert payload["reason_code"] == "unknown_adapter"
+    assert payload["topology_changed"] is False
+    assert payload["no_network"] is True

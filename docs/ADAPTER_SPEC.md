@@ -297,3 +297,10 @@ The contract pins:
 - receipt envelope and public sanitizer contract
 
 Golden checks are deterministic and remain fixture-only. They do not import broker SDKs, read credentials/env/certificates, call network, read or write `/workspace/steamer`, create operator receipts, or claim live/paper readiness beyond the fixture contract.
+
+
+## Fixture-only replay simulation (Stage 2)
+
+`steamer-card-engine adapter replay --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json` replays the Stage 1 fixture cases as a deterministic historical/fixture stream. It emits `adapter-replay/v1`, replay range / fixture / adapter / stable input hashes, a decision summary, and per-event simulation-only intents.
+
+The replay surface is still fixture-only: no broker SDK imports, no network, no credential/env/certificate reads, no `/workspace/steamer` state, no operator receipts, no runtime/cron topology changes, no broker-native orders, and no live readiness claim. Unknown adapters fail closed before fixture reads.

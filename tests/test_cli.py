@@ -1288,3 +1288,60 @@ def test_adapter_contract_check_unknown_adapter_fails_closed_json_contract(capsy
     assert payload["cli_contract"]["status"] == "reject"
     assert payload["reason_code"] == "unknown_adapter"
     assert payload["topology_changed"] is False
+
+
+def test_adapter_replay_fixture_json_contract_is_stable_and_simulation_only(capsys) -> None:
+    args = [
+        "adapter",
+        "replay",
+        "--adapter",
+        "fixture-paper-only",
+        "--fixtures",
+        "examples/probes/adapter_contract",
+        "--json",
+    ]
+
+    first_code = main(args)
+    first = json.loads(capsys.readouterr().out)
+    second_code = main(args)
+    second = json.loads(capsys.readouterr().out)
+
+    assert first_code == second_code == 0
+    assert first == second
+    assert first["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "adapter replay",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "summary.decision",
+        "status": "pass",
+    }
+    assert first["schema_version"] == "adapter-replay/v1"
+    assert first["execution"] == "simulation-only"
+    assert first["summary"]["simulation_only_intents"] is True
+    assert first["summary"]["broker_native_order_count"] == 0
+    assert first["live_readiness_claim"] is False
+    assert first["broker_native_orders"] == []
+    assert first["topology_changed"] is False
+
+
+def test_adapter_replay_unknown_adapter_fails_closed_json_contract(capsys) -> None:
+    code = main(
+        [
+            "adapter",
+            "replay",
+            "--adapter",
+            "live-broker",
+            "--fixtures",
+            "/path/that/must/not/be/read",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert payload["cli_contract"]["command"] == "adapter replay"
+    assert payload["cli_contract"]["exit_class"] == "operator-refused"
+    assert payload["cli_contract"]["status"] == "reject"
+    assert payload["reason_code"] == "unknown_adapter"
+    assert payload["topology_changed"] is False

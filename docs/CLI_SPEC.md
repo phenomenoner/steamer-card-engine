@@ -309,6 +309,7 @@ Examples:
 steamer-card-engine adapter probe --fixture paper-only --json
 steamer-card-engine adapter explain --adapter fixture-paper-only --json
 steamer-card-engine adapter contract check --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json
+steamer-card-engine adapter replay --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json
 ```
 
 Responsibilities:
@@ -316,6 +317,7 @@ Responsibilities:
 - expose adapter identity, capability profile, dispatch boundary, and topology status
 - pin the Stage 1 machine-readable contract for input context, normalized signal/order-intent candidate, reject/no-op reasons, receipt envelope, and sanitizer behavior
 - run deterministic golden fixture checks with stable reason codes (`paper_preflight_allowed`, `capability_mismatch`, `signal_no_action`)
+- run a Stage 2 replay-only fixture stream that emits `adapter-replay/v1`, replay/fixture/adapter/input hashes, deterministic decisions, and simulation-only intents
 - never emit broker-native orders; candidates remain normalized intent only with dispatch suppressed
 - keep the surface fixture-only: no broker SDK, network, credential/env/certificate reads, `/workspace/steamer` state, or operator arm/disarm coupling
 

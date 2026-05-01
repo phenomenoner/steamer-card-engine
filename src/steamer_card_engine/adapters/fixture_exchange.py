@@ -19,6 +19,7 @@ from steamer_card_engine.adapters.base import (
 FIXTURE_PROBE_SCHEMA_VERSION = "adapter-probe/v0"
 FIXTURE_CONTRACT_SCHEMA_VERSION = "adapter-contract/v1"
 FIXTURE_CONTRACT_FIXTURE_SCHEMA_VERSION = "adapter-contract-fixtures/v1"
+FIXTURE_REPLAY_SCHEMA_VERSION = "adapter-replay/v1"
 FIXTURE_ADAPTER_ID = "fixture-paper-only"
 FIXTURE_ADAPTER_VENDOR = "fixture"
 FIXTURE_ADAPTER_VERSION = "v0"
@@ -315,6 +316,26 @@ def evaluate_fixture_contract_case(case: dict[str, object]) -> dict[str, object]
     }
 
 
+
+def _fixture_cases_payload(fixtures_path: Path) -> tuple[Path, dict[str, object], list[dict[str, object]]]:
+    cases_file = fixtures_path / "cases.json" if fixtures_path.is_dir() else fixtures_path
+    fixture_payload = json.loads(cases_file.read_text(encoding="utf-8"))
+    cases_raw = fixture_payload.get("cases", [])
+    cases = [case for case in cases_raw if isinstance(case, dict)] if isinstance(cases_raw, list) else []
+    return cases_file, fixture_payload, cases
+
+
+def _adapter_stable_hash() -> str:
+    adapter = FixturePaperOnlyAdapter()
+    return _stable_hash(
+        {
+            "adapter": adapter.identity.to_public_dict(),
+            "capabilities": fixture_capabilities_public_dict(adapter.capabilities),
+            "contract": fixture_contract_schema(),
+            "dispatch": FIXTURE_DISPATCH_BOUNDARY,
+        }
+    )
+
 def build_fixture_contract_check_payload(
     *, adapter_id: str, fixtures_path: Path
 ) -> tuple[dict[str, object], int]:
@@ -330,12 +351,8 @@ def build_fixture_contract_check_payload(
             "no_network": True,
         }, 4
 
-    cases_file = fixtures_path / "cases.json" if fixtures_path.is_dir() else fixtures_path
-    fixture_payload = json.loads(cases_file.read_text(encoding="utf-8"))
-    cases = fixture_payload.get("cases", [])
-    if not isinstance(cases, list):
-        cases = []
-    results = [evaluate_fixture_contract_case(case) for case in cases if isinstance(case, dict)]
+    cases_file, fixture_payload, cases = _fixture_cases_payload(fixtures_path)
+    results = [evaluate_fixture_contract_case(case) for case in cases]
     failures: list[dict[str, object]] = []
     for case, result in zip(cases, results, strict=False):
         expect = case.get("expect", {}) if isinstance(case, dict) else {}
@@ -378,6 +395,98 @@ def build_fixture_contract_check_payload(
     }
     return payload, 0 if not failures else 4
 
+
+
+def build_fixture_replay_payload(*, adapter_id: str, fixtures_path: Path) -> tuple[dict[str, object], int]:
+    """Replay fixture adapter contract cases as a deterministic simulation-only stream."""
+
+    if adapter_id != FIXTURE_ADAPTER_ID:
+        return {
+            "schema_version": FIXTURE_REPLAY_SCHEMA_VERSION,
+            "adapter": {"id": adapter_id, "vendor": "fixture", "version": "unknown"},
+            "decision": "reject",
+            "reason_code": "unknown_adapter",
+            "stable_reason": "unknown adapter is not permitted for fixture replay",
+            "dispatch": FIXTURE_DISPATCH_BOUNDARY,
+            "topology_changed": False,
+            "no_network": True,
+        }, 4
+
+    cases_file, fixture_payload, cases = _fixture_cases_payload(fixtures_path)
+    decisions: list[dict[str, object]] = []
+    for index, case in enumerate(cases):
+        result = evaluate_fixture_contract_case(case)
+        intent = result.get("order_intent_candidate")
+        simulation_intent: dict[str, object] | None = None
+        if isinstance(intent, dict):
+            simulation_intent = dict(intent)
+            simulation_intent["simulation_only"] = True
+            simulation_intent["intent_mode"] = "replay-simulation"
+            simulation_intent["dispatch_suppressed"] = True
+            simulation_intent["broker_native_order"] = None
+        decisions.append(
+            {
+                "sequence": index,
+                "case_id": result.get("case_id"),
+                "input_hash": result.get("input_hash"),
+                "normalized_signal": result.get("normalized_signal"),
+                "simulation_intent": simulation_intent,
+                "receipt": result.get("receipt"),
+                "dispatch": result.get("dispatch"),
+                "broker_native_orders": [],
+            }
+        )
+
+    fixture_hash = _stable_hash(fixture_payload)
+    replay_range_hash = _stable_hash(
+        {
+            "fixtures": str(cases_file),
+            "case_ids": [decision["case_id"] for decision in decisions],
+            "input_hashes": [decision["input_hash"] for decision in decisions],
+        }
+    )
+    adapter_hash = _adapter_stable_hash()
+    replay_hash = _stable_hash(
+        {
+            "schema_version": FIXTURE_REPLAY_SCHEMA_VERSION,
+            "adapter_hash": adapter_hash,
+            "fixture_hash": fixture_hash,
+            "replay_range_hash": replay_range_hash,
+            "decisions": decisions,
+        }
+    )
+    summary = {
+        "decision": "pass",
+        "events": len(decisions),
+        "allow": sum(1 for d in decisions if (d.get("normalized_signal") or {}).get("decision") == "allow"),
+        "reject": sum(1 for d in decisions if (d.get("normalized_signal") or {}).get("decision") == "reject"),
+        "noop": sum(1 for d in decisions if (d.get("normalized_signal") or {}).get("decision") == "noop"),
+        "simulation_only_intents": True,
+        "broker_native_order_count": 0,
+    }
+    payload = {
+        "schema_version": FIXTURE_REPLAY_SCHEMA_VERSION,
+        "fixture_schema_version": fixture_payload.get("schema_version"),
+        "adapter": FixturePaperOnlyAdapter().identity.to_public_dict(),
+        "fixtures": str(cases_file),
+        "mode": "replay",
+        "execution": "simulation-only",
+        "hashes": {
+            "replay_hash": replay_hash,
+            "replay_range_hash": replay_range_hash,
+            "fixture_hash": fixture_hash,
+            "adapter_hash": adapter_hash,
+            "input_hash": _stable_hash({"fixture_hash": fixture_hash, "adapter_hash": adapter_hash}),
+        },
+        "summary": summary,
+        "decisions": decisions,
+        "dispatch": FIXTURE_DISPATCH_BOUNDARY,
+        "broker_native_orders": [],
+        "live_readiness_claim": False,
+        "topology_changed": False,
+        "no_network": True,
+    }
+    return payload, 0
 
 def build_fixture_probe_payload(*, fixture: str, execution_mode: str) -> tuple[dict[str, object], int]:
     if fixture != "paper-only":

@@ -247,3 +247,10 @@ Added read-only fixture contract surfaces:
 - `steamer-card-engine adapter contract check --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json`
 
 Topology/config/cron impact: unchanged. These commands load local sanitized fixtures only, emit deterministic JSON, and perform no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, and no runtime topology mutation.
+
+
+## Stage 2 fixture adapter replay topology note (2026-05-02)
+
+Added `steamer-card-engine adapter replay --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json` as a read-only replay-only simulation surface backed by `src/steamer_card_engine/adapters/fixture_exchange.py`.
+
+Topology/config/cron impact: unchanged. The command loads local sanitized fixtures only, emits deterministic JSON with replay/fixture/adapter hashes and simulation-only intents, and performs no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, no live readiness claim, and no runtime topology mutation.
