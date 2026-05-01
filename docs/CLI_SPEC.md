@@ -322,3 +322,14 @@ Responsibilities:
 - keep the surface fixture-only: no broker SDK, network, credential/env/certificate reads, `/workspace/steamer` state, or operator arm/disarm coupling
 
 All JSON outputs include `cli_contract.version = "cli-command/v1"`.
+
+### 8. Paper ledger commands
+
+Stage 3 local paper execution uses a repo-local SQLite ledger and remains fixture-only:
+
+```bash
+steamer-card-engine paper run --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --paper-ledger .state/paper/ledger.sqlite --receipt out/paper.receipt.json --json
+steamer-card-engine paper audit --paper-ledger .state/paper/ledger.sqlite --json
+```
+
+Both commands emit `cli_contract.version = "cli-command/v1"`, `no_network=true`, and `topology_changed=false`. `paper run` emits `paper-run/v1`; `paper audit` emits `paper-audit/v1`. PnL is placeholder-only and must not be described as market-real.

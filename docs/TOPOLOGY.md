@@ -254,3 +254,9 @@ Topology/config/cron impact: unchanged. These commands load local sanitized fixt
 Added `steamer-card-engine adapter replay --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json` as a read-only replay-only simulation surface backed by `src/steamer_card_engine/adapters/fixture_exchange.py`.
 
 Topology/config/cron impact: unchanged. The command loads local sanitized fixtures only, emits deterministic JSON with replay/fixture/adapter hashes and simulation-only intents, and performs no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, no live readiness claim, and no runtime topology mutation.
+
+## Stage 3 local paper ledger topology note (2026-05-02)
+
+Added `steamer-card-engine paper run` and `steamer-card-engine paper audit` backed by `src/steamer_card_engine/paper/` and a repo-local SQLite ledger path such as `.state/paper/ledger.sqlite`.
+
+Topology/config/cron impact: unchanged. These commands consume fixture replay output and write only the explicitly requested local paper ledger / receipt path. They perform no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator arm/disarm mutation, no live readiness claim, and no runtime/cron topology mutation.

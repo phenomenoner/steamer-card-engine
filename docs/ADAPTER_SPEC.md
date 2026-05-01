@@ -304,3 +304,9 @@ Golden checks are deterministic and remain fixture-only. They do not import brok
 `steamer-card-engine adapter replay --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json` replays the Stage 1 fixture cases as a deterministic historical/fixture stream. It emits `adapter-replay/v1`, replay range / fixture / adapter / stable input hashes, a decision summary, and per-event simulation-only intents.
 
 The replay surface is still fixture-only: no broker SDK imports, no network, no credential/env/certificate reads, no `/workspace/steamer` state, no operator receipts, no runtime/cron topology changes, no broker-native orders, and no live readiness claim. Unknown adapters fail closed before fixture reads.
+
+## Local paper ledger simulation (Stage 3)
+
+`steamer-card-engine paper run --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --paper-ledger .state/paper/ledger.sqlite --json` consumes Stage 2 simulation-only intents and writes a repo-local SQLite paper ledger.
+
+This surface proves local lifecycle/audit mechanics only: paper risk validation, deterministic accepted/filled paper orders, placeholder PnL, duplicate-order guard, and `paper audit` reconciliation. It does not connect to a broker, observe live market data, claim market-real PnL, or establish live readiness.

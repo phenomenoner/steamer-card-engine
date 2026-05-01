@@ -37,6 +37,7 @@ from steamer_card_engine.operator_control import (
     operator_submit_order_smoke,
 )
 from steamer_card_engine.observer.sim import build_sim_observer_bundle, write_sim_observer_bundle_json
+from steamer_card_engine.paper import PaperRunError, audit_paper_ledger, run_paper_replay
 from steamer_card_engine.sim_compare import (
     SimCompareError,
     compare_bundles,
@@ -299,6 +300,25 @@ def build_parser() -> argparse.ArgumentParser:
     adapter_replay.add_argument("--adapter", required=True)
     adapter_replay.add_argument("--fixtures", required=True)
     adapter_replay.add_argument("--json", action="store_true", dest="as_json")
+
+    paper = subparsers.add_parser(
+        "paper",
+        help="Repo-local fixture-only paper ledger commands (no broker connectivity)",
+    )
+    paper_sub = paper.add_subparsers(dest="paper_command", required=True)
+    paper_run = paper_sub.add_parser("run", help="Run fixture replay into a local paper ledger")
+    paper_run.add_argument("--adapter", required=True)
+    paper_run.add_argument("--fixtures", required=True)
+    paper_run.add_argument("--paper-ledger", default=".state/paper/ledger.sqlite")
+    paper_run.add_argument("--receipt")
+    paper_run.add_argument("--max-position", type=int, default=1)
+    paper_run.add_argument("--max-loss-placeholder", type=int, default=0)
+    paper_run.add_argument("--stale-signal-seconds", type=int, default=300)
+    paper_run.add_argument("--json", action="store_true", dest="as_json")
+
+    paper_audit = paper_sub.add_parser("audit", help="Audit a local paper ledger")
+    paper_audit.add_argument("--paper-ledger", default=".state/paper/ledger.sqlite")
+    paper_audit.add_argument("--json", action="store_true", dest="as_json")
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
@@ -736,6 +756,8 @@ def _cli_command_identity(args: argparse.Namespace) -> str:
         return f"operator {args.operator_command}"
     if args.command == "adapter" and getattr(args, "adapter_command", None):
         return f"adapter {args.adapter_command}"
+    if args.command == "paper" and getattr(args, "paper_command", None):
+        return f"paper {args.paper_command}"
     if args.command == "auth" and getattr(args, "auth_command", None):
         return f"auth {args.auth_command}"
     return str(getattr(args, "command", "unknown"))
@@ -2003,6 +2025,52 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return exit_code
 
+        if args.command == "paper" and args.paper_command == "run":
+            payload, exit_code = run_paper_replay(
+                adapter_id=args.adapter,
+                fixtures_path=Path(args.fixtures),
+                ledger_path=Path(args.paper_ledger),
+                receipt_path=Path(args.receipt) if args.receipt else None,
+                max_position=args.max_position,
+                max_loss_placeholder=args.max_loss_placeholder,
+                stale_signal_seconds=args.stale_signal_seconds,
+            )
+            payload = _attach_cli_contract(
+                payload,
+                command="paper run",
+                exit_code=exit_code,
+                status_key="risk.decision",
+                status_value=str((payload.get("risk") or {}).get("decision") if isinstance(payload.get("risk"), dict) else "unknown"),
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Paper run "
+                    f"status={payload['risk']['decision']} ledger={args.paper_ledger} "
+                    f"fills={payload['summary']['fills']}"
+                )
+            return exit_code
+
+        if args.command == "paper" and args.paper_command == "audit":
+            payload, exit_code = audit_paper_ledger(ledger_path=Path(args.paper_ledger))
+            payload = _attach_cli_contract(
+                payload,
+                command="paper audit",
+                exit_code=exit_code,
+                status_key="decision",
+                status_value=str(payload.get("decision") or "unknown"),
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Paper audit "
+                    f"decision={payload['decision']} ledger={args.paper_ledger} "
+                    f"failures={len(payload['invariant_failures'])}"
+                )
+            return exit_code
+
         if args.command == "operator" and args.operator_command == "status":
             result = operator_status(
                 state_file=Path(args.state_file),
@@ -2232,6 +2300,19 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_catalog_error(error)
     except ManifestValidationError as error:
         return _handle_manifest_error(error)
+    except PaperRunError as error:
+        payload = _attach_cli_contract(
+            error.payload,
+            command=_cli_command_identity(args),
+            exit_code=error.exit_code,
+            status_key="risk.decision",
+            status_value=str((error.payload.get("risk") or {}).get("decision") if isinstance(error.payload.get("risk"), dict) else "fail"),
+        )
+        if getattr(args, "as_json", False):
+            _print_json(payload)
+        else:
+            print(f"Paper command failed: {error}", flush=True)
+        return error.exit_code
     except SimCompareError as error:
         if getattr(args, "as_json", False):
             payload = {

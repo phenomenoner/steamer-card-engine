@@ -1,0 +1,46 @@
+{
+  "adapter": {
+    "id": "fixture-paper-only",
+    "vendor": "fixture",
+    "version": "v0"
+  },
+  "execution": "local-ledger-only",
+  "hashes": {
+    "adapter_hash": "cee3c1d70a6fd2f0712db450ccc5ec03e99799406ed110b3c31be499580d3d39",
+    "fixture_hash": "b779d9577e33a15aed2c1d79bf33f7b1d47f88c07a209cf2de9c413ba5557299",
+    "input_hash": "bde4839c36751f544a1e11389625f1481ee0fe8e1f604043af97a341bbba564b",
+    "receipt_hash": "50ffd15a7d30e5b3cad2b041f296c1d874252755a9bd99e25e0752f2c6bf70e5",
+    "replay_hash": "4ab93636705f5d5339870cdf69cd321a5c841c18b805f1d857430e551d8647e6",
+    "risk_profile_hash": "c2a05e328dbd4c88146bfab4db96050eb28605b61ab5c17fb336d20614952acf",
+    "run_id": "paper-run:0995e9c05b1dc0df"
+  },
+  "ledger": {
+    "backend": "sqlite",
+    "path": "out/stage3_paper_smoke/ledger.sqlite"
+  },
+  "ledger_schema_version": "paper-ledger/v1",
+  "live_readiness_claim": false,
+  "mode": "paper",
+  "no_network": true,
+  "risk": {
+    "decision": "pass",
+    "duplicate_order_guard": true,
+    "failures": [],
+    "max_loss_model": "placeholder-only; no market-real PnL claim",
+    "max_loss_placeholder": 0,
+    "max_position": 1,
+    "stale_signal_evidence": "fixture logical replay only; not evidence of market freshness",
+    "stale_signal_guard": true,
+    "stale_signal_seconds": 300
+  },
+  "schema_version": "paper-run/v1",
+  "summary": {
+    "broker_native_order_count": 0,
+    "cancels": 0,
+    "fills": 1,
+    "intents_seen": 1,
+    "orders_accepted": 1,
+    "orders_rejected": 0
+  },
+  "topology_changed": false
+}
