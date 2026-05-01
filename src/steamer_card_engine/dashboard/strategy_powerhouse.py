@@ -116,7 +116,6 @@ def _build_pipeline_status_board(
     active_plan: dict[str, Any] | None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     handoffs_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/handoffs"
-    backtests_root = workspace_root / "StrategyExecuter_Steamer-Antigravity/projects/steamer/research/provenance/backtests"
     intake_blade_map = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*blade-map.md")
     intake_checkpoint = _latest_matching_file(handoffs_root, "*strategy-intake-lanes*checkpoint.md")
 
@@ -125,9 +124,6 @@ def _build_pipeline_status_board(
         line_id="intraday_failed_auction_short",
     )
     state_path = Path(str(line_state.get("_path"))) if line_state else None
-
-    active_family = str(active_plan.get("family") or "") if active_plan else ""
-    proposal_family = str(proposal_plan.get("family") or "")
 
     def _state_stage(stage_id: str) -> dict[str, Any] | None:
         if not line_state:

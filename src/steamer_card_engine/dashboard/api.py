@@ -183,11 +183,9 @@ def create_app() -> FastAPI:
 
         try:
             while True:
-                sent = False
                 for event in observer_repo.stream_events(session_id, after_seq=after_seq):
                     await websocket.send_json(event)
                     after_seq = max(after_seq, int(event.get("seq") or after_seq))
-                    sent = True
                 if poll_seconds <= 0:
                     await websocket.send_json({"type": "stream_end", "after_seq": after_seq})
                     break

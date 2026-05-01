@@ -6,7 +6,7 @@
     "broker_native_order_count": 0,
     "ledger": {
       "backend": "sqlite",
-      "path": "/root/.openclaw/workspace/.state/steamer-card-engine-stage5a-smoke/ledger.sqlite"
+      "path": ".state/stage5a-smoke/ledger.sqlite"
     },
     "ledger_schema_version": "paper-ledger/v1",
     "place_order_call_count": 0
@@ -21,7 +21,7 @@
     "stale_events": 0
   },
   "hashes": {
-    "receipt_hash": "c904349c15ebd6e9625553bb04574bd90f8babc02e56820cd959dc322c1e9da5"
+    "receipt_hash": "6e525ad1744880f30607de04810673fba16623931a4bdd3fd1f8bf42fc8c87a3"
   },
   "live_order_route_present": false,
   "live_readiness_claim": false,
