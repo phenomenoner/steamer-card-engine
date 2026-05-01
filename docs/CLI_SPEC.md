@@ -344,3 +344,13 @@ steamer-card-engine broker redact-check --receipt docs/receipts/artifacts/2026-0
 ```
 
 `broker preflight` emits `broker-dry-run-preflight/v1`; `broker redact-check` emits `broker-dry-run-redact-check/v1`. This slice is mock transport only: no real SDK, network, credentials, account/session inspect, order placement, or live-readiness claim.
+
+### 10. Observe-paper fixture live-shape command
+
+Stage 5a observe-paper is fixture-only and paper-ledger-only:
+
+```bash
+steamer-card-engine observe paper --adapter fixture-paper-only --market-source fixture-live-shape --fixtures examples/probes/live_observe --execution paper --paper-ledger .state/paper/observe-ledger.sqlite --risk-profile conservative --duration-seconds 60 --stale-market-data-seconds 5 --receipt out/live-paper.receipt.json --json
+```
+
+The command emits `observe-paper-run/v1`, uses the shared `cli_contract.version = "cli-command/v1"`, and requires `--market-source fixture-live-shape` plus `--execution paper`. `--market-source live` is intentionally refused in Stage 5a; real live market-data observation is Stage 5b and requires separate CK authorization.

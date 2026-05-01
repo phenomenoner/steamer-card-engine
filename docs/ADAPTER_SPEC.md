@@ -316,3 +316,9 @@ This surface proves local lifecycle/audit mechanics only: paper risk validation,
 `steamer-card-engine broker preflight --broker mock-fixture --mode dry-run --no-place-orders --mock-transport fixture --fixtures examples/probes/broker_dry_run --json` validates broker adapter shape with a mock fixture transport only.
 
 This surface proves dry-run translation, redaction, and the no-place-orders invariant. It does not import real broker SDKs, inspect credentials/accounts/sessions, connect to network, place orders, or claim live readiness. Any missing guard, non-dry-run mode, unknown broker id, or forbidden broker/private fixture payload fails closed before translation.
+
+## Observe-paper fixture live-shape harness (Stage 5a)
+
+`steamer-card-engine observe paper --adapter fixture-paper-only --market-source fixture-live-shape --fixtures examples/probes/live_observe --execution paper --paper-ledger <path> --json` validates the live-observation shape while remaining fixture-only.
+
+This surface composes the Stage 3 paper ledger and proves freshness/outage fail-closed behavior, paper-ledger-only execution, and explicit separation from Stage 6 live canary authority. It performs no live market-data provider access, broker SDK import, network call, credential/account/session inspection, `/workspace/steamer` access, live order dispatch, or operator live arm.

@@ -1,0 +1,36 @@
+{
+  "account_summary": {
+    "pnl_model": "fixture-placeholder-v1",
+    "positions": [
+      {
+        "avg_price": 1.0,
+        "quantity": 1,
+        "realized_pnl": 0.0,
+        "symbol": "<FIXTURE_SYMBOL>"
+      }
+    ],
+    "realized_pnl": 0.0
+  },
+  "cli_contract": {
+    "command": "paper audit",
+    "exit_class": "success",
+    "exit_code": 0,
+    "status": "pass",
+    "status_key": "decision",
+    "version": "cli-command/v1"
+  },
+  "counts": {
+    "accepted": 1,
+    "cancels": 0,
+    "events": 3,
+    "fills": 1,
+    "orders": 1,
+    "rejected": 0
+  },
+  "decision": "pass",
+  "invariant_failures": [],
+  "ledger_schema_version": "paper-ledger/v1",
+  "no_network": true,
+  "schema_version": "paper-audit/v1",
+  "topology_changed": false
+}

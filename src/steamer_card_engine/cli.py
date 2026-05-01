@@ -41,6 +41,7 @@ from steamer_card_engine.operator_control import (
     operator_status,
     operator_submit_order_smoke,
 )
+from steamer_card_engine.observe import ObservePaperError, run_observe_paper
 from steamer_card_engine.observer.sim import build_sim_observer_bundle, write_sim_observer_bundle_json
 from steamer_card_engine.paper import PaperRunError, audit_paper_ledger, run_paper_replay
 from steamer_card_engine.sim_compare import (
@@ -261,6 +262,23 @@ def build_parser() -> argparse.ArgumentParser:
     observer_bundle.add_argument("--market-mode", default="sim")
     observer_bundle.add_argument("--timeframe", default="1m")
     observer_bundle.add_argument("--json", action="store_true", dest="as_json")
+
+    observe = subparsers.add_parser("observe", help="Observation commands")
+    observe_sub = observe.add_subparsers(dest="observe_command", required=True)
+    observe_paper = observe_sub.add_parser(
+        "paper",
+        help="Stage 5a fixture/live-shape observation with paper-ledger execution",
+    )
+    observe_paper.add_argument("--adapter", required=True)
+    observe_paper.add_argument("--market-source", required=True)
+    observe_paper.add_argument("--fixtures", required=True)
+    observe_paper.add_argument("--execution", required=True)
+    observe_paper.add_argument("--paper-ledger", required=True)
+    observe_paper.add_argument("--risk-profile", default="conservative")
+    observe_paper.add_argument("--duration-seconds", type=int, default=60)
+    observe_paper.add_argument("--stale-market-data-seconds", type=int, default=5)
+    observe_paper.add_argument("--receipt")
+    observe_paper.add_argument("--json", action="store_true", dest="as_json")
 
     adapter = subparsers.add_parser(
         "adapter",
@@ -785,6 +803,8 @@ def _cli_command_identity(args: argparse.Namespace) -> str:
         return f"operator {args.operator_command}"
     if args.command == "adapter" and getattr(args, "adapter_command", None):
         return f"adapter {args.adapter_command}"
+    if args.command == "observe" and getattr(args, "observe_command", None):
+        return f"observe {args.observe_command}"
     if args.command == "broker" and getattr(args, "broker_command", None):
         return f"broker {args.broker_command}"
     if args.command == "paper" and getattr(args, "paper_command", None):
@@ -2097,6 +2117,34 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Broker redact-check status={payload['status']} receipt={args.receipt}")
             return exit_code
 
+        if args.command == "observe" and args.observe_command == "paper":
+            payload, exit_code = run_observe_paper(
+                adapter_id=args.adapter,
+                market_source=args.market_source,
+                fixtures_path=Path(args.fixtures),
+                execution=args.execution,
+                ledger_path=Path(args.paper_ledger),
+                risk_profile=args.risk_profile,
+                duration_seconds=args.duration_seconds,
+                stale_market_data_seconds=args.stale_market_data_seconds,
+                receipt_path=Path(args.receipt) if args.receipt else None,
+            )
+            payload = _attach_cli_contract(
+                payload,
+                command="observe paper",
+                exit_code=exit_code,
+                status_key="risk.decision",
+                status_value=str((payload.get("risk") or {}).get("decision") if isinstance(payload.get("risk"), dict) else "unknown"),
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Observe paper "
+                    f"status={payload['risk']['decision']} source={args.market_source} ledger={args.paper_ledger}"
+                )
+            return exit_code
+
         if args.command == "paper" and args.paper_command == "run":
             payload, exit_code = run_paper_replay(
                 adapter_id=args.adapter,
@@ -2390,6 +2438,19 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(payload)
         else:
             print(f"Broker dry-run command failed: {error}", flush=True)
+        return error.exit_code
+    except ObservePaperError as error:
+        payload = _attach_cli_contract(
+            error.payload,
+            command=_cli_command_identity(args),
+            exit_code=error.exit_code,
+            status_key="risk.decision",
+            status_value=str((error.payload.get("risk") or {}).get("decision") if isinstance(error.payload.get("risk"), dict) else "fail"),
+        )
+        if getattr(args, "as_json", False):
+            _print_json(payload)
+        else:
+            print(f"Observe paper command failed: {error}", flush=True)
         return error.exit_code
     except PaperRunError as error:
         payload = _attach_cli_contract(

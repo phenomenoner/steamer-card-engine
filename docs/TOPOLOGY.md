@@ -266,3 +266,9 @@ Topology/config/cron impact: unchanged. These commands consume fixture replay ou
 Added `steamer-card-engine broker preflight` and `steamer-card-engine broker redact-check` backed by `src/steamer_card_engine/broker_dry_run/` and sanitized synthetic fixtures under `examples/probes/broker_dry_run/`.
 
 Topology/config/cron impact: unchanged. These commands validate mock-only translation/redaction/no-place-orders behavior. They perform no real broker SDK import, no network call, no credential/env/certificate/account/session read, no `/workspace/steamer` access, no operator arm/disarm mutation, no order placement, no live readiness claim, and no runtime/cron topology mutation.
+
+## Stage 5a observe-paper fixture live-shape topology note (2026-05-02)
+
+Added `steamer-card-engine observe paper` backed by `src/steamer_card_engine/observe/` and sanitized fixture-shaped market events under `examples/probes/live_observe/`.
+
+Topology/config/cron impact: unchanged. The command consumes local fixtures and writes only the explicitly requested local paper ledger / receipt path. It performs no real market-data provider access, no broker SDK import, no network call, no credential/env/certificate/account/session read, no `/workspace/steamer` access, no operator live arm/disarm mutation, no order placement, no Stage 6 live canary authority, no live readiness claim, and no runtime/cron topology mutation.

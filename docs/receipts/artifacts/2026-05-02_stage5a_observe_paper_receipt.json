@@ -1,0 +1,77 @@
+{
+  "broker_order_placement_enabled": false,
+  "duration_seconds": 60,
+  "execution": {
+    "backend": "paper-ledger-only",
+    "broker_native_order_count": 0,
+    "ledger": {
+      "backend": "sqlite",
+      "path": "/root/.openclaw/workspace/.state/steamer-card-engine-stage5a-smoke/ledger.sqlite"
+    },
+    "ledger_schema_version": "paper-ledger/v1",
+    "place_order_call_count": 0
+  },
+  "execution_backend": "paper-ledger-only",
+  "freshness": {
+    "decision": "pass",
+    "fail_closed": true,
+    "failures": [],
+    "max_staleness_seconds": 5,
+    "outage_detected": false,
+    "stale_events": 0
+  },
+  "hashes": {
+    "receipt_hash": "c904349c15ebd6e9625553bb04574bd90f8babc02e56820cd959dc322c1e9da5"
+  },
+  "live_order_route_present": false,
+  "live_readiness_claim": false,
+  "market_source": {
+    "credential_inspection": "not-performed",
+    "fixture_hash": "1eed4e6d60ea6d275e42f05eccc532a24a25beb86bc5865cf79e9530d3f55889",
+    "kind": "fixture-live-shape",
+    "no_network": true,
+    "provider": "fixture"
+  },
+  "mode": "observe-paper",
+  "no_network": true,
+  "paper_audit": {
+    "counts": {
+      "accepted": 1,
+      "cancels": 0,
+      "events": 3,
+      "fills": 1,
+      "orders": 1,
+      "rejected": 0
+    },
+    "decision": "pass",
+    "schema_version": "paper-audit/v1"
+  },
+  "paper_run": {
+    "decision": "pass",
+    "schema_version": "paper-run/v1",
+    "summary": {
+      "broker_native_order_count": 0,
+      "cancels": 0,
+      "fills": 1,
+      "intents_seen": 1,
+      "orders_accepted": 1,
+      "orders_rejected": 0
+    }
+  },
+  "risk": {
+    "decision": "pass",
+    "paper_risk_checked": true,
+    "profile": "conservative"
+  },
+  "schema_version": "observe-paper-run/v1",
+  "stage": "5a-fixture-live-shape",
+  "stage6_live_canary_authority": false,
+  "summary": {
+    "fills": 1,
+    "market_events_seen": 1,
+    "paper_orders_accepted": 1,
+    "paper_orders_rejected": 0,
+    "signals_seen": 1
+  },
+  "topology_changed": false
+}

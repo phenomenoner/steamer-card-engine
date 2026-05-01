@@ -1,0 +1,20 @@
+{
+  "schema_version": "observe-paper-fixture/v1",
+  "adapter_contract_fixtures": "../adapter_contract",
+  "events": [
+    {
+      "case_id": "fresh-live-shape-1",
+      "sequence": 1,
+      "logical_time_seconds": 60,
+      "age_seconds": 1,
+      "status": "ok",
+      "symbol_ref": "<PUBLIC_SYMBOL_REF>",
+      "price": 1.0,
+      "signal": {
+        "action": "enter",
+        "confidence": 0.75,
+        "reason": "fixture-live-shape-fresh"
+      }
+    }
+  ]
+}
