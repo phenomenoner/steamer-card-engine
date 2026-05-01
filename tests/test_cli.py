@@ -1137,3 +1137,82 @@ def test_operator_preflight_smoke_can_read_probe_snapshot_and_turn_ready(
         "status_key": "preflight_status",
         "status": "ready",
     }
+
+
+def test_adapter_probe_fixture_paper_only_json_contract(capsys) -> None:
+    code = main(["adapter", "probe", "--fixture", "paper-only", "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "adapter probe",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "preflight.decision",
+        "status": "allow",
+    }
+    assert payload["adapter"]["id"] == "fixture-paper-only"
+    assert payload["preflight"]["decision"] == "allow"
+    assert payload["preflight"]["execution_mode"] == "paper"
+    assert payload["receipt"]["normalized"] is True
+    assert payload["dispatch"] == "fixture-only; no broker SDK; no live order"
+    assert payload["topology_changed"] is False
+
+
+def test_adapter_probe_live_mode_fails_closed_json_contract(capsys) -> None:
+    code = main(
+        [
+            "adapter",
+            "probe",
+            "--fixture",
+            "paper-only",
+            "--execution-mode",
+            "live",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert payload["cli_contract"]["exit_code"] == 4
+    assert payload["cli_contract"]["exit_class"] == "operator-refused"
+    assert payload["cli_contract"]["status"] == "reject"
+    assert payload["preflight"]["decision"] == "reject"
+    assert payload["preflight"]["execution_mode"] == "live"
+    assert payload["dispatch"] == "fixture-only; no broker SDK; no live order"
+
+
+def test_adapter_probe_unknown_execution_mode_fails_closed_and_sanitized(capsys) -> None:
+    code = main(
+        [
+            "adapter",
+            "probe",
+            "--fixture",
+            "paper-only",
+            "--execution-mode",
+            "sandbox",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    serialized = json.dumps(payload, sort_keys=True).lower()
+    assert code == 4
+    assert payload["preflight"]["decision"] == "reject"
+    assert payload["preflight"]["reason"] == "unknown execution mode is not permitted for broker submit"
+    assert payload["topology_changed"] is False
+    for term in ("token", "password", "api_key", "secret", "cert", "raw_response", "env"):
+        assert term not in serialized
+
+
+def test_adapter_probe_does_not_create_default_operator_state(capsys, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    code = main(["adapter", "probe", "--fixture", "paper-only", "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["topology_changed"] is False
+    assert not (tmp_path / ".state" / "operator_posture.json").exists()
+    assert not (tmp_path / ".state" / "operator_receipts").exists()

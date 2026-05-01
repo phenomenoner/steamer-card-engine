@@ -268,3 +268,14 @@ The runtime should consume these as structured states, not stringly-typed surpri
 - Adapters are not where risk policy should live.
 - Adapters should not own multi-card scheduling decisions.
 - Adapters should not hide mixed account / `user_def` routing ambiguity from the runtime.
+
+## Fixture-only adapter probe (Stage 0)
+
+`FixturePaperOnlyAdapter` is a deterministic contract probe, not a broker adapter. It exposes:
+
+- adapter identity `fixture-paper-only` / vendor `fixture` / version `v0`
+- capability profile with marketdata enabled, account queries disabled, paper submit/cancel enabled, live trading disabled
+- normalized receipts only; no raw vendor payloads
+- fail-closed preflight for `live` or unknown execution modes before any dispatch boundary
+
+Red lines: no broker SDK imports, no network, no credential/env/certificate reads, no `/workspace/steamer` state, and no live/paper readiness claim beyond this fixture-only contract probe.

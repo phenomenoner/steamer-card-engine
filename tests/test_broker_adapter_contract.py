@@ -12,6 +12,11 @@ from steamer_card_engine.adapters.base import (
     broker_submit_preflight,
     normalized_broker_reject,
 )
+from steamer_card_engine.adapters.fixture_exchange import (
+    FIXTURE_DISPATCH_BOUNDARY,
+    FixturePaperOnlyAdapter,
+    build_fixture_probe_payload,
+)
 
 
 class FixtureBrokerAdapter:
@@ -237,3 +242,50 @@ def test_session_public_dict_uses_placeholder_safe_scope() -> None:
     assert "super-secret-token" not in serialized
     assert "<ACCOUNT_SCOPE>" not in serialized
     assert "_ACCOUNT_SCOPE_" in serialized
+
+def test_fixture_probe_payload_allows_paper_only_without_dispatch() -> None:
+    payload, exit_code = build_fixture_probe_payload(fixture="paper-only", execution_mode="paper")
+
+    assert exit_code == 0
+    assert payload["adapter"] == {"id": "fixture-paper-only", "vendor": "fixture", "version": "v0"}
+    assert payload["capabilities"]["paper_trading_enabled"] is True
+    assert payload["capabilities"]["live_trading_enabled"] is False
+    assert payload["preflight"]["decision"] == "allow"
+    assert payload["receipt"]["status"] == "ok"
+    assert payload["receipt"]["normalized"] is True
+    assert payload["dispatch"] == FIXTURE_DISPATCH_BOUNDARY
+    assert payload["topology_changed"] is False
+    assert payload["no_network"] is True
+
+
+def test_fixture_probe_rejects_live_and_unknown_modes_before_dispatch() -> None:
+    live_payload, live_exit = build_fixture_probe_payload(fixture="paper-only", execution_mode="live")
+    unknown_payload, unknown_exit = build_fixture_probe_payload(
+        fixture="paper-only",
+        execution_mode="sandbox",
+    )
+
+    assert live_exit == 4
+    assert live_payload["preflight"]["decision"] == "reject"
+    assert live_payload["preflight"]["broker_allows"] is False
+    assert live_payload["dispatch"] == FIXTURE_DISPATCH_BOUNDARY
+    assert unknown_exit == 4
+    assert unknown_payload["preflight"]["decision"] == "reject"
+    assert unknown_payload["preflight"]["reason"] == "unknown execution mode is not permitted for broker submit"
+    assert unknown_payload["dispatch"] == FIXTURE_DISPATCH_BOUNDARY
+
+
+def test_fixture_probe_public_payload_contains_no_secret_like_or_vendor_raw_material() -> None:
+    payload, _ = build_fixture_probe_payload(fixture="paper-only", execution_mode="paper")
+    serialized = json.dumps(payload, sort_keys=True).lower()
+
+    forbidden = ("token", "password", "api_key", "secret", "cert", "raw_response", "env")
+    assert all(term not in serialized for term in forbidden)
+
+
+def test_fixture_adapter_has_no_order_events_or_live_capability() -> None:
+    adapter = FixturePaperOnlyAdapter()
+
+    assert adapter.capabilities.live_trading_enabled is False
+    assert adapter.capabilities.account_query_enabled is False
+    assert tuple(adapter.iter_order_events()) == ()

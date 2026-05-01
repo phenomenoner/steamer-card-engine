@@ -232,3 +232,9 @@ Canonical note:
 - History-source index slice receipt: `docs/receipts/2026-04-09_dashboard_history-source-index_slice.md`
 - `五氣朝元` closure receipt for the baton-line authority sweep: `docs/receipts/2026-04-09_dashboard_active-family-baton-line_wuqi-chaoyuan_closure.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
+
+## Stage 0 fixture adapter probe topology note (2026-05-02)
+
+Added `steamer-card-engine adapter probe --fixture paper-only --json` as a read-only CLI contract probe backed by `src/steamer_card_engine/adapters/fixture_exchange.py`.
+
+Topology/config/cron impact: unchanged. The probe performs no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, and no runtime topology mutation.

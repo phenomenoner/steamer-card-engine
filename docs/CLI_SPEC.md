@@ -286,3 +286,15 @@ Replay and live-sim jobs should converge on a stable artifact set such as:
 - summary metrics
 
 That keeps agent-assisted workflows reviewable instead of theatrical.
+
+### Adapter probe commands
+
+Stage 0 adapter work is pinned to a fixture-only probe:
+
+```bash
+steamer-card-engine adapter probe --fixture paper-only --json
+```
+
+The JSON payload uses the shared `cli_contract.version = "cli-command/v1"` envelope and reports adapter identity, capabilities, fixture-only session posture, preflight decision, sanitized normalized receipt, dispatch boundary, and `topology_changed=false`.
+
+`--execution-mode live` and unknown modes fail closed with exit code `4` before dispatch. This command does not read credentials, connect to brokers, write operator state, or claim broker/paper/live readiness beyond the deterministic fixture.

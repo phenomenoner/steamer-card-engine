@@ -9,6 +9,7 @@ import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from steamer_card_engine.adapters.fixture_exchange import build_fixture_probe_payload
 from steamer_card_engine.manifest import (
     ManifestValidationError,
     load_auth_profile,
@@ -46,12 +47,19 @@ from steamer_card_engine.strategy_catalog import (
 
 TPE = ZoneInfo("Asia/Taipei")
 CRITICAL_SURFACES = ("marketdata", "broker")
-STEAMER_CRON_HEALTH_ROOT = Path(
-    os.environ.get(
-        "STEAMER_CARD_ENGINE_STEAMER_CRON_ROOT",
-        "/root/.openclaw/workspace/.state/steamer/cron-health",
+_DEFAULT_STEAMER_CRON_HEALTH_ROOT = Path("/root/.openclaw/workspace/.state/steamer/cron-health")
+STEAMER_CRON_HEALTH_ROOT = _DEFAULT_STEAMER_CRON_HEALTH_ROOT
+
+
+def _steamer_cron_health_root() -> Path:
+    if STEAMER_CRON_HEALTH_ROOT != _DEFAULT_STEAMER_CRON_HEALTH_ROOT:
+        return STEAMER_CRON_HEALTH_ROOT
+    return Path(
+        os.environ.get(
+            "STEAMER_CARD_ENGINE_STEAMER_CRON_ROOT",
+            str(_DEFAULT_STEAMER_CRON_HEALTH_ROOT),
+        )
     )
-)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -242,6 +250,19 @@ def build_parser() -> argparse.ArgumentParser:
     observer_bundle.add_argument("--market-mode", default="sim")
     observer_bundle.add_argument("--timeframe", default="1m")
     observer_bundle.add_argument("--json", action="store_true", dest="as_json")
+
+    adapter = subparsers.add_parser(
+        "adapter",
+        help="Fixture-only adapter contract probes (no broker connectivity)",
+    )
+    adapter_sub = adapter.add_subparsers(dest="adapter_command", required=True)
+    adapter_probe = adapter_sub.add_parser(
+        "probe",
+        help="Emit a fixture-only adapter capability/preflight contract probe",
+    )
+    adapter_probe.add_argument("--fixture", required=True)
+    adapter_probe.add_argument("--execution-mode", default="paper")
+    adapter_probe.add_argument("--json", action="store_true", dest="as_json")
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
@@ -677,6 +698,8 @@ def _cli_command_identity(args: argparse.Namespace) -> str:
         return f"sim {args.sim_command}"
     if args.command == "operator" and getattr(args, "operator_command", None):
         return f"operator {args.operator_command}"
+    if args.command == "adapter" and getattr(args, "adapter_command", None):
+        return f"adapter {args.adapter_command}"
     if args.command == "auth" and getattr(args, "auth_command", None):
         return f"auth {args.auth_command}"
     return str(getattr(args, "command", "unknown"))
@@ -744,7 +767,7 @@ def _apply_connection_contract(summary: dict) -> dict:
 
 
 def _steamer_probe_snapshot_for_date(probe_date: str) -> dict:
-    stage_dir = STEAMER_CRON_HEALTH_ROOT / probe_date / "stages"
+    stage_dir = _steamer_cron_health_root() / probe_date / "stages"
     aws_auth_path = stage_dir / "aws_auth.json"
     ec2_power_on_path = stage_dir / "ec2_power_on.json"
     ec2_kickoff_path = stage_dir / "ec2_kickoff.json"
@@ -1846,6 +1869,29 @@ def main(argv: list[str] | None = None) -> int:
                     f"events={len(bundle.events)}"
                 )
             return 0
+
+        if args.command == "adapter" and args.adapter_command == "probe":
+            payload, exit_code = build_fixture_probe_payload(
+                fixture=args.fixture,
+                execution_mode=args.execution_mode,
+            )
+            status_value = str(payload.get("preflight", {}).get("decision", "unknown"))
+            payload = _attach_cli_contract(
+                payload,
+                command="adapter probe",
+                exit_code=exit_code,
+                status_key="preflight.decision",
+                status_value=status_value,
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Adapter probe "
+                    f"decision={status_value} fixture={args.fixture} "
+                    f"mode={args.execution_mode} dispatch={payload['dispatch']}"
+                )
+            return exit_code
 
         if args.command == "operator" and args.operator_command == "status":
             result = operator_status(
