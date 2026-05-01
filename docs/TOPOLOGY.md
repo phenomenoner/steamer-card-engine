@@ -260,3 +260,9 @@ Topology/config/cron impact: unchanged. The command loads local sanitized fixtur
 Added `steamer-card-engine paper run` and `steamer-card-engine paper audit` backed by `src/steamer_card_engine/paper/` and a repo-local SQLite ledger path such as `.state/paper/ledger.sqlite`.
 
 Topology/config/cron impact: unchanged. These commands consume fixture replay output and write only the explicitly requested local paper ledger / receipt path. They perform no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator arm/disarm mutation, no live readiness claim, and no runtime/cron topology mutation.
+
+## Stage 4a broker dry-run mock topology note (2026-05-02)
+
+Added `steamer-card-engine broker preflight` and `steamer-card-engine broker redact-check` backed by `src/steamer_card_engine/broker_dry_run/` and sanitized synthetic fixtures under `examples/probes/broker_dry_run/`.
+
+Topology/config/cron impact: unchanged. These commands validate mock-only translation/redaction/no-place-orders behavior. They perform no real broker SDK import, no network call, no credential/env/certificate/account/session read, no `/workspace/steamer` access, no operator arm/disarm mutation, no order placement, no live readiness claim, and no runtime/cron topology mutation.

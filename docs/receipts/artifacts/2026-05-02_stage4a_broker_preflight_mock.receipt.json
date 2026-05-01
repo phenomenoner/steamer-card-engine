@@ -1,0 +1,60 @@
+{
+  "account_inspection": "not-performed",
+  "broker": {
+    "id": "mock-fixture",
+    "vendor": "mock",
+    "version": "v0"
+  },
+  "credential_inspection": "not-performed",
+  "live_readiness_claim": false,
+  "mode": "dry-run",
+  "no_network": true,
+  "order_placement": {
+    "broker_native_order_count": 0,
+    "enabled": false,
+    "guard": "no-place-orders",
+    "guard_present": true,
+    "guard_required": true,
+    "place_order_call_count": 0
+  },
+  "redaction": {
+    "checked_term_count": 7,
+    "matches": [],
+    "raw_vendor_payload_present": false,
+    "status": "pass"
+  },
+  "schema_version": "broker-dry-run-preflight/v1",
+  "topology_changed": false,
+  "translation": {
+    "cases_checked": 1,
+    "input_kind": "normalized_execution_request",
+    "schema_version": "broker-dry-run-translation/v1",
+    "translations": [
+      {
+        "broker_native_order": null,
+        "case_id": "synthetic-buy-1",
+        "dispatch_suppressed": true,
+        "dry_run_operation": "submit_preview",
+        "order_type": "market",
+        "quantity": 1,
+        "request_id": "dry-run:synthetic-buy-1",
+        "side": "buy",
+        "symbol_ref": "<PUBLIC_SYMBOL_REF>",
+        "time_in_force": "day"
+      }
+    ]
+  },
+  "transport": {
+    "id": "mock-fixture",
+    "kind": "mock",
+    "no_network": true
+  },
+  "transport_health": {
+    "account_inspection": "not-performed",
+    "connectivity": "mock-verified",
+    "credential_inspection": "not-performed",
+    "no_network": true,
+    "transport_id": "mock-fixture",
+    "transport_kind": "mock"
+  }
+}

@@ -310,3 +310,9 @@ The replay surface is still fixture-only: no broker SDK imports, no network, no 
 `steamer-card-engine paper run --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --paper-ledger .state/paper/ledger.sqlite --json` consumes Stage 2 simulation-only intents and writes a repo-local SQLite paper ledger.
 
 This surface proves local lifecycle/audit mechanics only: paper risk validation, deterministic accepted/filled paper orders, placeholder PnL, duplicate-order guard, and `paper audit` reconciliation. It does not connect to a broker, observe live market data, claim market-real PnL, or establish live readiness.
+
+## Broker dry-run mock preflight (Stage 4a)
+
+`steamer-card-engine broker preflight --broker mock-fixture --mode dry-run --no-place-orders --mock-transport fixture --fixtures examples/probes/broker_dry_run --json` validates broker adapter shape with a mock fixture transport only.
+
+This surface proves dry-run translation, redaction, and the no-place-orders invariant. It does not import real broker SDKs, inspect credentials/accounts/sessions, connect to network, place orders, or claim live readiness. Any missing guard, non-dry-run mode, unknown broker id, or forbidden broker/private fixture payload fails closed before translation.

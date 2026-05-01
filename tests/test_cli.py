@@ -1345,3 +1345,96 @@ def test_adapter_replay_unknown_adapter_fails_closed_json_contract(capsys) -> No
     assert payload["cli_contract"]["status"] == "reject"
     assert payload["reason_code"] == "unknown_adapter"
     assert payload["topology_changed"] is False
+
+
+def test_cli_broker_preflight_json_writes_explicit_receipt(capsys, tmp_path: Path) -> None:
+    receipt = tmp_path / "broker-preflight.receipt.json"
+
+    code = main(
+        [
+            "broker",
+            "preflight",
+            "--broker",
+            "mock-fixture",
+            "--mode",
+            "dry-run",
+            "--no-place-orders",
+            "--mock-transport",
+            "fixture",
+            "--fixtures",
+            "examples/probes/broker_dry_run",
+            "--receipt",
+            str(receipt),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["schema_version"] == "broker-dry-run-preflight/v1"
+    assert payload["cli_contract"]["command"] == "broker preflight"
+    assert payload["order_placement"]["enabled"] is False
+    assert receipt.exists()
+
+
+def test_cli_broker_preflight_rejects_missing_no_place_orders_without_receipt(
+    capsys, tmp_path: Path
+) -> None:
+    receipt = tmp_path / "should-not-exist.json"
+
+    code = main(
+        [
+            "broker",
+            "preflight",
+            "--broker",
+            "mock-fixture",
+            "--mode",
+            "dry-run",
+            "--mock-transport",
+            "fixture",
+            "--fixtures",
+            str(tmp_path / "missing-fixtures"),
+            "--receipt",
+            str(receipt),
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert payload["reason"] == "missing-no-place-orders"
+    assert not receipt.exists()
+
+
+def test_cli_broker_redact_check_json(capsys, tmp_path: Path) -> None:
+    receipt = tmp_path / "broker-preflight.receipt.json"
+    assert (
+        main(
+            [
+                "broker",
+                "preflight",
+                "--broker",
+                "mock-fixture",
+                "--mode",
+                "dry-run",
+                "--no-place-orders",
+                "--mock-transport",
+                "fixture",
+                "--fixtures",
+                "examples/probes/broker_dry_run",
+                "--receipt",
+                str(receipt),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    code = main(["broker", "redact-check", "--receipt", str(receipt), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["schema_version"] == "broker-dry-run-redact-check/v1"
+    assert payload["status"] == "pass"
+    assert payload["cli_contract"]["command"] == "broker redact-check"

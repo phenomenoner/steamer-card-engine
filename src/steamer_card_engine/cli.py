@@ -15,6 +15,11 @@ from steamer_card_engine.adapters.fixture_exchange import (
     build_fixture_probe_payload,
     build_fixture_replay_payload,
 )
+from steamer_card_engine.broker_dry_run import (
+    BrokerDryRunError,
+    build_preflight_receipt,
+    redact_check_receipt,
+)
 from steamer_card_engine.manifest import (
     ManifestValidationError,
     load_auth_profile,
@@ -300,6 +305,30 @@ def build_parser() -> argparse.ArgumentParser:
     adapter_replay.add_argument("--adapter", required=True)
     adapter_replay.add_argument("--fixtures", required=True)
     adapter_replay.add_argument("--json", action="store_true", dest="as_json")
+
+    broker = subparsers.add_parser(
+        "broker",
+        help="Mock-only broker dry-run checks (no broker connectivity)",
+    )
+    broker_sub = broker.add_subparsers(dest="broker_command", required=True)
+    broker_preflight = broker_sub.add_parser(
+        "preflight",
+        help="Run Stage 4a mock-fixture broker dry-run preflight",
+    )
+    broker_preflight.add_argument("--broker", required=True, dest="broker_id")
+    broker_preflight.add_argument("--mode", required=True)
+    broker_preflight.add_argument("--no-place-orders", action="store_true", dest="no_place_orders")
+    broker_preflight.add_argument("--mock-transport", required=True)
+    broker_preflight.add_argument("--fixtures", required=True)
+    broker_preflight.add_argument("--receipt")
+    broker_preflight.add_argument("--json", action="store_true", dest="as_json")
+
+    broker_redact = broker_sub.add_parser(
+        "redact-check",
+        help="Check a Stage 4a mock broker dry-run receipt for forbidden raw/secret terms",
+    )
+    broker_redact.add_argument("--receipt", required=True)
+    broker_redact.add_argument("--json", action="store_true", dest="as_json")
 
     paper = subparsers.add_parser(
         "paper",
@@ -756,6 +785,8 @@ def _cli_command_identity(args: argparse.Namespace) -> str:
         return f"operator {args.operator_command}"
     if args.command == "adapter" and getattr(args, "adapter_command", None):
         return f"adapter {args.adapter_command}"
+    if args.command == "broker" and getattr(args, "broker_command", None):
+        return f"broker {args.broker_command}"
     if args.command == "paper" and getattr(args, "paper_command", None):
         return f"paper {args.paper_command}"
     if args.command == "auth" and getattr(args, "auth_command", None):
@@ -2025,6 +2056,47 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return exit_code
 
+        if args.command == "broker" and args.broker_command == "preflight":
+            payload = build_preflight_receipt(
+                broker_id=args.broker_id,
+                mode=args.mode,
+                no_place_orders=args.no_place_orders,
+                mock_transport=args.mock_transport,
+                fixtures_path=Path(args.fixtures),
+                receipt_path=Path(args.receipt) if args.receipt else None,
+            )
+            payload = _attach_cli_contract(
+                payload,
+                command="broker preflight",
+                exit_code=0,
+                status_key="schema_version",
+                status_value=str(payload.get("schema_version") or "unknown"),
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Broker preflight "
+                    f"schema={payload['schema_version']} broker={args.broker_id} no_network={payload['no_network']}"
+                )
+            return 0
+
+        if args.command == "broker" and args.broker_command == "redact-check":
+            payload = redact_check_receipt(receipt_path=Path(args.receipt))
+            exit_code = 0 if payload["status"] == "pass" else 4
+            payload = _attach_cli_contract(
+                payload,
+                command="broker redact-check",
+                exit_code=exit_code,
+                status_key="status",
+                status_value=str(payload.get("status") or "unknown"),
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(f"Broker redact-check status={payload['status']} receipt={args.receipt}")
+            return exit_code
+
         if args.command == "paper" and args.paper_command == "run":
             payload, exit_code = run_paper_replay(
                 adapter_id=args.adapter,
@@ -2300,6 +2372,25 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_catalog_error(error)
     except ManifestValidationError as error:
         return _handle_manifest_error(error)
+    except BrokerDryRunError as error:
+        payload = {
+            "ok": False,
+            "error": str(error),
+            "reason": error.reason,
+            "schema_version": "broker-dry-run-error/v1",
+        }
+        payload = _attach_cli_contract(
+            payload,
+            command=_cli_command_identity(args),
+            exit_code=error.exit_code,
+            status_key="reason",
+            status_value=error.reason,
+        )
+        if getattr(args, "as_json", False):
+            _print_json(payload)
+        else:
+            print(f"Broker dry-run command failed: {error}", flush=True)
+        return error.exit_code
     except PaperRunError as error:
         payload = _attach_cli_contract(
             error.payload,

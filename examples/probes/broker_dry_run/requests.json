@@ -1,0 +1,13 @@
+{
+  "schema_version": "broker-dry-run-fixture/v1",
+  "requests": [
+    {
+      "case_id": "synthetic-buy-1",
+      "symbol_ref": "<PUBLIC_SYMBOL_REF>",
+      "side": "buy",
+      "quantity": 1,
+      "order_type": "market",
+      "time_in_force": "day"
+    }
+  ]
+}

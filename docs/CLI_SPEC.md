@@ -333,3 +333,14 @@ steamer-card-engine paper audit --paper-ledger .state/paper/ledger.sqlite --json
 ```
 
 Both commands emit `cli_contract.version = "cli-command/v1"`, `no_network=true`, and `topology_changed=false`. `paper run` emits `paper-run/v1`; `paper audit` emits `paper-audit/v1`. PnL is placeholder-only and must not be described as market-real.
+
+### 9. Broker dry-run mock commands
+
+Stage 4a broker dry-run is mock-only and requires the no-place-orders guard:
+
+```bash
+steamer-card-engine broker preflight --broker mock-fixture --mode dry-run --no-place-orders --mock-transport fixture --fixtures examples/probes/broker_dry_run --receipt docs/receipts/artifacts/2026-05-02_stage4a_broker_preflight_mock.receipt.json --json
+steamer-card-engine broker redact-check --receipt docs/receipts/artifacts/2026-05-02_stage4a_broker_preflight_mock.receipt.json --json
+```
+
+`broker preflight` emits `broker-dry-run-preflight/v1`; `broker redact-check` emits `broker-dry-run-redact-check/v1`. This slice is mock transport only: no real SDK, network, credentials, account/session inspect, order placement, or live-readiness claim.
