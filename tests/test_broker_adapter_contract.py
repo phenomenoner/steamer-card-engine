@@ -289,3 +289,116 @@ def test_fixture_adapter_has_no_order_events_or_live_capability() -> None:
     assert adapter.capabilities.live_trading_enabled is False
     assert adapter.capabilities.account_query_enabled is False
     assert tuple(adapter.iter_order_events()) == ()
+
+
+def test_fixture_contract_explain_schema_pins_stage1_surfaces() -> None:
+    from steamer_card_engine.adapters.fixture_exchange import build_fixture_explain_payload
+
+    payload, exit_code = build_fixture_explain_payload(adapter_id="fixture-paper-only")
+
+    assert exit_code == 0
+    assert payload["schema_version"] == "adapter-contract/v1"
+    assert payload["dispatch"] == FIXTURE_DISPATCH_BOUNDARY
+    assert payload["topology_changed"] is False
+    contract = payload["contract"]
+    assert contract["input_context"]["required"] == [
+        "card_id",
+        "deck_id",
+        "symbol",
+        "side",
+        "quantity",
+        "execution_mode",
+        "signal",
+    ]
+    assert contract["order_intent_candidate"]["broker_native_order"] is None
+    assert contract["receipt_envelope"]["broker_native_orders_allowed"] is False
+    assert "receipt_envelope" in contract
+    assert "sanitizer_contract" in contract
+
+
+def test_fixture_contract_case_outputs_are_deterministic_and_not_broker_native() -> None:
+    from steamer_card_engine.adapters.fixture_exchange import evaluate_fixture_contract_case
+
+    case = {
+        "case_id": "paper-buy-valid",
+        "input_context": {
+            "card_id": "fixture-card-paper-buy",
+            "deck_id": "fixture-deck-paper-only",
+            "symbol": "<FIXTURE_SYMBOL>",
+            "side": "buy",
+            "quantity": 1,
+            "execution_mode": "paper",
+            "signal": {"action": "enter", "confidence": 0.75, "reason": "fixture-threshold-cross"},
+        },
+    }
+
+    first = evaluate_fixture_contract_case(case)
+    second = evaluate_fixture_contract_case(case)
+
+    assert first == second
+    assert first["normalized_signal"]["decision"] == "allow"
+    assert first["normalized_signal"]["reason_code"] == "paper_preflight_allowed"
+    assert first["order_intent_candidate"]["kind"] == "normalized_order_intent_candidate"
+    assert first["order_intent_candidate"]["broker_native_order"] is None
+    assert first["broker_native_orders"] == []
+    assert first["dispatch"] == FIXTURE_DISPATCH_BOUNDARY
+
+
+def test_fixture_contract_reject_and_noop_reasons_are_stable() -> None:
+    from steamer_card_engine.adapters.fixture_exchange import evaluate_fixture_contract_case
+
+    live_reject = evaluate_fixture_contract_case(
+        {
+            "case_id": "live-buy-rejected",
+            "input_context": {
+                "symbol": "<FIXTURE_SYMBOL>",
+                "side": "buy",
+                "quantity": 1,
+                "execution_mode": "live",
+                "signal": {"action": "enter"},
+            },
+        }
+    )
+    noop = evaluate_fixture_contract_case(
+        {
+            "case_id": "hold-noop",
+            "input_context": {
+                "symbol": "<FIXTURE_SYMBOL>",
+                "side": "buy",
+                "quantity": 0,
+                "execution_mode": "paper",
+                "signal": {"action": "hold"},
+            },
+        }
+    )
+
+    assert live_reject["normalized_signal"]["decision"] == "reject"
+    assert live_reject["normalized_signal"]["reason_code"] == "capability_mismatch"
+    assert live_reject["reject_or_noop_reason"]["stable_reason"]
+    assert noop["normalized_signal"]["decision"] == "noop"
+    assert noop["normalized_signal"]["reason_code"] == "signal_no_action"
+    assert noop["order_intent_candidate"] is None
+    assert noop["reject_or_noop_reason"]["stable_reason"] == "signal action does not request an order intent"
+
+
+def test_fixture_contract_check_golden_cases_and_sanitized_public_payload() -> None:
+    from pathlib import Path
+
+    from steamer_card_engine.adapters.fixture_exchange import build_fixture_contract_check_payload
+
+    payload, exit_code = build_fixture_contract_check_payload(
+        adapter_id="fixture-paper-only",
+        fixtures_path=Path("examples/probes/adapter_contract"),
+    )
+    serialized = json.dumps(payload, sort_keys=True).lower()
+
+    assert exit_code == 0
+    assert payload["summary"] == {"checked": 3, "failed": 0, "decision": "pass"}
+    assert {case["normalized_signal"]["reason_code"] for case in payload["cases"]} == {
+        "paper_preflight_allowed",
+        "capability_mismatch",
+        "signal_no_action",
+    }
+    assert "broker_native_order" in serialized
+    for term in ("super-secret-token", "raw_response", "api_key", "password"):
+        assert term not in serialized

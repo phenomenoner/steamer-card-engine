@@ -1,0 +1,66 @@
+{
+  "schema_version": "adapter-contract-fixtures/v1",
+  "adapter": "fixture-paper-only",
+  "cases": [
+    {
+      "case_id": "paper-buy-valid",
+      "input_context": {
+        "card_id": "fixture-card-paper-buy",
+        "deck_id": "fixture-deck-paper-only",
+        "symbol": "<FIXTURE_SYMBOL>",
+        "side": "buy",
+        "quantity": 1,
+        "execution_mode": "paper",
+        "signal": {
+          "action": "enter",
+          "confidence": 0.75,
+          "reason": "fixture-threshold-cross"
+        }
+      },
+      "expect": {
+        "decision": "allow",
+        "reason_code": "paper_preflight_allowed"
+      }
+    },
+    {
+      "case_id": "live-buy-rejected",
+      "input_context": {
+        "card_id": "fixture-card-live-buy",
+        "deck_id": "fixture-deck-paper-only",
+        "symbol": "<FIXTURE_SYMBOL>",
+        "side": "buy",
+        "quantity": 1,
+        "execution_mode": "live",
+        "signal": {
+          "action": "enter",
+          "confidence": 0.75,
+          "reason": "fixture-live-attempt"
+        }
+      },
+      "expect": {
+        "decision": "reject",
+        "reason_code": "capability_mismatch"
+      }
+    },
+    {
+      "case_id": "hold-noop",
+      "input_context": {
+        "card_id": "fixture-card-hold",
+        "deck_id": "fixture-deck-paper-only",
+        "symbol": "<FIXTURE_SYMBOL>",
+        "side": "buy",
+        "quantity": 0,
+        "execution_mode": "paper",
+        "signal": {
+          "action": "hold",
+          "confidence": 0.25,
+          "reason": "fixture-no-action"
+        }
+      },
+      "expect": {
+        "decision": "noop",
+        "reason_code": "signal_no_action"
+      }
+    }
+  ]
+}

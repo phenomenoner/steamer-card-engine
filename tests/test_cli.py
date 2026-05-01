@@ -1216,3 +1216,75 @@ def test_adapter_probe_does_not_create_default_operator_state(capsys, tmp_path: 
     assert payload["topology_changed"] is False
     assert not (tmp_path / ".state" / "operator_posture.json").exists()
     assert not (tmp_path / ".state" / "operator_receipts").exists()
+
+
+def test_adapter_explain_fixture_contract_json_contract(capsys) -> None:
+    code = main(["adapter", "explain", "--adapter", "fixture-paper-only", "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "adapter explain",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "decision",
+        "status": "explained",
+    }
+    assert payload["schema_version"] == "adapter-contract/v1"
+    assert payload["contract"]["receipt_envelope"]["broker_native_orders_allowed"] is False
+    assert payload["dispatch"] == "fixture-only; no broker SDK; no live order"
+    assert payload["topology_changed"] is False
+
+
+def test_adapter_contract_check_fixture_golden_json_contract(capsys) -> None:
+    code = main(
+        [
+            "adapter",
+            "contract",
+            "check",
+            "--adapter",
+            "fixture-paper-only",
+            "--fixtures",
+            "examples/probes/adapter_contract",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["cli_contract"] == {
+        "version": "cli-command/v1",
+        "command": "adapter contract check",
+        "exit_code": 0,
+        "exit_class": "success",
+        "status_key": "summary.decision",
+        "status": "pass",
+    }
+    assert payload["summary"] == {"checked": 3, "failed": 0, "decision": "pass"}
+    assert payload["failures"] == []
+    assert payload["cases"][0]["order_intent_candidate"]["broker_native_order"] is None
+    assert payload["dispatch"] == "fixture-only; no broker SDK; no live order"
+    assert payload["topology_changed"] is False
+
+
+def test_adapter_contract_check_unknown_adapter_fails_closed_json_contract(capsys) -> None:
+    code = main(
+        [
+            "adapter",
+            "contract",
+            "check",
+            "--adapter",
+            "unknown-adapter",
+            "--fixtures",
+            "examples/probes/adapter_contract",
+            "--json",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert payload["cli_contract"]["exit_class"] == "operator-refused"
+    assert payload["cli_contract"]["status"] == "reject"
+    assert payload["reason_code"] == "unknown_adapter"
+    assert payload["topology_changed"] is False

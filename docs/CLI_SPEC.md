@@ -298,3 +298,25 @@ steamer-card-engine adapter probe --fixture paper-only --json
 The JSON payload uses the shared `cli_contract.version = "cli-command/v1"` envelope and reports adapter identity, capabilities, fixture-only session posture, preflight decision, sanitized normalized receipt, dispatch boundary, and `topology_changed=false`.
 
 `--execution-mode live` and unknown modes fail closed with exit code `4` before dispatch. This command does not read credentials, connect to brokers, write operator state, or claim broker/paper/live readiness beyond the deterministic fixture.
+
+### 7. Adapter fixture contract commands
+
+Used for CLI-first adapter hardening without broker connectivity.
+
+Examples:
+
+```bash
+steamer-card-engine adapter probe --fixture paper-only --json
+steamer-card-engine adapter explain --adapter fixture-paper-only --json
+steamer-card-engine adapter contract check --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json
+```
+
+Responsibilities:
+
+- expose adapter identity, capability profile, dispatch boundary, and topology status
+- pin the Stage 1 machine-readable contract for input context, normalized signal/order-intent candidate, reject/no-op reasons, receipt envelope, and sanitizer behavior
+- run deterministic golden fixture checks with stable reason codes (`paper_preflight_allowed`, `capability_mismatch`, `signal_no_action`)
+- never emit broker-native orders; candidates remain normalized intent only with dispatch suppressed
+- keep the surface fixture-only: no broker SDK, network, credential/env/certificate reads, `/workspace/steamer` state, or operator arm/disarm coupling
+
+All JSON outputs include `cli_contract.version = "cli-command/v1"`.

@@ -238,3 +238,12 @@ Canonical note:
 Added `steamer-card-engine adapter probe --fixture paper-only --json` as a read-only CLI contract probe backed by `src/steamer_card_engine/adapters/fixture_exchange.py`.
 
 Topology/config/cron impact: unchanged. The probe performs no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, and no runtime topology mutation.
+
+## Stage 1 fixture adapter contract topology note (2026-05-02)
+
+Added read-only fixture contract surfaces:
+
+- `steamer-card-engine adapter explain --adapter fixture-paper-only --json`
+- `steamer-card-engine adapter contract check --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json`
+
+Topology/config/cron impact: unchanged. These commands load local sanitized fixtures only, emit deterministic JSON, and perform no broker SDK import, no network call, no credential/env/certificate read, no `/workspace/steamer` access, no operator posture/receipt write, and no runtime topology mutation.

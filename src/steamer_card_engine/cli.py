@@ -9,7 +9,11 @@ import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from steamer_card_engine.adapters.fixture_exchange import build_fixture_probe_payload
+from steamer_card_engine.adapters.fixture_exchange import (
+    build_fixture_contract_check_payload,
+    build_fixture_explain_payload,
+    build_fixture_probe_payload,
+)
 from steamer_card_engine.manifest import (
     ManifestValidationError,
     load_auth_profile,
@@ -263,6 +267,29 @@ def build_parser() -> argparse.ArgumentParser:
     adapter_probe.add_argument("--fixture", required=True)
     adapter_probe.add_argument("--execution-mode", default="paper")
     adapter_probe.add_argument("--json", action="store_true", dest="as_json")
+
+    adapter_explain = adapter_sub.add_parser(
+        "explain",
+        help="Explain the fixture-only adapter contract schema and capability profile",
+    )
+    adapter_explain.add_argument("--adapter", required=True)
+    adapter_explain.add_argument("--json", action="store_true", dest="as_json")
+
+    adapter_contract = adapter_sub.add_parser(
+        "contract",
+        help="Fixture-only adapter contract checks",
+    )
+    adapter_contract_sub = adapter_contract.add_subparsers(
+        dest="adapter_contract_command",
+        required=True,
+    )
+    adapter_contract_check = adapter_contract_sub.add_parser(
+        "check",
+        help="Check fixture adapter contract cases against golden expectations",
+    )
+    adapter_contract_check.add_argument("--adapter", required=True)
+    adapter_contract_check.add_argument("--fixtures", required=True)
+    adapter_contract_check.add_argument("--json", action="store_true", dest="as_json")
 
     operator = subparsers.add_parser("operator", help="Operator governance commands")
     operator_sub = operator.add_subparsers(dest="operator_command", required=True)
@@ -1892,6 +1919,53 @@ def main(argv: list[str] | None = None) -> int:
                     f"mode={args.execution_mode} dispatch={payload['dispatch']}"
                 )
             return exit_code
+
+        if args.command == "adapter" and args.adapter_command == "explain":
+            payload, exit_code = build_fixture_explain_payload(adapter_id=args.adapter)
+            status_value = str(payload.get("decision", "explained" if exit_code == 0 else "reject"))
+            payload = _attach_cli_contract(
+                payload,
+                command="adapter explain",
+                exit_code=exit_code,
+                status_key="decision",
+                status_value=status_value,
+            )
+            if args.as_json:
+                _print_json(payload)
+            else:
+                print(
+                    "Adapter explain "
+                    f"status={status_value} adapter={args.adapter} dispatch={payload['dispatch']}"
+                )
+            return exit_code
+
+        if args.command == "adapter" and args.adapter_command == "contract":
+            if args.adapter_contract_command == "check":
+                payload, exit_code = build_fixture_contract_check_payload(
+                    adapter_id=args.adapter,
+                    fixtures_path=Path(args.fixtures),
+                )
+                summary = payload.get("summary", {})
+                status_value = str(
+                    summary.get("decision", "reject" if exit_code else "pass")
+                    if isinstance(summary, dict)
+                    else "reject"
+                )
+                payload = _attach_cli_contract(
+                    payload,
+                    command="adapter contract check",
+                    exit_code=exit_code,
+                    status_key="summary.decision",
+                    status_value=status_value,
+                )
+                if args.as_json:
+                    _print_json(payload)
+                else:
+                    print(
+                        "Adapter contract check "
+                        f"status={status_value} adapter={args.adapter} dispatch={payload['dispatch']}"
+                    )
+                return exit_code
 
         if args.command == "operator" and args.operator_command == "status":
             result = operator_status(

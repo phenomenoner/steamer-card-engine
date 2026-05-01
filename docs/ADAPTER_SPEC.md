@@ -279,3 +279,21 @@ The runtime should consume these as structured states, not stringly-typed surpri
 - fail-closed preflight for `live` or unknown execution modes before any dispatch boundary
 
 Red lines: no broker SDK imports, no network, no credential/env/certificate reads, no `/workspace/steamer` state, and no live/paper readiness claim beyond this fixture-only contract probe.
+
+## Fixture-only adapter contract hardening (Stage 1)
+
+`FixturePaperOnlyAdapter` also exposes a Stage 1 machine-readable contract surface for golden checks before any replay/runtime/broker coupling:
+
+- `steamer-card-engine adapter explain --adapter fixture-paper-only --json`
+- `steamer-card-engine adapter contract check --adapter fixture-paper-only --fixtures examples/probes/adapter_contract --json`
+
+The contract pins:
+
+- input card/deck context (`card_id`, `deck_id`, public symbol reference, side, quantity, execution mode, signal)
+- normalized signal decision (`allow`, `reject`, `noop`) with stable reason codes
+- normalized order-intent candidate shape with `broker_native_order = null`
+- reject/no-op reason envelope with stable reason text, retryability, and replay safety
+- fixture capability profile
+- receipt envelope and public sanitizer contract
+
+Golden checks are deterministic and remain fixture-only. They do not import broker SDKs, read credentials/env/certificates, call network, read or write `/workspace/steamer`, create operator receipts, or claim live/paper readiness beyond the fixture contract.
