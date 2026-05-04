@@ -53,6 +53,67 @@ type ObserverSessionsPayload = {
   strategy_runs?: StrategyRun[];
 };
 
+type FixtureDateItem = {
+  date: string;
+  hero?: boolean;
+  compare_status?: string;
+  scenario_id?: string;
+  symbol_count?: number | null;
+  calendar?: string | null;
+  timezone?: string | null;
+  local_run_count?: number;
+  lanes?: Record<string, number>;
+  s3_archive_present?: boolean;
+  s3_manifest_present?: boolean;
+  watchlist_present?: boolean;
+  fixture_compare_present?: boolean;
+};
+
+type RuntimeDatesPayload = {
+  source_kind: string;
+  date_count: number;
+  runtime_date_count: number;
+  fixture_dates: string[];
+  dates: FixtureDateItem[];
+  notes?: string[];
+};
+
+type ProductStrategyCard = {
+  id: string;
+  card_id: string;
+  card_version?: string;
+  deck_id?: string;
+  lane: string;
+  top_symbols?: Array<{ label: string; count: number }>;
+  intent_count?: number;
+};
+
+type ProductDeckView = {
+  date: string;
+  universe?: {
+    scenario_id?: string | null;
+    calendar?: string | null;
+    timezone?: string | null;
+    symbol_count?: number;
+    symbol_samples?: string[];
+  };
+  strategy?: {
+    cards?: ProductStrategyCard[];
+  };
+};
+
+type RuntimeBarsPayload = {
+  date: string;
+  symbol: string;
+  timeframe: string;
+  source_kind: string;
+  source_path?: string | null;
+  tick_count: number;
+  bar_count: number;
+  bars: Candle[];
+  note?: string | null;
+};
+
 function symbolPoolLabel(sourceKind: string) {
   if (sourceKind === "observer-sessions-fallback") return "Mounted sessions fallback";
   if (sourceKind === "observer-bundle-metadata") return "Mounted bundle metadata (actual)";
@@ -314,6 +375,13 @@ function formatTimestamp(value: string | null | undefined) {
   });
 }
 
+function formatDateLabel(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Taipei" });
+}
+
 function toUtcTimestamp(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
 }
@@ -388,7 +456,105 @@ function TimeframeSelector({ value, onChange }: { value: ChartTimeframe; onChang
   );
 }
 
+function DateSelector({ dates, value, onChange }: { dates: FixtureDateItem[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="observer-session-selector" htmlFor="observer-date-select">
+      <span className="mini-label">Step 0 · Runtime date · {dates.length || 1} dates indexed</span>
+      <select id="observer-date-select" value={value} disabled={!dates.length} onChange={(event) => onChange(event.target.value)}>
+        {dates.length ? dates.map((item) => {
+          const runCount = item.local_run_count ?? 0;
+          const suffix = runCount ? `${runCount} local runs` : (item.watchlist_present ? "watchlist/data collected" : (item.fixture_compare_present ? "fixture compare" : "runtime index"));
+          const s3 = item.s3_archive_present ? " · S3 archive" : "";
+          return <option key={item.date} value={item.date}>{formatDateLabel(item.date)} · {suffix}{s3}</option>;
+        }) : <option value={value}>{formatDateLabel(value)}</option>}
+      </select>
+    </label>
+  );
+}
+
 function StrategySelector({
+  cards,
+  value,
+  onChange,
+}: {
+  cards: ProductStrategyCard[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="observer-session-selector" htmlFor="observer-strategy-select">
+      <span className="mini-label">Step 1 · Strategy Card executed on date</span>
+      <select id="observer-strategy-select" value={value} disabled={!cards.length} onChange={(event) => onChange(event.target.value)}>
+        {cards.length ? cards.map((card) => (
+          <option key={card.id} value={card.id}>
+            {card.lane} / {card.card_id} · {card.card_version ?? "—"}
+          </option>
+        )) : <option value="">Runtime date indexed · strategy-card detail pending</option>}
+      </select>
+    </label>
+  );
+}
+
+function ViewModeSelector({
+  isOverviewMode,
+  onChange,
+}: {
+  isOverviewMode: boolean;
+  onChange: (mode: "overview" | "symbol") => void;
+}) {
+  return (
+    <label className="observer-session-selector" htmlFor="observer-view-mode-select">
+      <span className="mini-label">Step 2 · View</span>
+      <select
+        id="observer-view-mode-select"
+        value={isOverviewMode ? "overview" : "symbol"}
+        onChange={(event) => onChange(event.target.value === "symbol" ? "symbol" : "overview")}
+      >
+        <option value="overview">Overview · trades / position / PnL / receipts</option>
+        <option value="symbol">Symbol Detail · chart / orders / fills / timeline</option>
+      </select>
+    </label>
+  );
+}
+
+function SymbolSelector({
+  symbols,
+  value,
+  disabled,
+  onChange,
+}: {
+  symbols: string[];
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const selectorSymbols = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    [value, ...symbols].forEach((symbol) => {
+      const normalized = typeof symbol === "string" ? symbol.trim() : "";
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      out.push(normalized);
+    });
+    return out;
+  }, [symbols, value]);
+  return (
+    <label className={`observer-session-selector ${disabled ? "observer-session-selector-disabled" : ""}`} htmlFor="observer-symbol-select">
+      <span className="mini-label">Step 3 · Symbol for detail · chart-backed status</span>
+      <select id="observer-symbol-select" value={value} disabled={disabled || !selectorSymbols.length} onChange={(event) => onChange(event.target.value)}>
+        {!selectorSymbols.length ? <option value="">No symbols mounted</option> : null}
+        {selectorSymbols.map((symbol) => (
+          <option key={symbol} value={symbol}>
+            {symbol}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function StrategyRunSelector({
   strategies,
   value,
   onChange,
@@ -398,9 +564,9 @@ function StrategySelector({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="observer-session-selector" htmlFor="observer-strategy-select">
+    <label className="observer-session-selector" htmlFor="observer-replay-strategy-select">
       <span className="mini-label">Strategy Card selector</span>
-      <select id="observer-strategy-select" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select id="observer-replay-strategy-select" value={value} onChange={(event) => onChange(event.target.value)}>
         {strategies.map((strategy) => (
           <option key={strategy.strategy_id} value={strategy.strategy_id}>
             {strategy.strategy_label}
@@ -716,7 +882,7 @@ function ReceiptTrustPanel({ bootstrap, selected }: { bootstrap: ObserverBootstr
   );
 }
 
-function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[]; markers: ChartMarker[]; mode?: "live" | "replay" }) {
+function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[]; markers: ChartMarker[]; mode?: "live" | "replay" | "runtime" }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -791,7 +957,7 @@ function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[];
   return (
     <div className="observer-chart-shell">
       <div className="observer-chart-legend" aria-label="Chart marker legend">
-        <span className="mini-label">{mode === "replay" ? "replay markers" : "live markers"}</span>
+        <span className="mini-label">{mode === "runtime" ? "runtime bars" : mode === "replay" ? "replay markers" : "live markers"}</span>
         <span><i className="legend-dot legend-buy" />buy/order</span>
         <span><i className="legend-dot legend-sell" />sell/order</span>
         <span><i className="legend-dot legend-fill" />fill</span>
@@ -836,6 +1002,69 @@ export function ObserverSurface() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasNoSession, setHasNoSession] = useState(false);
+  const [fixtureDates, setFixtureDates] = useState<FixtureDateItem[]>([]);
+  const [runtimeDateSource, setRuntimeDateSource] = useState<string>("fixture-only");
+  const [selectedProductDate, setSelectedProductDate] = useState<string>("");
+  const [productDeck, setProductDeck] = useState<ProductDeckView | null>(null);
+  const [selectedProductCardId, setSelectedProductCardId] = useState<string>("");
+  const [productDeckError, setProductDeckError] = useState<string | null>(null);
+  const [runtimeBars, setRuntimeBars] = useState<RuntimeBarsPayload | null>(null);
+  const [runtimeBarsError, setRuntimeBarsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDates() {
+      try {
+        const runtimePayload = await getJson<RuntimeDatesPayload>("/api/runtime/dates");
+        if (cancelled) return;
+        const dates = runtimePayload.dates ?? [];
+        setFixtureDates(dates);
+        setRuntimeDateSource(runtimePayload.source_kind);
+        const defaultDate = dates.find((item) => item.local_run_count)?.date ?? dates.find((item) => item.hero)?.date ?? dates[0]?.date ?? "";
+        setSelectedProductDate((current) => current || defaultDate);
+      } catch {
+        if (!cancelled) {
+          const dates = await getJson<FixtureDateItem[]>("/api/dates").catch(() => []);
+          setFixtureDates(dates);
+          setRuntimeDateSource("fixture-fallback");
+        }
+      }
+    }
+    void loadDates();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProductDeck() {
+      if (!selectedProductDate) {
+        setProductDeck(null);
+        return;
+      }
+      const dateItem = fixtureDates.find((item) => item.date === selectedProductDate);
+      if (dateItem && !dateItem.fixture_compare_present) {
+        setProductDeck(null);
+        setSelectedProductCardId("");
+        setProductDeckError(null);
+        return;
+      }
+      try {
+        const deck = await getJson<ProductDeckView>(`/api/days/${selectedProductDate}/deck`);
+        if (cancelled) return;
+        setProductDeck(deck);
+        const cards = deck.strategy?.cards ?? [];
+        setSelectedProductCardId((current) => cards.some((card) => card.id === current) ? current : cards[0]?.id ?? "");
+        setProductDeckError(null);
+      } catch (reason) {
+        if (!cancelled) {
+          setProductDeck(null);
+          setProductDeckError(String(reason));
+        }
+      }
+    }
+    void loadProductDeck();
+    return () => { cancelled = true; };
+  }, [selectedProductDate, fixtureDates]);
 
   useEffect(() => {
     let cancelled = false;
@@ -968,10 +1197,9 @@ export function ObserverSurface() {
 
   useEffect(() => {
     if (selectedView === OVERVIEW_VIEW_ID) return;
-    if (resolveMountedSymbolSessionId(selectedView, selectedStrategy, sessionIdsBySymbol)) return;
-    if (selectedStrategy?.symbols.includes(selectedView)) return;
+    if (selectedStrategy) return;
     setSelectedView(OVERVIEW_VIEW_ID);
-  }, [selectedStrategy, selectedView, sessionIdsBySymbol]);
+  }, [selectedStrategy, selectedView]);
 
   const strategySummarySessionId = selectedStrategy?.default_session_id ?? selectedStrategy?.session_ids[0] ?? null;
   const selectedSymbol = selectedView === OVERVIEW_VIEW_ID ? null : selectedView;
@@ -979,6 +1207,30 @@ export function ObserverSurface() {
   const hasMountedSymbolSession = Boolean(selectedSymbol && mountedSymbolSessionId);
   const isOverviewMode = selectedView === OVERVIEW_VIEW_ID;
   const activeSessionId = hasMountedSymbolSession ? mountedSymbolSessionId : strategySummarySessionId;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRuntimeBars() {
+      if (isOverviewMode || !selectedProductDate || !selectedSymbol) {
+        setRuntimeBars(null);
+        setRuntimeBarsError(null);
+        return;
+      }
+      const timeframe = chartTimeframe === "auto" ? "1m" : chartTimeframe;
+      try {
+        const payload = await getJson<RuntimeBarsPayload>(`/api/runtime/dates/${selectedProductDate}/symbols/${selectedSymbol.replace(".TW", "")}/bars?timeframe=${timeframe}`);
+        if (cancelled) return;
+        setRuntimeBars(payload);
+        setRuntimeBarsError(null);
+      } catch (reason) {
+        if (cancelled) return;
+        setRuntimeBars(null);
+        setRuntimeBarsError(String(reason));
+      }
+    }
+    void loadRuntimeBars();
+    return () => { cancelled = true; };
+  }, [isOverviewMode, selectedProductDate, selectedSymbol, chartTimeframe]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1120,6 +1372,15 @@ export function ObserverSurface() {
   }, [sessions, symbolPool]);
 
   const viewSymbols = selectedStrategy?.symbols.length ? selectedStrategy.symbols : effectivePool.symbols;
+  const productCards = productDeck?.strategy?.cards ?? [];
+  const selectedProductCard = productCards.find((card) => card.id === selectedProductCardId) ?? productCards[0] ?? null;
+  const selectedRuntimeDate = fixtureDates.find((item) => item.date === selectedProductDate) ?? null;
+  const strategyCardLabel = selectedProductCard ? `${selectedProductCard.lane} / ${selectedProductCard.card_id}` : (selectedRuntimeDate?.fixture_compare_present ? selectedStrategy?.strategy_label ?? "fixture strategy pending" : "runtime strategy-card detail pending");
+  const productUniverseSymbols = normalizeSymbolList([
+    ...(productDeck?.universe?.symbol_samples ?? []),
+    ...((selectedProductCard?.top_symbols ?? []).map((item) => item.label)),
+    ...viewSymbols,
+  ]);
   const activeSession = state.session;
 
   if (loading && !state.bootstrap) return <div className="state-block">Loading observer sidecar…</div>;
@@ -1129,19 +1390,95 @@ export function ObserverSurface() {
   if (!state.bootstrap) return <div className="state-block">Observer bootstrap unavailable.</div>;
 
   const bootstrap = state.bootstrap;
-  const chartCandles = aggregateCandles(bootstrap.chart.candles, chartTimeframe);
-  const chartMarkers = alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
+  const mountedDetailSymbols = normalizeSymbolList(
+    selectedStrategy.session_ids
+      .map((sessionId) => sessions.find((session) => session.session_id === sessionId)?.symbol)
+      .filter((symbol): symbol is string => typeof symbol === "string" && symbol.trim().length > 0),
+  );
+  const detailSymbols = productUniverseSymbols.length ? productUniverseSymbols : (mountedDetailSymbols.length ? mountedDetailSymbols : (bootstrap.symbol ? [bootstrap.symbol] : []));
+  const dateStepLabel = selectedProductDate ? formatDateLabel(selectedProductDate) : formatDateLabel(bootstrap.generated_at.slice(0, 10));
+  const defaultDetailSymbol =
+    bootstrap.symbol
+    ?? detailSymbols.find((symbol) => resolveMountedSymbolSessionId(symbol, selectedStrategy, sessionIdsBySymbol))
+    ?? detailSymbols[0]
+    ?? "";
+  const detailSymbolValue = selectedSymbol && detailSymbols.includes(selectedSymbol) ? selectedSymbol : defaultDetailSymbol;
+  const handleViewModeChange = (mode: "overview" | "symbol") => {
+    if (mode === "overview") {
+      setSelectedView(OVERVIEW_VIEW_ID);
+      return;
+    }
+    setSelectedView(detailSymbolValue || defaultDetailSymbol || OVERVIEW_VIEW_ID);
+  };
+  const breadcrumbSymbol = selectedSymbol ?? bootstrap.symbol ?? defaultDetailSymbol;
+  const runtimeChartAvailable = Boolean(runtimeBars && runtimeBars.bar_count > 0 && runtimeBars.bars.length > 0);
+  const chartCandles = runtimeChartAvailable ? (runtimeBars?.bars ?? []) : aggregateCandles(bootstrap.chart.candles, chartTimeframe);
+  const chartMarkers = runtimeChartAvailable ? [] : alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
+  const chartSourceLabel = runtimeChartAvailable ? `runtime-derived market ticks · ${runtimeBars?.tick_count ?? 0} ticks / ${runtimeBars?.bar_count ?? 0} bars` : "mounted observer session";
   const poolSourceLabel = symbolPoolLabel(effectivePool.source_kind);
   const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
   const universeSymbols = effectivePool.symbols.length ? effectivePool.symbols : (effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols);
-  const missingSymbolSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
+  const missingSymbolSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession && !runtimeChartAvailable;
   const overviewSummary = summarizeStrategyOverview(selectedStrategy, viewSymbols, overviewBootstraps.length ? overviewBootstraps : [bootstrap]);
+  const handleSymbolSelection = (symbol: string) => {
+    const mountedSessionId = resolveMountedSymbolSessionId(symbol, selectedStrategy, sessionIdsBySymbol);
+    if (mountedSessionId) {
+      const canonicalSymbol = sessions.find((session) => session.session_id === mountedSessionId)?.symbol ?? symbol;
+      setSelectedView(canonicalSymbol);
+      return;
+    }
+    setSelectedView(symbol);
+  };
 
   return (
     <main className="observer-surface">
+      <section className="panel observer-focus-card">
+        <div className="panel-header">
+          <h3>Strategy Card selector</h3>
+          <span className="pill">Overview / Symbol Detail</span>
+        </div>
+        <div className="panel-body observer-focus-body">
+          <div className="observer-title-row observer-focus-title-row">
+            <h2>{dateStepLabel} · {strategyCardLabel}</h2>
+            <span className="pill">selected date/card flow</span>
+          </div>
+          <p className="strategy-note observer-focus-copy">Use the controls below: Step 0 picks from the runtime live-sim/run index, Step 1 picks a real strategy card when a fixture deck exists, Step 2 chooses Overview vs Symbol Detail, Step 3 shows the date/card universe with chart-backed status.</p>
+          <div className="observer-breadcrumb" aria-label="Current Strategy Card path">
+            <span>Date</span>
+            <strong>{dateStepLabel}</strong>
+            <span>›</span>
+            <span>Strategy Card</span>
+            <strong>{strategyCardLabel}</strong>
+            <span>›</span>
+            <strong>{isOverviewMode ? "Overview" : "Symbol Detail"}</strong>
+            <span>›</span>
+            <strong>{isOverviewMode ? `mounted symbol ${breadcrumbSymbol}` : `symbol ${breadcrumbSymbol}`}</strong>
+          </div>
+          <div className="observer-focus-layout">
+            <div className="observer-focus-selector-block">
+              <DateSelector dates={fixtureDates} value={selectedProductDate} onChange={setSelectedProductDate} />
+              <StrategySelector cards={productCards} value={selectedProductCardId} onChange={setSelectedProductCardId} />
+              <ViewModeSelector isOverviewMode={isOverviewMode} onChange={handleViewModeChange} />
+              <SymbolSelector symbols={detailSymbols} value={detailSymbolValue} disabled={isOverviewMode} onChange={handleSymbolSelection} />
+              <p className="card-meta observer-focus-helper">Overview summarizes strategy-card truth. Switch View to Symbol Detail, then choose a symbol; chart-backed symbols load chart/orders/fills/timeline, while unavailable symbols show a no-chart-backed-data state.</p>
+            </div>
+            <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
+              <div><span className="mini-label">current path</span><strong>{isOverviewMode ? `Overview · mounted ${breadcrumbSymbol}` : `Symbol Detail · ${breadcrumbSymbol}`}</strong></div>
+              <div><span className="mini-label">chart symbol</span><strong>{isOverviewMode ? `${bootstrap.symbol} (overview reference)` : runtimeChartAvailable ? `${runtimeBars?.symbol} · runtime bars` : missingSymbolSelection ? `not chart-backed · ${selectedSymbol}` : bootstrap.symbol}</strong></div>
+              <div><span className="mini-label">chart source</span><strong>{chartSourceLabel}</strong></div>
+              <div><span className="mini-label">strategy card</span><strong>{selectedProductCard ? `${selectedProductCard.lane}/${selectedProductCard.card_id}` : "runtime detail pending"}</strong></div>
+              <div><span className="mini-label">symbol source</span><strong>{productDeck ? `date/card universe · ${productDeck.universe?.symbol_count ?? detailSymbols.length}` : selectedStrategy.symbols_source_kind}</strong></div>
+              <div><span className="mini-label">date source</span><strong>{runtimeDateSource}</strong></div>
+              <div><span className="mini-label">symbols in date/card selector</span><strong>{detailSymbols.length}</strong></div>
+              <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="panel observer-status-strip">
         <div className="panel-header">
-          <h3>Observer Status</h3>
+          <h3>Chart-backed Observer Session · provenance</h3>
           <div className="observer-chip-row">
             <span className={`status-chip status-chip-${freshnessClass}`}>LIVE FRESHNESS · {bootstrap.freshness_state.toUpperCase()}</span>
             <span className={`status-chip status-chip-${streamTone(state.streamState, state.sequenceGaps.length > 0)}`}>{streamLabel(state.streamState, state.sequenceGaps.length)}</span>
@@ -1149,7 +1486,7 @@ export function ObserverSurface() {
           </div>
         </div>
         <div className="panel-body observer-status-body observer-top-meta">
-          <div><span className="mini-label">session id</span><strong>{bootstrap.session_id}</strong></div>
+          <div><span className="mini-label">observer session id</span><strong>{missingSymbolSelection ? `not linked to ${selectedSymbol}` : bootstrap.session_id}</strong></div>
           <div><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
           <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
           <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
@@ -1189,34 +1526,7 @@ export function ObserverSurface() {
         </div>
       </section>
 
-      <section className="panel observer-focus-card">
-        <div className="panel-header">
-          <h3>Strategy Card selector</h3>
-          <span className="pill">Overview / Symbol Detail</span>
-        </div>
-        <div className="panel-body observer-focus-body">
-          <div className="observer-title-row observer-focus-title-row">
-            <h2>{selectedStrategy.strategy_label}</h2>
-            <span className="pill">{selectedStrategy.strategy_source_kind}</span>
-          </div>
-          <p className="strategy-note observer-focus-copy">Strategy Card picks the strategy run. Overview summarizes strategy-card truth; Symbol Detail opens one mounted chart and execution trace.</p>
-          <div className="observer-focus-layout">
-            <div className="observer-focus-selector-block">
-              <StrategySelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} />
-              <ViewSelector symbols={viewSymbols} value={selectedView} onChange={setSelectedView} />
-              <p className="card-meta observer-focus-helper">Overview = trades / position / PnL truth / receipts. Symbol Detail = bar chart / orders / fills / health timeline.</p>
-            </div>
-            <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
-              <div><span className="mini-label">strategy id</span><strong>{selectedStrategy.strategy_id}</strong></div>
-              <div><span className="mini-label">view</span><strong>{selectedView === OVERVIEW_VIEW_ID ? "Strategy Card Overview" : `Symbol Detail · ${selectedView}`}</strong></div>
-              <div><span className="mini-label">mounted session</span><strong>{activeSession?.session_id ?? "none"}</strong></div>
-              <div><span className="mini-label">symbol source</span><strong>{selectedStrategy.symbols_source_kind}</strong></div>
-              <div><span className="mini-label">symbols in view selector</span><strong>{viewSymbols.length}</strong></div>
-              <div><span className="mini-label">websocket</span><strong>{state.streamState}</strong></div>
-            </div>
-          </div>
-        </div>
-      </section>
+
 
       {!isOverviewMode && !missingSymbolSelection ? (
         <div className="metrics-row observer-metrics-row">
@@ -1230,7 +1540,7 @@ export function ObserverSurface() {
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>{isOverviewMode ? "Strategy Card Overview" : "Symbol Detail · Bar Chart"}</h3>
+            <h3>{isOverviewMode ? `Strategy Card Overview · mounted symbol ${bootstrap.symbol}` : runtimeChartAvailable ? `Runtime Bar Chart · ${runtimeBars?.symbol} · ${chartTimeframe === "auto" ? "1m" : chartTimeframe}` : missingSymbolSelection ? `No chart-backed data · ${selectedSymbol}` : `Symbol Detail · ${bootstrap.symbol} · ${chartTimeframe === "auto" ? bootstrap.timeframe : chartTimeframe} Bar Chart`}</h3>
             {!isOverviewMode ? <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div> : null}
           </div>
           <div className="panel-body observer-chart-wrap">
@@ -1240,7 +1550,7 @@ export function ObserverSurface() {
                   <strong>Strategy Card Overview</strong>
                   <span className="status-chip status-chip-muted">read-only receipt truth</span>
                 </div>
-                <p className="card-meta">Trades, position, PnL, and receipt state are derived only from mounted sanitized observer bootstraps. PnL stays unavailable when the payload does not provide it.</p>
+                <p className="card-meta">Trades, position, PnL, and receipt state are derived only from mounted sanitized observer bootstraps. Current mounted chart reference: {bootstrap.symbol}. Switch View to Symbol Detail to inspect that symbol&apos;s chart and execution trace.</p>
                 {overviewLoading ? <ReconciliationStateBlock label="overview" state="derived" reason="Loading mounted session bootstraps for strategy-card summary." /> : null}
                 {overviewError ? <ReconciliationStateBlock label="overview" state="degraded" reason={`Unable to load every mounted session bootstrap: ${overviewError}`} /> : null}
                 <div className="observer-top-meta observer-overview-grid">
@@ -1256,11 +1566,14 @@ export function ObserverSurface() {
               </div>
             ) : missingSymbolSelection ? (
               <div className="state-block observer-empty-state">
-                <strong>No mounted symbol session for {selectedSymbol}.</strong>
-                <span>View selector includes full universe symbols, but this symbol does not have a mounted observer session yet.</span>
+                <strong>No runtime or mounted chart data for {selectedSymbol}.</strong>
+                <span>This symbol is in the selected runtime/date universe, but no verified runtime bars or mounted observer chart session are available yet. Chart/timeline are intentionally not shown to avoid stale data.</span>
               </div>
             ) : (
-              <ObserverChart candles={chartCandles} markers={chartMarkers} mode="live" />
+              <>
+                {runtimeBarsError ? <ReconciliationStateBlock label="runtime bars" state="degraded" reason={runtimeBarsError} /> : null}
+                <ObserverChart candles={chartCandles} markers={chartMarkers} mode={runtimeChartAvailable ? "runtime" : "live"} />
+              </>
             )}
           </div>
         </section>
@@ -1349,31 +1662,46 @@ export function ObserverSurface() {
         </aside> : null}
       </div>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h3>{isOverviewMode ? "Strategy Card Overview · Timeline" : "Symbol Detail · Timeline"}</h3>
-          <div className="observer-chip-row">
-            <span className="pill">selected mounted session</span>
-            <span className="status-chip status-chip-muted">append-only order</span>
-            <span className="status-chip status-chip-muted">cursor follows chart time</span>
+      {missingSymbolSelection ? (
+        <section className="panel">
+          <div className="panel-header">
+            <h3>No chart-backed timeline · {selectedSymbol}</h3>
+            <div className="observer-chip-row">
+              <span className="pill">date/card universe symbol</span>
+              <span className="status-chip status-chip-alert">not mounted</span>
+            </div>
           </div>
-        </div>
-        <div className="panel-body observer-timeline-grid">
-          {state.timeline.map((item) => (
-            <article className="history-item" key={item.seq}>
-              <div className="history-item-head">
-                <div>
-                  <div className="card-title history-title">#{item.seq} · {item.title}</div>
-                  <div className="card-meta">{formatTimestamp(item.event_time)} · {item.event_type}</div>
+          <div className="panel-body">
+            <ReconciliationStateBlock label="timeline" state="unavailable" reason="This selected symbol has no mounted observer timeline. Timeline rows from another symbol are intentionally hidden." />
+          </div>
+        </section>
+      ) : (
+        <section className="panel">
+          <div className="panel-header">
+            <h3>{isOverviewMode ? "Strategy Card Overview · Timeline" : "Symbol Detail · Timeline"}</h3>
+            <div className="observer-chip-row">
+              <span className="pill">selected mounted session</span>
+              <span className="status-chip status-chip-muted">append-only order</span>
+              <span className="status-chip status-chip-muted">cursor follows chart time</span>
+            </div>
+          </div>
+          <div className="panel-body observer-timeline-grid">
+            {state.timeline.map((item) => (
+              <article className="history-item" key={item.seq}>
+                <div className="history-item-head">
+                  <div>
+                    <div className="card-title history-title">#{item.seq} · {item.title}</div>
+                    <div className="card-meta">{formatTimestamp(item.event_time)} · {item.event_type}</div>
+                  </div>
+                  <span className={`status-chip status-chip-${tone(item.freshness_state)}`}>{item.status}</span>
                 </div>
-                <span className={`status-chip status-chip-${tone(item.freshness_state)}`}>{item.status}</span>
-              </div>
-              <p className="card-meta">{item.summary}</p>
-              <span className="observer-timeline-cursor">cursor {formatTimestamp(item.event_time)} · seq {item.seq}</span>
-            </article>
-          ))}
-        </div>
-      </section>
+                <p className="card-meta">{item.summary}</p>
+                <span className="observer-timeline-cursor">cursor {formatTimestamp(item.event_time)} · seq {item.seq}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
@@ -1567,7 +1895,7 @@ export function ReplayHistorySurface() {
         <div className="panel-body observer-focus-body">
           <div className="observer-focus-layout">
             <div className="observer-focus-selector-block">
-              {selectedStrategy ? <StrategySelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} /> : null}
+              {selectedStrategy ? <StrategyRunSelector strategies={strategies} value={selectedStrategy.strategy_id} onChange={setSelectedStrategyId} /> : null}
               <ViewSelector symbols={viewSymbols} value={selectedView} onChange={setSelectedView} />
               <p className="card-meta observer-focus-helper">Overview means portfolio-level replay behavior. Symbol means chart-level replay execution detail.</p>
             </div>

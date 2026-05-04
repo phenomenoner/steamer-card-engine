@@ -863,6 +863,39 @@ button {
   box-shadow: 0 0 0 2px rgba(94, 243, 177, 0.12);
 }
 
+.observer-session-selector-disabled {
+  opacity: 0.72;
+}
+
+.observer-session-selector select:disabled {
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.observer-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 205, 129, 0.35);
+  background: rgba(255, 205, 129, 0.08);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.observer-breadcrumb strong {
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: inherit;
+}
+
 .observer-session-selector-single select {
   border-color: rgba(255, 205, 129, 0.45);
   box-shadow: 0 0 0 2px rgba(255, 205, 129, 0.12);
@@ -1460,7 +1493,6 @@ body {
   background: rgba(198, 99, 99, 0.08);
 }
 
-.observer-focus-card,
 .observer-universe-card {
   display: none;
 }

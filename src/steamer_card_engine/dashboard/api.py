@@ -13,6 +13,8 @@ from steamer_card_engine.observer.history import ObserverHistoryError, observer_
 from .aggregator import DashboardDataError, build_card_detail, build_day_bundle, list_fixture_dates
 from .fixtures import repo_root
 from .strategy_pipeline import StrategyPipelineDataError, build_strategy_pipeline_view
+from .runtime_chart import build_runtime_symbol_bars
+from .runtime_index import build_runtime_dates_index
 from .strategy_powerhouse import StrategyPowerhouseDataError, build_strategy_powerhouse_view
 
 
@@ -34,6 +36,14 @@ def create_app() -> FastAPI:
     @app.get("/api/dates")
     def dates() -> list[dict]:
         return list_fixture_dates(root)
+
+    @app.get("/api/runtime/dates")
+    def runtime_dates() -> dict:
+        return build_runtime_dates_index(root)
+
+    @app.get("/api/runtime/dates/{date}/symbols/{symbol}/bars")
+    def runtime_symbol_bars(date: str, symbol: str, timeframe: str = "1m") -> dict:
+        return build_runtime_symbol_bars(date=date, symbol=symbol, timeframe=timeframe, root=root)
 
     @app.get("/api/days/{date}/deck")
     def deck(date: str) -> dict:

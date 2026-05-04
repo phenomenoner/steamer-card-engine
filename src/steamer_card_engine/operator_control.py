@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 import json
 import os
@@ -9,6 +9,15 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from steamer_card_engine.adapters.neoapi_broker import NeoApiBrokerAdapter, load_neoapi_credentials
+from steamer_card_engine.live_execution import (
+    DryRunRoundTripAdapter,
+    FirstLiveRiskGuard,
+    LiveExecutionPolicy,
+    RoundTripLedger,
+    build_sell_first_round_trip_plan,
+    rejected_round_trip_receipt,
+)
 from steamer_card_engine.manifest import ManifestValidationError, load_auth_profile, load_deck_manifest
 
 
@@ -931,6 +940,197 @@ def operator_plan_real_trade_gate(
         "receipt_path": receipt["receipt_path"],
     }
     return OperatorResult(payload=payload, exit_code=0 if not blockers else OPERATOR_REFUSED_EXIT)
+
+
+def operator_execute_real_trade_gate(
+    *,
+    state_file: Path,
+    receipt_dir: Path,
+    auth_profile_path: str,
+    deck_ref: str,
+    symbol: str,
+    quantity: int,
+    shortable_symbols: list[str],
+    mode: str,
+    confirm_live_submit: bool,
+    roundtrip_ledger_path: Path,
+    neoapi_secret_dir: Path | None,
+    operator_id: str | None,
+    operator_note: str | None,
+    broker_adapter: Any | None = None,
+) -> OperatorResult:
+    state = load_operator_state(state_file)
+    _apply_auth_profile(state, auth_profile_path=auth_profile_path, session_id=None)
+    auto_disarm_receipt = _maybe_auto_disarm(state=state, state_file=state_file, receipt_dir=receipt_dir)
+
+    resolved_operator = _resolve_operator_id(operator_id)
+    request = {
+        "deck": deck_ref,
+        "symbol": symbol,
+        "quantity": quantity,
+        "shortable_symbols": sorted(set(shortable_symbols)),
+        "mode": mode,
+        "confirm_live_submit": confirm_live_submit,
+        "roundtrip_ledger_path": str(roundtrip_ledger_path),
+        "neoapi_secret_dir": str(neoapi_secret_dir) if neoapi_secret_dir else None,
+    }
+    blockers: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+
+    if mode not in {"dry-run", "live"}:
+        blockers.append({"code": "invalid-mode", "detail": "mode must be dry-run or live"})
+    if mode == "live" and not confirm_live_submit:
+        blockers.append({"code": "missing-live-submit-confirmation", "detail": "live mode requires --confirm-live-submit"})
+
+    deck_id: str | None = None
+    deck_path: str | None = None
+    deck_symbols: list[str] = []
+    real_trade_gate_policy: dict[str, Any] = {}
+    try:
+        deck_id, deck_path = _resolve_deck(deck_ref)
+        deck = load_deck_manifest(deck_path)
+        deck_symbols = list(deck.symbol_scope)
+        if symbol not in set(deck.symbol_scope):
+            blockers.append(
+                {"code": "symbol-not-in-deck-scope", "symbol": symbol, "deck_symbol_scope": sorted(deck.symbol_scope)}
+            )
+        actual_cards = list(deck.cards)
+        if actual_cards != list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS):
+            blockers.append(
+                {
+                    "code": "stage1-deck-card-contract-mismatch",
+                    "expected_cards": list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS),
+                    "actual_cards": actual_cards,
+                }
+            )
+        real_trade_gate_policy = _load_real_trade_gate_policy(deck_path)
+        blockers.extend(_stage1_policy_blockers(real_trade_gate_policy))
+    except FileNotFoundError as error:
+        blockers.append({"code": "deck-unresolved", "detail": str(error)})
+    except ManifestValidationError as error:
+        blockers.append({"code": "deck-manifest-invalid", "detail": str(error), "errors": list(error.errors)})
+
+    if deck_id is not None and deck_path is not None:
+        armed_scope = state.get("armed_scope") if isinstance(state.get("armed_scope"), dict) else {}
+        if armed_scope.get("deck_id") != deck_id or armed_scope.get("deck_ref") != deck_path:
+            blockers.append(
+                {
+                    "code": "armed-scope-deck-mismatch",
+                    "armed_deck_id": armed_scope.get("deck_id"),
+                    "requested_deck_id": deck_id,
+                    "armed_deck_ref": armed_scope.get("deck_ref"),
+                    "requested_deck_ref": deck_path,
+                }
+            )
+
+    if not state["capabilities"].get("trade_enabled"):
+        blockers.append({"code": "trade-disabled", "detail": "auth profile trade_enabled=false"})
+    if symbol not in set(shortable_symbols):
+        blockers.append({"code": "short-capability-unproven", "symbol": symbol})
+
+    submission_gate = _submission_gate(state)
+    if not submission_gate["allowed"]:
+        blockers.append({"code": "submission-gate-denied", "gate_reason": submission_gate["reason"]})
+
+    policy_max_quantity = min(int(real_trade_gate_policy.get("max_quantity") or 1000), 1000)
+    policy = LiveExecutionPolicy(
+        symbol_allowlist=frozenset(shortable_symbols),
+        max_quantity=policy_max_quantity,
+        max_round_trips_per_day=int(
+            real_trade_gate_policy.get("max_round_trips_per_day")
+            or STAGE1_REAL_TRADE_GATE_POLICY["max_round_trips_per_day"]
+        ),
+    )
+    ledger = RoundTripLedger(roundtrip_ledger_path)
+    guard = FirstLiveRiskGuard(policy=policy, ledger=ledger)
+    risk = guard.evaluate(symbol=symbol, quantity=quantity)
+    blockers.extend(risk.blockers)
+
+    plan = build_sell_first_round_trip_plan(symbol=symbol, quantity=quantity)
+    execution_receipt: dict[str, Any]
+    status: str
+    if blockers:
+        status = "refused"
+        execution_receipt = rejected_round_trip_receipt(plan=plan, blockers=blockers)
+    else:
+        if broker_adapter is not None:
+            adapter = broker_adapter
+        elif mode == "live":
+            if neoapi_secret_dir is None:
+                blockers.append({"code": "neoapi-secret-dir-required", "detail": "live mode requires --neoapi-secret-dir"})
+                adapter = None
+            else:
+                try:
+                    adapter = NeoApiBrokerAdapter(
+                        credentials=load_neoapi_credentials(neoapi_secret_dir),
+                        expected_account_no=str(state["session"].get("account_no") or ""),
+                    )
+                except Exception as error:
+                    blockers.append({"code": "neoapi-credential-load-failed", "detail": str(error)[:240]})
+                    adapter = None
+        else:
+            adapter = DryRunRoundTripAdapter()
+
+        if blockers or adapter is None:
+            status = "refused"
+            execution_receipt = rejected_round_trip_receipt(plan=plan, blockers=blockers)
+        else:
+            execution_receipt = adapter.execute_round_trip(plan)
+            status = str(execution_receipt.get("status") or "unknown")
+            if status == "round-trip-closed":
+                ledger.record_closed(
+                    day=_utc_now().date(),
+                    symbol=symbol,
+                    plan_id=plan.plan_id,
+                    receipt_id=str(execution_receipt.get("receipt_id") or plan.plan_id),
+                )
+
+    details: dict[str, Any] = {
+        "request": request,
+        "deck_id": deck_id,
+        "deck_ref": deck_path,
+        "deck_symbol_scope": sorted(deck_symbols),
+        "real_trade_gate_policy": real_trade_gate_policy,
+        "blockers": blockers,
+        "warnings": warnings,
+        "plan": {
+            "plan_id": plan.plan_id,
+            "entry": asdict(plan.entry),
+            "exit": asdict(plan.exit),
+            "broker_mapping": plan.broker_mapping,
+        },
+        "execution_receipt": execution_receipt,
+    }
+    if auto_disarm_receipt:
+        details["auto_disarm_receipt"] = auto_disarm_receipt["receipt_path"]
+
+    receipt_status = "executed" if status in {"dry-run-closed", "round-trip-closed"} else status
+    receipt = _write_receipt(
+        receipt_dir=receipt_dir,
+        action="execute-real-trade-gate",
+        status=receipt_status,
+        operator_id=resolved_operator,
+        operator_note=operator_note,
+        state_file=state_file,
+        details=details,
+        state=state,
+    )
+    _append_recent_action(state, receipt)
+    save_operator_state(state_file, state)
+
+    payload = {
+        "ok": status in {"dry-run-closed", "round-trip-closed"},
+        "execution_status": status,
+        "mode": mode,
+        "boundary": "dry-run default; live mode requires explicit arm + --mode live + --confirm-live-submit + --neoapi-secret-dir",
+        "blockers": blockers,
+        "warnings": warnings,
+        "plan": details["plan"],
+        "execution_receipt": execution_receipt,
+        "receipt_path": receipt["receipt_path"],
+    }
+    return OperatorResult(payload=payload, exit_code=0 if payload["ok"] else OPERATOR_REFUSED_EXIT)
+
 
 
 def operator_live_smoke_readiness(

@@ -35,6 +35,7 @@ from steamer_card_engine.manifest import (
 from steamer_card_engine.operator_control import (
     operator_arm_live,
     operator_disarm_live,
+    operator_execute_real_trade_gate,
     operator_flatten,
     operator_live_smoke_readiness,
     operator_plan_real_trade_gate,
@@ -449,6 +450,25 @@ def build_parser() -> argparse.ArgumentParser:
     plan_real_trade_gate.add_argument("--state-file", default=".state/operator_posture.json")
     plan_real_trade_gate.add_argument("--receipt-dir", default=".state/operator_receipts")
     plan_real_trade_gate.add_argument("--json", action="store_true", dest="as_json")
+
+    execute_real_trade_gate = operator_sub.add_parser(
+        "execute-real-trade-gate",
+        help="Execute the Stage 1 real-trade gate through risk + broker adapter; dry-run by default",
+    )
+    execute_real_trade_gate.add_argument("--deck", required=True)
+    execute_real_trade_gate.add_argument("--auth-profile", required=True)
+    execute_real_trade_gate.add_argument("--symbol", required=True)
+    execute_real_trade_gate.add_argument("--quantity", required=True, type=int)
+    execute_real_trade_gate.add_argument("--shortable-symbol", action="append", default=[], dest="shortable_symbols")
+    execute_real_trade_gate.add_argument("--mode", choices=("dry-run", "live"), default="dry-run")
+    execute_real_trade_gate.add_argument("--confirm-live-submit", action="store_true")
+    execute_real_trade_gate.add_argument("--roundtrip-ledger", default=".state/live_roundtrip_ledger.json")
+    execute_real_trade_gate.add_argument("--neoapi-secret-dir", default=None)
+    execute_real_trade_gate.add_argument("--operator-id")
+    execute_real_trade_gate.add_argument("--operator-note")
+    execute_real_trade_gate.add_argument("--state-file", default=".state/operator_posture.json")
+    execute_real_trade_gate.add_argument("--receipt-dir", default=".state/operator_receipts")
+    execute_real_trade_gate.add_argument("--json", action="store_true", dest="as_json")
 
     live_smoke = operator_sub.add_parser(
         "live-smoke-readiness",
@@ -2291,6 +2311,35 @@ def main(argv: list[str] | None = None) -> int:
                 exit_code=result.exit_code,
                 status_key="plan_status",
                 status_value=str(result.payload.get("plan_status") or "unknown"),
+            )
+            if args.as_json:
+                _print_json(result.payload)
+            else:
+                _print_operator_action_summary(result.payload)
+            return result.exit_code
+
+        if args.command == "operator" and args.operator_command == "execute-real-trade-gate":
+            result = operator_execute_real_trade_gate(
+                state_file=Path(args.state_file),
+                receipt_dir=Path(args.receipt_dir),
+                auth_profile_path=args.auth_profile,
+                deck_ref=args.deck,
+                symbol=args.symbol,
+                quantity=args.quantity,
+                shortable_symbols=args.shortable_symbols,
+                mode=args.mode,
+                confirm_live_submit=args.confirm_live_submit,
+                roundtrip_ledger_path=Path(args.roundtrip_ledger),
+                neoapi_secret_dir=Path(args.neoapi_secret_dir) if args.neoapi_secret_dir else None,
+                operator_id=args.operator_id,
+                operator_note=args.operator_note,
+            )
+            result.payload = _attach_cli_contract(
+                result.payload,
+                command="operator execute-real-trade-gate",
+                exit_code=result.exit_code,
+                status_key="execution_status",
+                status_value=str(result.payload.get("execution_status") or "unknown"),
             )
             if args.as_json:
                 _print_json(result.payload)
