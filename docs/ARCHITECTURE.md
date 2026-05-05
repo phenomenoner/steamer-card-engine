@@ -137,7 +137,25 @@ CardRuntime
 
 Recorder / Audit Trail spans the full chain.
 ReplayRunner and LiveSim reuse the same event, feature, intent, and execution contracts where possible.
+
+ReadOnlyDashboardSidecar
+  -> RuntimeStoreImporter
+      -> RuntimeStore(SQLite)
+          -> FastAPI / React live monitor
 ```
+
+### Read-only dashboard sidecar
+
+`steamer_card_engine.dashboard.*` is a read-only monitor sidecar inside this project. Its job is to index runtime artifacts and expose dashboard/API views for operators.
+
+Safety boundary:
+
+- it may read runtime artifacts and maintain a local runtime store;
+- it may render bars, date catalogs, order summaries, and decision aggregates;
+- it must not submit broker orders, mutate strategy policy, or hold broker authority;
+- when a runtime date/symbol is selected, charts must use exact runtime bars only and must not fallback to mounted observer candles.
+
+See `docs/LIVE_MONITOR_SIDECAR.md` for the public sidecar contract.
 
 ## Component responsibilities
 

@@ -15,6 +15,7 @@ from .fixtures import repo_root
 from .strategy_pipeline import StrategyPipelineDataError, build_strategy_pipeline_view
 from .runtime_chart import build_runtime_symbol_bars
 from .runtime_index import build_runtime_dates_index
+from .runtime_store import build_decision_aggregates_from_store
 from .strategy_powerhouse import StrategyPowerhouseDataError, build_strategy_powerhouse_view
 
 
@@ -44,6 +45,14 @@ def create_app() -> FastAPI:
     @app.get("/api/runtime/dates/{date}/symbols/{symbol}/bars")
     def runtime_symbol_bars(date: str, symbol: str, timeframe: str = "1m") -> dict:
         return build_runtime_symbol_bars(date=date, symbol=symbol, timeframe=timeframe, root=root)
+
+    @app.get("/api/runtime/dates/{date}/decision-aggregates")
+    def runtime_decision_aggregates(date: str, symbol: str | None = None, limit: int = 100) -> dict:
+        store_path = os.getenv("STEAMER_DASHBOARD_RUNTIME_DB")
+        if not store_path:
+            return {"date": date, "symbol": symbol, "source_kind": "unavailable", "aggregate_count": 0, "aggregates": []}
+        payload = build_decision_aggregates_from_store(store_path, date, symbol=symbol, limit=limit)
+        return payload or {"date": date, "symbol": symbol, "source_kind": "unavailable", "aggregate_count": 0, "aggregates": []}
 
     @app.get("/api/days/{date}/deck")
     def deck(date: str) -> dict:

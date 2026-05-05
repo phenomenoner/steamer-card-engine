@@ -17,6 +17,7 @@ steamer-card-engine/
 │   ├── ARCHITECTURE.md
 │   ├── CARD_SPEC.md
 │   ├── ADAPTER_SPEC.md
+│   ├── LIVE_MONITOR_SIDECAR.md
 │   ├── CLI_SPEC.md
 │   ├── SETUP.md
 │   ├── AUTH_AND_SESSION_MODEL.md
@@ -96,6 +97,7 @@ steamer-card-engine/
 - `docs/ARCHITECTURE.md` — planes, boundaries, intended components
 - `docs/CARD_SPEC.md` — card + intent contract (fields + behavior rules)
 - `docs/ADAPTER_SPEC.md` — market/broker normalization + routing expectations
+- `docs/LIVE_MONITOR_SIDECAR.md` — 唯讀 dashboard / live monitor sidecar 邊界、runtime store、API 與安全姿態
 - `docs/AUTH_AND_SESSION_MODEL.md` — logical session + capability posture
 - `docs/DAYTRADING_GUARDRAILS.md` — emergency stop / forced exit / flatten policy
 - `docs/CLI_SPEC.md` — intended CLI families + governance stance
@@ -129,8 +131,14 @@ steamer-card-engine/
 - `tools/steamer_card_engine_trading_day_preflight_cron.py`
   - cron-safe wrapper for the trading-day preflight chain (`NO_REPLY` on green, concise `BLOCKED ...` on red)
   - defaults to `STEAMER_CARD_ENGINE_PROBE_SOURCE=steamer-cron-health` when no explicit probe fixture is injected
-- `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`
-  - pin current CLI behaviors, aligned `cli_contract` JSON envelopes, JSON error posture, validation rules, and M1 comparator hard-gate behavior
+- `src/steamer_card_engine/dashboard/`
+  - read-only dashboard / live monitor sidecar
+  - runtime bars are derived from exact runtime date/symbol artifacts, never from mounted observer candles when a runtime selection is active
+  - optional SQLite runtime store supports catalog, tick provenance, dedupe, and decision aggregates
+  - `runtime_store_cli` maintains the store with explicit `--date` or discovered `--latest N` windows
+  - this sidecar does not submit broker orders, mutate strategy policy, or hold broker authority
+- `tests/test_cli.py`, `tests/test_manifests.py`, `tests/test_sim_compare.py`, `tests/test_dashboard.py`
+  - pin current CLI behaviors, aligned `cli_contract` JSON envelopes, JSON error posture, validation rules, M1 comparator hard-gate behavior, and dashboard sidecar runtime-store/freshness contracts
 - `runs/...` + `comparisons/...`
   - committed M1 receipt artifacts (baseline bundle, candidate bundle, comparator outputs) for a 3-scenario pre-sprint evidence pack
   - compare outputs are now decision-grade (`compare-manifest.json`, `diff.json`, `summary.md`), not just placeholder plumbing
@@ -232,6 +240,7 @@ Canonical note:
 - History-source index slice receipt: `docs/receipts/2026-04-09_dashboard_history-source-index_slice.md`
 - `五氣朝元` closure receipt for the baton-line authority sweep: `docs/receipts/2026-04-09_dashboard_active-family-baton-line_wuqi-chaoyuan_closure.md`
 - Copilot consultant critique: `docs/CONSULTANT_REVIEW_COPILOT.md`
+- Live monitor sidecar public contract: `docs/LIVE_MONITOR_SIDECAR.md`
 
 ## Stage 0 fixture adapter probe topology note (2026-05-02)
 

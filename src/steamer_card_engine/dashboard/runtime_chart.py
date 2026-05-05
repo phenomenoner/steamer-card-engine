@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,16 @@ def _parse_date(value: str) -> str:
     return text
 
 
+def _normalize_symbol(value: Any) -> str:
+    text = str(value or "").strip().upper()
+    return text[:-3] if text.endswith(".TW") else text
+
+
+def _configured_runtime_root() -> Path | None:
+    raw = os.getenv("STEAMER_DASHBOARD_RUNTIME_ROOT")
+    return Path(raw) if raw else None
+
+
 def _runtime_run_roots(base_root: Path, date: str) -> list[Path]:
     roots: list[Path] = []
     dashed = f"{date[:4]}-{date[4:6]}-{date[6:]}"
@@ -30,9 +42,11 @@ def _runtime_run_roots(base_root: Path, date: str) -> list[Path]:
         local = base_root / "runs" / lane / dashed
         if local.exists():
             roots.extend([item for item in local.iterdir() if item.is_dir() and ("live-sim" in item.name or "neoapi" in item.name)])
-    current = Path("/opt/trading/current/data/sim") / date
-    if current.exists():
-        roots.extend([item for item in current.iterdir() if item.is_dir()])
+    configured_root = _configured_runtime_root()
+    if configured_root is not None:
+        current = configured_root / date
+        if current.exists():
+            roots.extend([item for item in current.iterdir() if item.is_dir()])
     return sorted(roots, key=lambda item: item.name, reverse=True)
 
 
@@ -45,6 +59,18 @@ def _event_logs_for_date(base_root: Path, date: str) -> list[Path]:
     return sorted(logs, key=lambda item: (item.stat().st_mtime, str(item)), reverse=True)
 
 
+def _tick_logs_for_date(base_root: Path, date: str) -> list[Path]:
+    logs: list[Path] = []
+    for root in _runtime_run_roots(base_root, date):
+        for candidate in (
+            root / "data" / date / "ticks.jsonl",
+            root / "ticks.jsonl",
+        ):
+            if candidate.exists():
+                logs.append(candidate)
+    return sorted(logs, key=lambda item: (item.stat().st_mtime, str(item)), reverse=True)
+
+
 def _parse_event_tick(line: str, symbol: str) -> Tick | None:
     try:
         event = json.loads(line)
@@ -52,8 +78,8 @@ def _parse_event_tick(line: str, symbol: str) -> Tick | None:
         return None
     if event.get("event_type") != "market_tick":
         return None
-    raw_symbol = str(event.get("symbol") or event.get("payload", {}).get("symbol") or "").strip()
-    if raw_symbol != symbol:
+    raw_symbol = _normalize_symbol(event.get("symbol") or event.get("payload", {}).get("symbol") or "")
+    if raw_symbol != _normalize_symbol(symbol):
         return None
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     price = payload.get("price", event.get("price"))
@@ -80,6 +106,53 @@ def _parse_event_tick(line: str, symbol: str) -> Tick | None:
         return None
     if parsed_time.tzinfo is None:
         parsed_time = parsed_time.replace(tzinfo=timezone.utc)
+    return Tick(time=parsed_time.astimezone(timezone.utc), price=parsed_price, size=parsed_size)
+
+
+def _parse_epoch_like_time(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    # Fubon websocket tick `time` is observed as epoch microseconds;
+    # `ws_received_time` is epoch seconds with fractions. Keep this heuristic
+    # bounded to common second/millisecond/microsecond/nanosecond scales.
+    if numeric > 1_000_000_000_000_000_000:
+        numeric = numeric / 1_000_000_000
+    elif numeric > 1_000_000_000_000_000:
+        numeric = numeric / 1_000_000
+    elif numeric > 1_000_000_000_000:
+        numeric = numeric / 1_000
+    try:
+        return datetime.fromtimestamp(numeric, timezone.utc)
+    except (OSError, OverflowError, ValueError):
+        return None
+
+
+def _parse_recorded_tick(line: str, symbol: str) -> Tick | None:
+    try:
+        event = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    raw_symbol = _normalize_symbol(event.get("symbol") or "")
+    if raw_symbol != _normalize_symbol(symbol):
+        return None
+    price = event.get("price")
+    if price is None:
+        return None
+    try:
+        parsed_price = float(price)
+    except (TypeError, ValueError):
+        return None
+    try:
+        parsed_size = float(event.get("size") or event.get("volume") or 0)
+    except (TypeError, ValueError):
+        parsed_size = 0.0
+    parsed_time = _parse_epoch_like_time(event.get("time")) or _parse_epoch_like_time(event.get("ws_received_time"))
+    if parsed_time is None:
+        return None
     return Tick(time=parsed_time.astimezone(timezone.utc), price=parsed_price, size=parsed_size)
 
 
@@ -134,34 +207,60 @@ def build_runtime_symbol_bars(
 ) -> dict[str, Any]:
     base_root = root or repo_root()
     compact_date = _parse_date(date)
-    normalized_symbol = symbol.replace(".TW", "").strip()
-    cached = _load_cached_bars(base_root, compact_date, normalized_symbol, timeframe)
-    if cached is not None:
-        return cached
-    logs = _event_logs_for_date(base_root, compact_date)
+    normalized_symbol = _normalize_symbol(symbol)
+    event_logs = _event_logs_for_date(base_root, compact_date)
+    tick_logs = _tick_logs_for_date(base_root, compact_date)
+    newest_file_mtime = max((path.stat().st_mtime for path in [*event_logs, *tick_logs]), default=0.0)
+    store_path = os.getenv("STEAMER_DASHBOARD_RUNTIME_DB")
+    if store_path:
+        from .runtime_store import build_runtime_symbol_bars_from_store, runtime_store_date_updated_epoch
+
+        stored = build_runtime_symbol_bars_from_store(store_path, compact_date, normalized_symbol, timeframe=timeframe, max_ticks=max_ticks)
+        store_updated_at = runtime_store_date_updated_epoch(store_path, compact_date) or 0.0
+        if stored is not None and store_updated_at >= newest_file_mtime:
+            return stored
     ticks: list[Tick] = []
     selected_log: Path | None = None
-    for log in logs:
+    source_kind = "unavailable"
+    for log in event_logs:
+        matched: deque[Tick] = deque(maxlen=max_ticks)
         with log.open("r", encoding="utf-8", errors="replace") as file:
             for line in file:
                 tick = _parse_event_tick(line, normalized_symbol)
                 if tick is not None:
-                    ticks.append(tick)
-                    selected_log = log
-                    if len(ticks) >= max_ticks:
-                        break
-        if ticks:
+                    matched.append(tick)
+        if matched:
+            ticks = list(matched)
+            selected_log = log
+            source_kind = "runtime-event-log-market-tick"
             break
+    if not ticks:
+        for log in tick_logs:
+            matched: deque[Tick] = deque(maxlen=max_ticks)
+            with log.open("r", encoding="utf-8", errors="replace") as file:
+                for line in file:
+                    tick = _parse_recorded_tick(line, normalized_symbol)
+                    if tick is not None:
+                        matched.append(tick)
+            if matched:
+                ticks = list(matched)
+                selected_log = log
+                source_kind = "runtime-ticks-jsonl"
+                break
+    cached = None if ticks else _load_cached_bars(base_root, compact_date, normalized_symbol, timeframe)
+    if cached is not None:
+        return cached
     bars = _ticks_to_bars(ticks, timeframe)
     return {
         "date": f"{compact_date[:4]}-{compact_date[4:6]}-{compact_date[6:]}",
         "symbol": normalized_symbol,
         "timeframe": timeframe,
-        "source_kind": "runtime-event-log-market-tick" if ticks else "unavailable",
+        "source_kind": source_kind,
         "source_path": str(selected_log) if selected_log else None,
-        "available_event_logs": len(logs),
+        "available_event_logs": len(event_logs),
+        "available_tick_logs": len(tick_logs),
         "tick_count": len(ticks),
         "bar_count": len(bars),
         "bars": bars,
-        "note": None if ticks else "No runtime event-log market_tick records found for selected date/symbol in mounted local sources.",
+        "note": None if ticks else "No runtime tick records found for selected date/symbol in mounted local sources.",
     }

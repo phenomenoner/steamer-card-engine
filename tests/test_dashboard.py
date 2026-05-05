@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import re
 import shutil
+import sqlite3
 import tomllib
 
 from fastapi.testclient import TestClient
@@ -12,6 +13,8 @@ from steamer_card_engine.dashboard import build_day_bundle, create_app, list_fix
 from steamer_card_engine.dashboard.fixtures import FixtureDay, repo_root
 from steamer_card_engine.dashboard.history_source_index import STATE_RELATIVE_PATH, build_strategy_history_source_index
 from steamer_card_engine.dashboard.strategy_pipeline import build_strategy_pipeline_view
+from steamer_card_engine.dashboard.runtime_chart import build_runtime_symbol_bars
+from steamer_card_engine.dashboard.runtime_store import import_runtime_files_once
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 from steamer_card_engine.observer import build_mock_observer_session, reset_observer_repository_cache
 from steamer_card_engine.observer.history import _build_record
@@ -460,6 +463,407 @@ def test_strategy_powerhouse_view_explicitly_flags_missing_active_plan_truth(tmp
     activation = surface["baton_line"].get("activation")
     assert activation is not None
     assert activation["plan_state"] == "unknown"
+
+
+def test_runtime_bars_build_from_recorded_ticks_jsonl(tmp_path: Path) -> None:
+    run_root = (
+        tmp_path
+        / "runs"
+        / "steamer-card-engine"
+        / "2026-05-05"
+        / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest"
+        / "data"
+        / "20260505"
+    )
+    run_root.mkdir(parents=True)
+    ticks = run_root / "ticks.jsonl"
+    ticks.write_text(
+        "\n".join(
+            [
+                json.dumps({"symbol": "1314", "price": 7.21, "size": 392, "time": 1777941358942092}),
+                json.dumps({"symbol": "0052", "price": 55.4, "size": 212, "time": 1777941359000000}),
+                json.dumps({"symbol": "1314", "price": 7.2, "size": 234, "time": 1777941379007268}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = build_runtime_symbol_bars("2026-05-05", "1314", root=tmp_path)
+
+    assert payload["source_kind"] == "runtime-ticks-jsonl"
+    assert payload["source_path"] == str(ticks)
+    assert payload["tick_count"] == 2
+    assert payload["bar_count"] == 2
+    assert {bar["close"] for bar in payload["bars"]} == {7.21, 7.2}
+
+
+def test_runtime_bars_do_not_cross_date_or_symbol_fallback(tmp_path: Path) -> None:
+    run_root = (
+        tmp_path
+        / "runs"
+        / "steamer-card-engine"
+        / "2026-04-27"
+        / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest"
+        / "data"
+        / "20260427"
+    )
+    run_root.mkdir(parents=True)
+    (run_root / "ticks.jsonl").write_text(
+        json.dumps({"symbol": "1314", "price": 7.33, "size": 100, "time": 1777250000000000}) + "\n",
+        encoding="utf-8",
+    )
+
+    missing_date = build_runtime_symbol_bars("2026-04-22", "1314", root=tmp_path)
+    missing_symbol = build_runtime_symbol_bars("2026-04-27", "0052", root=tmp_path)
+
+    assert missing_date["source_kind"] == "unavailable"
+    assert missing_date["tick_count"] == 0
+    assert missing_date["bars"] == []
+    assert missing_symbol["source_kind"] == "unavailable"
+    assert missing_symbol["tick_count"] == 0
+    assert missing_symbol["bars"] == []
+
+
+def test_runtime_store_imports_ticks_decisions_orders_and_serves_bars(tmp_path: Path, monkeypatch) -> None:
+    data_dir = (
+        tmp_path
+        / "runs"
+        / "steamer-card-engine"
+        / "2026-05-05"
+        / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest"
+        / "data"
+        / "20260505"
+    )
+    data_dir.mkdir(parents=True)
+    (data_dir / "ticks.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"symbol": "1314", "price": 7.21, "size": 392, "time": 1777941358942092}),
+                json.dumps({"symbol": "1314", "price": 7.2, "size": 234, "time": 1777941379007268}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (data_dir / "decisions.jsonl").write_text(
+        json.dumps({"symbol": "1314", "gate": "LONG_ONE_VCP", "enter": True, "reason": "test", "state": {"now_ts": 1777941379}}) + "\n",
+        encoding="utf-8",
+    )
+    (data_dir / "orders.jsonl").write_text(
+        json.dumps({"symbol": "1314", "side": "buy", "quantity": 1000, "price": 7.2, "status": "dry-run", "time": 1777941379}) + "\n",
+        encoding="utf-8",
+    )
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+    payload = build_runtime_symbol_bars("2026-05-05", "1314", root=tmp_path)
+
+    assert receipt.run_count == 1
+    assert receipt.tick_count == 2
+    assert receipt.decision_count == 1
+    assert receipt.order_count == 1
+    assert payload["source_kind"] == "runtime-store-sqlite-ticks"
+    assert payload["source_path"] == str(db)
+    assert payload["tick_count"] == 2
+    assert payload["bar_count"] == 2
+
+
+def test_runtime_store_normalizes_tw_suffix_and_keeps_provenance(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text(json.dumps({"symbol": "2330.TW", "price": 500, "size": 100, "time": 1777941358942092}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+    payload = build_runtime_symbol_bars("2026-05-05", "2330", root=tmp_path)
+
+    assert payload["source_kind"] == "runtime-store-sqlite-ticks"
+    assert payload["tick_count"] == 1
+    assert payload["symbol"] == "2330"
+    assert str(ticks) in payload["source_paths"]
+
+
+def test_runtime_store_reimport_shrunk_file_removes_orphans(tmp_path: Path) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text("\n".join(json.dumps({"symbol": "1314", "price": 7 + i / 10, "size": 100, "time": 1777941358000000 + i * 1_000_000}) for i in range(3)) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+
+    ticks.write_text(json.dumps({"symbol": "1314", "price": 7, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+
+    conn = sqlite3.connect(db)
+    count = conn.execute("SELECT COUNT(*) FROM ticks WHERE symbol='1314'").fetchone()[0]
+    assert count == 1
+
+
+def test_runtime_store_imports_event_log_and_root_ticks(tmp_path: Path) -> None:
+    run_root = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run"
+    run_root.mkdir(parents=True)
+    (run_root / "event-log.jsonl").write_text(json.dumps({"event_type": "market_tick", "symbol": "1314", "price": 7.0, "payload": {"size": 100}, "event_time_utc": "2026-05-05T09:00:00Z"}) + "\n", encoding="utf-8")
+    (run_root / "ticks.jsonl").write_text(json.dumps({"symbol": "0052", "price": 55.0, "size": 200, "time": 1777941360000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    conn = sqlite3.connect(db)
+    symbols = {row[0] for row in conn.execute("SELECT DISTINCT symbol FROM ticks")}
+
+    assert receipt.tick_count == 2
+    assert symbols == {"1314", "0052"}
+
+
+def test_runtime_store_uses_per_date_freshness_not_db_file_mtime(tmp_path: Path, monkeypatch) -> None:
+    data_a = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-a" / "data" / "20260505"
+    data_b = tmp_path / "runs" / "steamer-card-engine" / "2026-05-06" / "live-sim-b" / "data" / "20260506"
+    data_a.mkdir(parents=True)
+    data_b.mkdir(parents=True)
+    ticks_a = data_a / "ticks.jsonl"
+    ticks_a.write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    (data_b / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 8.0, "size": 100, "time": 1778027758000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    ticks_a.write_text("\n".join([
+        json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}),
+        json.dumps({"symbol": "1314", "price": 7.9, "size": 100, "time": 1777941360000000}),
+    ]) + "\n", encoding="utf-8")
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+
+    payload = build_runtime_symbol_bars("2026-05-05", "1314", root=tmp_path)
+
+    assert payload["source_kind"] == "runtime-ticks-jsonl"
+    assert payload["tick_count"] == 2
+    assert payload["bars"][-1]["close"] == 7.9
+
+
+def test_runtime_store_does_not_hide_fresher_filesystem_ticks(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    ticks.write_text("\n".join([
+        json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}),
+        json.dumps({"symbol": "1314", "price": 7.5, "size": 200, "time": 1777941360000000}),
+    ]) + "\n", encoding="utf-8")
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+
+    payload = build_runtime_symbol_bars("2026-05-05", "1314", root=tmp_path)
+
+    assert payload["source_kind"] == "runtime-ticks-jsonl"
+    assert payload["tick_count"] == 2
+    assert payload["bars"][-1]["close"] == 7.5
+
+
+def test_runtime_store_limit_keeps_latest_ticks(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text("\n".join(json.dumps({"symbol": "1314", "price": float(i), "size": 1, "time": 1777941358000000 + i * 1_000_000}) for i in range(5)) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+
+    payload = build_runtime_symbol_bars("2026-05-05", "1314", root=tmp_path, max_ticks=2)
+
+    assert payload["tick_count"] == 2
+    assert payload["bars"][0]["open"] == 3.0
+    assert payload["bars"][-1]["close"] == 4.0
+
+
+def test_runtime_store_dedupes_ticks_across_tick_file_and_event_log(tmp_path: Path) -> None:
+    run_root = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run"
+    data_dir = run_root / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    (run_root / "event-log.jsonl").write_text(json.dumps({"event_type": "market_tick", "symbol": "1314", "price": 7.0, "payload": {"size": 100}, "event_time_utc": "2026-05-05T00:35:58Z"}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    conn = sqlite3.connect(db)
+
+    assert conn.execute("SELECT COUNT(*) FROM ticks").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM source_files").fetchone()[0] == 2
+
+
+def test_runtime_store_catalog_from_db_merges_runtime_index_evidence(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    (tmp_path / "comparisons").mkdir()
+    watchlist_only = tmp_path / "staging" / "steamer" / "watchlists" / "2026-05-06"
+    watchlist_only.mkdir(parents=True)
+    s3_cache = tmp_path / ".state" / "steamer"
+    s3_cache.mkdir(parents=True)
+    (s3_cache / "runtime-s3-index.json").write_text(json.dumps({"dates": [{"date": "20260507", "s3_archive_present": True, "s3_manifest_present": True}]}), encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+    from steamer_card_engine.dashboard.runtime_index import build_runtime_dates_index
+
+    payload = build_runtime_dates_index(tmp_path)
+    by_date = {item["date"]: item for item in payload["dates"]}
+
+    assert payload["source_kind"] == "runtime-store-sqlite-catalog+local-runs+s3-runtime-archive-cache+fixture-compare-index"
+    assert by_date["2026-05-05"]["db_tick_count"] == 1
+    assert by_date["2026-05-06"]["watchlist_present"] is True
+    assert by_date["2026-05-07"]["s3_archive_present"] is True
+
+
+def test_runtime_store_imports_decision_aggregates(tmp_path: Path) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    (data_dir / "decisions.jsonl").write_text("\n".join([
+        json.dumps({"symbol": "1314", "gate": "LONG_ONE_VCP", "enter": False, "reason": "not_ready: slope_3 None", "state": {"now_ts": 1777941358}}),
+        json.dumps({"symbol": "1314", "gate": "LONG_ONE_VCP", "enter": False, "reason": "not_ready: slope_3 0.1", "state": {"now_ts": 1777941360}}),
+        json.dumps({"symbol": "1314", "gate": "LONG_ONE_VCP", "enter": True, "reason": "go: breakout", "state": {"now_ts": 1777941370}}),
+    ]) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    conn = sqlite3.connect(db)
+    aggregate_rows = conn.execute("SELECT enter, reason_code, reason_sample, count FROM decision_aggregates ORDER BY count DESC, enter").fetchall()
+
+    assert receipt.decision_count == 1
+    assert aggregate_rows == [(0, "not_ready", "not_ready: slope_3 None", 2), (1, "go", "go: breakout", 1)]
+
+
+def test_runtime_decision_aggregates_api(tmp_path: Path, monkeypatch) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    (data_dir / "decisions.jsonl").write_text(json.dumps({"symbol": "1314", "gate": "LONG_ONE_VCP", "enter": False, "reason": "not_ready", "state": {"now_ts": 1777941358}}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-05"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+    client = TestClient(create_app())
+
+    response = client.get("/api/runtime/dates/2026-05-05/decision-aggregates?symbol=1314")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source_kind"] == "runtime-store-sqlite-decision-aggregates"
+    assert payload["aggregate_count"] == 1
+    assert payload["aggregates"][0]["count"] == 1
+    assert payload["aggregates"][0]["reason_code"] == "not_ready"
+
+
+def test_runtime_store_cli_latest_window_discovers_dates(tmp_path: Path) -> None:
+    for date in ("2026-05-05", "2026-05-04"):
+        compact = date.replace("-", "")
+        data_dir = tmp_path / "runs" / "steamer-card-engine" / date / "live-sim-run" / "data" / compact
+        data_dir.mkdir(parents=True)
+        (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    receipt = tmp_path / "receipt.json"
+    from steamer_card_engine.dashboard.runtime_store_cli import main as runtime_store_cli_main
+
+    assert runtime_store_cli_main(["--db", str(db), "--root", str(tmp_path), "--latest", "2", "--receipt", str(receipt)]) == 0
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["dates"] == ["2026-05-05", "2026-05-04"]
+    assert payload["tick_count"] == 2
+
+
+def test_runtime_store_cli_explicit_date_overrides_latest(tmp_path: Path) -> None:
+    for date in ("2026-05-05", "2026-05-04"):
+        compact = date.replace("-", "")
+        data_dir = tmp_path / "runs" / "steamer-card-engine" / date / "live-sim-run" / "data" / compact
+        data_dir.mkdir(parents=True)
+        (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    receipt = tmp_path / "receipt.json"
+    from steamer_card_engine.dashboard.runtime_store_cli import main as runtime_store_cli_main
+
+    assert runtime_store_cli_main(["--db", str(db), "--root", str(tmp_path), "--latest", "2", "--date", "2026-05-04", "--receipt", str(receipt)]) == 0
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["dates"] == ["2026-05-04"]
+    assert payload["tick_count"] == 1
+
+
+def test_runtime_store_cli_writes_receipt(tmp_path: Path) -> None:
+    data_dir = tmp_path / "runs" / "steamer-card-engine" / "2026-05-05" / "live-sim-run" / "data" / "20260505"
+    data_dir.mkdir(parents=True)
+    (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "1314", "price": 7.0, "size": 100, "time": 1777941358000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    receipt = tmp_path / "receipt.json"
+    from steamer_card_engine.dashboard.runtime_store_cli import main as runtime_store_cli_main
+
+    assert runtime_store_cli_main(["--db", str(db), "--root", str(tmp_path), "--date", "2026-05-05", "--receipt", str(receipt)]) == 0
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["tick_count"] == 1
+
+
+def test_runtime_store_schema_normalizes_source_files_and_tick_fingerprint(tmp_path: Path) -> None:
+    db = tmp_path / "runtime.sqlite"
+    conn = sqlite3.connect(db)
+    from steamer_card_engine.dashboard.runtime_store import ensure_runtime_store_schema
+
+    ensure_runtime_store_schema(conn)
+    schema = conn.execute("SELECT sql FROM sqlite_master WHERE name='ticks'").fetchone()[0]
+    assert "PRIMARY KEY (run_id, source_id, source_line)" in schema
+    assert "UNIQUE (run_id, tick_fingerprint)" in schema
+    assert conn.execute("SELECT sql FROM sqlite_master WHERE name='source_files'").fetchone()[0]
+
+
+def test_runtime_store_rebuilds_v5_tick_schema_cleanly(tmp_path: Path) -> None:
+    db = tmp_path / "runtime.sqlite"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """
+        CREATE TABLE ticks (
+            run_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            ts_epoch REAL NOT NULL,
+            price REAL NOT NULL,
+            size REAL NOT NULL DEFAULT 0,
+            source_path TEXT NOT NULL,
+            source_line INTEGER NOT NULL,
+            PRIMARY KEY (run_id, source_line)
+        );
+        CREATE TABLE decisions (
+            run_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            symbol TEXT,
+            ts_utc TEXT,
+            gate TEXT,
+            enter INTEGER,
+            reason TEXT,
+            state_json TEXT,
+            source_path TEXT NOT NULL,
+            source_line INTEGER NOT NULL,
+            PRIMARY KEY (run_id, source_path, source_line)
+        );
+        CREATE TABLE orders (
+            run_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            symbol TEXT,
+            ts_utc TEXT,
+            side TEXT,
+            qty REAL,
+            price REAL,
+            status TEXT,
+            raw_json TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            source_line INTEGER NOT NULL,
+            PRIMARY KEY (run_id, source_path, source_line)
+        );
+        """
+    )
+    from steamer_card_engine.dashboard.runtime_store import ensure_runtime_store_schema
+
+    ensure_runtime_store_schema(conn)
+    schema = conn.execute("SELECT sql FROM sqlite_master WHERE name='ticks'").fetchone()[0]
+
+    assert "PRIMARY KEY (run_id, source_id, source_line)" in schema
+    assert conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
 
 
 def test_dashboard_api_routes() -> None:

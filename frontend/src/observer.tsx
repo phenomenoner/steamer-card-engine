@@ -1411,14 +1411,18 @@ export function ObserverSurface() {
     setSelectedView(detailSymbolValue || defaultDetailSymbol || OVERVIEW_VIEW_ID);
   };
   const breadcrumbSymbol = selectedSymbol ?? bootstrap.symbol ?? defaultDetailSymbol;
-  const runtimeChartAvailable = Boolean(runtimeBars && runtimeBars.bar_count > 0 && runtimeBars.bars.length > 0);
-  const chartCandles = runtimeChartAvailable ? (runtimeBars?.bars ?? []) : aggregateCandles(bootstrap.chart.candles, chartTimeframe);
-  const chartMarkers = runtimeChartAvailable ? [] : alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe);
-  const chartSourceLabel = runtimeChartAvailable ? `runtime-derived market ticks · ${runtimeBars?.tick_count ?? 0} ticks / ${runtimeBars?.bar_count ?? 0} bars` : "mounted observer session";
+  const hasRuntimeSelection = Boolean(!isOverviewMode && selectedProductDate && selectedSymbol);
+  const runtimeChartAvailable = Boolean(runtimeBars && runtimeBars.source_kind !== "unavailable" && runtimeBars.bar_count > 0 && runtimeBars.bars.length > 0);
+  const chartCandles = runtimeChartAvailable ? (runtimeBars?.bars ?? []) : (hasRuntimeSelection ? [] : aggregateCandles(bootstrap.chart.candles, chartTimeframe));
+  const chartMarkers = runtimeChartAvailable ? [] : (hasRuntimeSelection ? [] : alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe));
+  const runtimeSourceLabel = runtimeBars?.source_kind && runtimeBars.source_kind !== "unavailable"
+    ? `${runtimeBars.source_kind} · ${runtimeBars.tick_count ?? 0} ticks / ${runtimeBars.bar_count ?? 0} bars`
+    : `unavailable for ${selectedProductDate ?? "selected date"} / ${selectedSymbol ?? "selected symbol"}`;
+  const chartSourceLabel = runtimeChartAvailable ? runtimeSourceLabel : (hasRuntimeSelection ? runtimeSourceLabel : "mounted observer session");
   const poolSourceLabel = symbolPoolLabel(effectivePool.source_kind);
   const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
   const universeSymbols = effectivePool.symbols.length ? effectivePool.symbols : (effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols);
-  const missingSymbolSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession && !runtimeChartAvailable;
+  const missingMountedSessionSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
   const overviewSummary = summarizeStrategyOverview(selectedStrategy, viewSymbols, overviewBootstraps.length ? overviewBootstraps : [bootstrap]);
   const handleSymbolSelection = (symbol: string) => {
     const mountedSessionId = resolveMountedSymbolSessionId(symbol, selectedStrategy, sessionIdsBySymbol);
@@ -1464,7 +1468,7 @@ export function ObserverSurface() {
             </div>
             <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
               <div><span className="mini-label">current path</span><strong>{isOverviewMode ? `Overview · mounted ${breadcrumbSymbol}` : `Symbol Detail · ${breadcrumbSymbol}`}</strong></div>
-              <div><span className="mini-label">chart symbol</span><strong>{isOverviewMode ? `${bootstrap.symbol} (overview reference)` : runtimeChartAvailable ? `${runtimeBars?.symbol} · runtime bars` : missingSymbolSelection ? `not chart-backed · ${selectedSymbol}` : bootstrap.symbol}</strong></div>
+              <div><span className="mini-label">chart symbol</span><strong>{isOverviewMode ? `${bootstrap.symbol} (overview reference)` : runtimeChartAvailable ? `${runtimeBars?.symbol} · runtime bars` : hasRuntimeSelection ? `no exact runtime bars · ${selectedSymbol}` : missingMountedSessionSelection ? `not chart-backed · ${selectedSymbol}` : bootstrap.symbol}</strong></div>
               <div><span className="mini-label">chart source</span><strong>{chartSourceLabel}</strong></div>
               <div><span className="mini-label">strategy card</span><strong>{selectedProductCard ? `${selectedProductCard.lane}/${selectedProductCard.card_id}` : "runtime detail pending"}</strong></div>
               <div><span className="mini-label">symbol source</span><strong>{productDeck ? `date/card universe · ${productDeck.universe?.symbol_count ?? detailSymbols.length}` : selectedStrategy.symbols_source_kind}</strong></div>
@@ -1486,7 +1490,7 @@ export function ObserverSurface() {
           </div>
         </div>
         <div className="panel-body observer-status-body observer-top-meta">
-          <div><span className="mini-label">observer session id</span><strong>{missingSymbolSelection ? `not linked to ${selectedSymbol}` : bootstrap.session_id}</strong></div>
+          <div><span className="mini-label">observer session id</span><strong>{missingMountedSessionSelection ? `not linked to ${selectedSymbol}` : bootstrap.session_id}</strong></div>
           <div><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
           <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
           <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
@@ -1528,7 +1532,7 @@ export function ObserverSurface() {
 
 
 
-      {!isOverviewMode && !missingSymbolSelection ? (
+      {!isOverviewMode && !missingMountedSessionSelection ? (
         <div className="metrics-row observer-metrics-row">
           <InfoCard label="engine state" value={bootstrap.health.engine_state.toUpperCase()} subvalue={`freshness ${bootstrap.health.feed_freshness_seconds}s`} />
           <InfoCard label="position" value={`${bootstrap.position.side.toUpperCase()} ${bootstrap.position.quantity}`} subvalue={`avg ${bootstrap.position.avg_price ?? "unavailable"}`} />
@@ -1540,7 +1544,7 @@ export function ObserverSurface() {
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>{isOverviewMode ? `Strategy Card Overview · mounted symbol ${bootstrap.symbol}` : runtimeChartAvailable ? `Runtime Bar Chart · ${runtimeBars?.symbol} · ${chartTimeframe === "auto" ? "1m" : chartTimeframe}` : missingSymbolSelection ? `No chart-backed data · ${selectedSymbol}` : `Symbol Detail · ${bootstrap.symbol} · ${chartTimeframe === "auto" ? bootstrap.timeframe : chartTimeframe} Bar Chart`}</h3>
+            <h3>{isOverviewMode ? `Strategy Card Overview · mounted symbol ${bootstrap.symbol}` : runtimeChartAvailable ? `Runtime Bar Chart · ${runtimeBars?.symbol} · ${chartTimeframe === "auto" ? "1m" : chartTimeframe}` : hasRuntimeSelection ? `No exact runtime bars · ${selectedProductDate} · ${selectedSymbol}` : missingMountedSessionSelection ? `No chart-backed data · ${selectedSymbol}` : `Symbol Detail · ${bootstrap.symbol} · ${chartTimeframe === "auto" ? bootstrap.timeframe : chartTimeframe} Bar Chart`}</h3>
             {!isOverviewMode ? <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div> : null}
           </div>
           <div className="panel-body observer-chart-wrap">
@@ -1564,7 +1568,12 @@ export function ObserverSurface() {
                   <div><span className="mini-label">active receipt seq</span><strong>{bootstrap.latest_seq}</strong></div>
                 </div>
               </div>
-            ) : missingSymbolSelection ? (
+            ) : hasRuntimeSelection && !runtimeChartAvailable ? (
+              <div className="state-block observer-empty-state">
+                <strong>No exact runtime bars for {selectedProductDate} / {selectedSymbol}.</strong>
+                <span>Mounted observer candles are intentionally not used as fallback for a runtime date/symbol selection, to avoid showing stale cross-date prices.</span>
+              </div>
+            ) : missingMountedSessionSelection ? (
               <div className="state-block observer-empty-state">
                 <strong>No runtime or mounted chart data for {selectedSymbol}.</strong>
                 <span>This symbol is in the selected runtime/date universe, but no verified runtime bars or mounted observer chart session are available yet. Chart/timeline are intentionally not shown to avoid stale data.</span>
@@ -1578,7 +1587,7 @@ export function ObserverSurface() {
           </div>
         </section>
 
-        {!isOverviewMode && !missingSymbolSelection ? <aside className="observer-right-rail">
+        {!isOverviewMode && !missingMountedSessionSelection ? <aside className="observer-right-rail">
           <section className="panel observer-reconciliation-panel">
             <div className="panel-header">
               <h3>Symbol Detail · Execution State</h3>
@@ -1662,7 +1671,7 @@ export function ObserverSurface() {
         </aside> : null}
       </div>
 
-      {missingSymbolSelection ? (
+      {missingMountedSessionSelection ? (
         <section className="panel">
           <div className="panel-header">
             <h3>No chart-backed timeline · {selectedSymbol}</h3>

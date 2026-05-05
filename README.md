@@ -77,6 +77,7 @@ See [`docs/LIVE_EXECUTION_GATE.md`](docs/LIVE_EXECUTION_GATE.md) for the public 
 - [`docs/AUTH_AND_SESSION_MODEL.md`](docs/AUTH_AND_SESSION_MODEL.md) — auth/session posture and capability boundaries.
 - [`docs/DAYTRADING_GUARDRAILS.md`](docs/DAYTRADING_GUARDRAILS.md) — day-trading risk and exit guardrails.
 - [`docs/LIVE_EXECUTION_GATE.md`](docs/LIVE_EXECUTION_GATE.md) — bounded live execution gate and fill-source contract.
+- [`docs/LIVE_MONITOR_SIDECAR.md`](docs/LIVE_MONITOR_SIDECAR.md) — 唯讀 dashboard / live monitor sidecar 邊界、runtime store、API 與安全姿態。
 - [`docs/SETUP.md`](docs/SETUP.md) — development setup.
 - [`CHANGELOG.md`](CHANGELOG.md) — public release notes.
 
@@ -111,6 +112,12 @@ uv run steamer-card-engine operator plan-real-trade-gate \
 - Prefer dry-run/replay/live-sim evidence before expanding live authority.
 - Public docs should describe contracts and behavior, not private operational incidents.
 
+## Live monitor sidecar
+
+The dashboard / live monitor lives inside this repository as a **read-only sidecar** under `steamer_card_engine.dashboard.*`.
+
+It can index runtime artifacts into a local SQLite store and expose read-only API/UI surfaces, but it must not submit broker orders, mutate strategy policy, or hold broker authority. See [`docs/LIVE_MONITOR_SIDECAR.md`](docs/LIVE_MONITOR_SIDECAR.md) for the public contract.
+
 ## Status
 
-This repository is an evolving seed product. It has useful CLI contracts, manifests, tests, and bounded live-execution scaffolding, but it should still be treated as pre-production until replay/live-sim/live gates are hardened across more scenarios.
+This repository is an evolving seed product. It has useful CLI contracts, manifests, tests, bounded live-execution scaffolding, and a read-only monitor sidecar, but it should still be treated as pre-production until replay/live-sim/live gates are hardened across more scenarios.
