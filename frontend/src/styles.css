@@ -9,8 +9,9 @@
   --line-strong: rgba(141, 170, 186, 0.3);
   --text: #e0f2fe;
   --muted: #8ba8bb;
-  --accent: #5ef3b1;
-  --accent-warm: #ffcd81;
+  --accent: #d97757;
+  --accent-warm: #ecb15c;
+  --positive: #59dd9c;
   --alert: #ff6b6b;
   --info: #80c2ff;
   --shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
@@ -102,7 +103,7 @@ button {
 .dashboard-tab-active {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(94, 243, 177, 0.06);
+  background: rgba(217, 119, 87, 0.06);
 }
 
 .deck-selector {
@@ -132,8 +133,8 @@ button {
 
 .deck-tab-active {
   border-color: var(--accent);
-  background: rgba(94, 243, 177, 0.05);
-  box-shadow: inset 0 0 15px rgba(94, 243, 177, 0.05);
+  background: rgba(217, 119, 87, 0.05);
+  box-shadow: inset 0 0 15px rgba(217, 119, 87, 0.05);
 }
 
 .deck-tab-active::after {
@@ -225,6 +226,7 @@ button {
 .metric-card strong {
   display: block;
   font-size: 1.8rem;
+  letter-spacing: -0.015em;
   font-family: "IBM Plex Mono", monospace;
   margin: 12px 0 4px;
 }
@@ -266,7 +268,7 @@ button {
 }
 
 .card-item-active .card-trigger {
-  background: rgba(94, 243, 177, 0.03);
+  background: rgba(217, 119, 87, 0.03);
 }
 
 .card-title {
@@ -308,7 +310,7 @@ button {
 }
 
 .timeline-item-active .timeline-trigger {
-  background: rgba(94, 243, 177, 0.08);
+  background: rgba(217, 119, 87, 0.08);
   color: var(--accent);
 }
 
@@ -533,7 +535,7 @@ button {
 
 .history-item-highlight {
   border-color: var(--line-strong);
-  background: rgba(94, 243, 177, 0.04);
+  background: rgba(217, 119, 87, 0.04);
 }
 
 .history-item-head {
@@ -670,8 +672,8 @@ button {
 
 .status-chip-accent {
   color: var(--accent);
-  border-color: rgba(94, 243, 177, 0.35);
-  background: rgba(94, 243, 177, 0.08);
+  border-color: rgba(217, 119, 87, 0.35);
+  background: rgba(217, 119, 87, 0.08);
 }
 
 .status-chip-alert {
@@ -740,9 +742,9 @@ button {
 
 .observer-focus-selector-block {
   padding: 14px;
-  border: 1px solid rgba(94, 243, 177, 0.4);
-  background: rgba(94, 243, 177, 0.08);
-  box-shadow: inset 0 0 24px rgba(94, 243, 177, 0.08);
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  background: rgba(217, 119, 87, 0.08);
+  box-shadow: inset 0 0 24px rgba(217, 119, 87, 0.08);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -853,14 +855,14 @@ button {
 }
 
 .observer-session-selector select {
-  border: 1px solid rgba(94, 243, 177, 0.5);
+  border: 1px solid rgba(217, 119, 87, 0.5);
   border-radius: 10px;
   background: rgba(10, 16, 22, 0.9);
   color: var(--text);
   padding: 10px 12px;
   font: inherit;
   font-weight: 600;
-  box-shadow: 0 0 0 2px rgba(94, 243, 177, 0.12);
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.12);
 }
 
 .observer-session-selector-disabled {
@@ -1141,7 +1143,7 @@ button {
 .timeframe-selector button.active {
   color: #061018;
   background: var(--accent);
-  box-shadow: 0 0 18px rgba(94, 243, 177, 0.2);
+  box-shadow: 0 0 18px rgba(217, 119, 87, 0.2);
 }
 
 /* Observer v0 trust hierarchy */
@@ -1268,7 +1270,7 @@ button {
   box-shadow: 0 0 10px currentColor;
 }
 
-.legend-buy { color: var(--accent); background: var(--accent); }
+.legend-buy { color: var(--positive); background: var(--positive); }
 .legend-sell { color: var(--alert); background: var(--alert); }
 .legend-fill { color: var(--accent-cool); background: var(--accent-cool); }
 .legend-derived { color: var(--muted); background: var(--muted); }

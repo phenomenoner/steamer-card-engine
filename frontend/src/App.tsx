@@ -1577,7 +1577,7 @@ function DashboardApp() {
         <ObserverSurface />
       ) : dashboardTab === "live-sim" ? (
         deckLoading ? (
-          <div className="state-block">Engaging deck link…</div>
+          <div className="state-block" role="status" aria-live="polite">Engaging deck link…</div>
         ) : deck ? (
           <main className="dashboard-surface">
             <div className="metrics-row">
@@ -1645,7 +1645,7 @@ function DashboardApp() {
                       {isActive && (
                         <div className="expansion-panel">
                           {cardLoading ? (
-                            <div className="muted">Scanning archives…</div>
+                            <div className="muted" role="status" aria-live="polite">Scanning archives…</div>
                           ) : cardDetail ? (
                             <>
                               <div className="kv-grid">
@@ -1721,25 +1721,25 @@ function DashboardApp() {
             </section>
           </main>
         ) : (
-          <div className="state-block">Select a deck to begin.</div>
+          <div className="state-block" role="status">Select a deck to begin.</div>
         )
       ) : dashboardTab === "strategy-powerhouse" ? (
         strategyLoading ? (
-          <div className="state-block">Loading strategy-powerhouse surface…</div>
+          <div className="state-block" role="status" aria-live="polite">Loading strategy-powerhouse surface…</div>
         ) : strategyPowerhouse ? (
           <StrategySurface view={strategyPowerhouse} />
         ) : (
-          <div className="state-block">Strategy-powerhouse artifacts are unavailable.</div>
+          <div className="state-block" role="status">Strategy-powerhouse artifacts are unavailable.</div>
         )
       ) : pipelineLoading ? (
-        <div className="state-block">Loading strategy-pipeline surface…</div>
+        <div className="state-block" role="status" aria-live="polite">Loading strategy-pipeline surface…</div>
       ) : strategyPipeline ? (
         <StrategyPipelineSurface view={strategyPipeline} />
       ) : (
-        <div className="state-block">Strategy-pipeline artifacts are unavailable.</div>
+        <div className="state-block" role="status">Strategy-pipeline artifacts are unavailable.</div>
       )}
 
-      {error ? <div className="state-block text-alert">ERROR: {error}</div> : null}
+      {error ? <div className="state-block text-alert" role="alert">ERROR: {error}</div> : null}
     </div>
   );
 }

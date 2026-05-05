@@ -639,7 +639,10 @@ function ObserverTrustStrip({
   const sessionText = sessionLabel ? `${sessionId} · ${sessionLabel}` : sessionId;
   return (
     <div className="observer-trust-strip observer-trust-strip-inline" aria-label="Observer session identity">
+      <span className="status-chip status-chip-muted">READ ONLY</span>
       <span className="status-chip status-chip-muted">{mode === "replay" ? "NO LIVE STREAM" : "OBSERVER STREAM"}</span>
+      <span className="status-chip status-chip-muted">NO BROKER CONTROL</span>
+      <span className="status-chip status-chip-muted">NO RUNTIME WRITE-BACK</span>
       {sessionText ? <span className="pill">session {sessionText}</span> : null}
       {bundleId ? <span className="pill">bundle {bundleId}</span> : null}
       {generatedAt ? <span className="pill">generated {formatTimestamp(generatedAt)}</span> : null}
@@ -713,7 +716,7 @@ function applyObserverEvent(state: ObserverState, event: ObserverEvent): Observe
             time: toBarTime(event.event_time),
             position: order.side === "sell" ? "aboveBar" : "belowBar",
             shape: order.side === "sell" ? "arrowDown" : "arrowUp",
-            color: order.side === "sell" ? "#ff6b6b" : "#5ef3b1",
+            color: order.side === "sell" ? "#ff6b6b" : "#59dd9c",
             text: `${String(order.side).toUpperCase()} SUBMIT`,
             event_id: event.event_id,
           } satisfies ChartMarker,
@@ -898,13 +901,13 @@ function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[];
         timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
         localization: { timeFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
         rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
-        crosshair: { vertLine: { color: "rgba(94,243,177,0.3)" }, horzLine: { color: "rgba(94,243,177,0.3)" } },
+        crosshair: { vertLine: { color: "rgba(89,221,156,0.28)" }, horzLine: { color: "rgba(89,221,156,0.28)" } },
       });
       const series = chart.addSeries(CandlestickSeries, {
-        upColor: "#5ef3b1",
+        upColor: "#59dd9c",
         downColor: "#ff6b6b",
         borderVisible: false,
-        wickUpColor: "#5ef3b1",
+        wickUpColor: "#59dd9c",
         wickDownColor: "#ff6b6b",
       });
       chartRef.current = chart;
@@ -951,7 +954,7 @@ function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[];
   }, [candles, markers]);
 
   if (chartError) {
-    return <div className="state-block text-alert">CHART ERROR: {chartError}</div>;
+    return <div className="state-block text-alert" role="alert">CHART ERROR: {chartError}</div>;
   }
 
   return (
@@ -1383,11 +1386,11 @@ export function ObserverSurface() {
   ]);
   const activeSession = state.session;
 
-  if (loading && !state.bootstrap) return <div className="state-block">Loading observer sidecar…</div>;
-  if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
-  if (hasNoSession) return <div className="state-block observer-empty-state"><strong>No observer session mounted.</strong><span>Set STEAMER_OBSERVER_BUNDLE_JSON or enable a mock session, then refresh this read-only surface.</span></div>;
-  if (!selectedStrategy) return <div className="state-block">Strategy selector unavailable.</div>;
-  if (!state.bootstrap) return <div className="state-block">Observer bootstrap unavailable.</div>;
+  if (loading && !state.bootstrap) return <div className="state-block" role="status" aria-live="polite">Loading observer sidecar…</div>;
+  if (error) return <div className="state-block text-alert" role="alert">ERROR: {error}</div>;
+  if (hasNoSession) return <div className="state-block observer-empty-state" role="status"><strong>No observer session mounted.</strong><span>Set STEAMER_OBSERVER_BUNDLE_JSON or enable a mock session, then refresh this read-only surface.</span></div>;
+  if (!selectedStrategy) return <div className="state-block" role="status">Strategy selector unavailable.</div>;
+  if (!state.bootstrap) return <div className="state-block" role="status">Observer bootstrap unavailable.</div>;
 
   const bootstrap = state.bootstrap;
   const mountedDetailSymbols = normalizeSymbolList(
@@ -1569,12 +1572,12 @@ export function ObserverSurface() {
                 </div>
               </div>
             ) : hasRuntimeSelection && !runtimeChartAvailable ? (
-              <div className="state-block observer-empty-state">
+              <div className="state-block observer-empty-state" role="status">
                 <strong>No exact runtime bars for {selectedProductDate} / {selectedSymbol}.</strong>
                 <span>Mounted observer candles are intentionally not used as fallback for a runtime date/symbol selection, to avoid showing stale cross-date prices.</span>
               </div>
             ) : missingMountedSessionSelection ? (
-              <div className="state-block observer-empty-state">
+              <div className="state-block observer-empty-state" role="status">
                 <strong>No runtime or mounted chart data for {selectedSymbol}.</strong>
                 <span>This symbol is in the selected runtime/date universe, but no verified runtime bars or mounted observer chart session are available yet. Chart/timeline are intentionally not shown to avoid stale data.</span>
               </div>
@@ -1860,11 +1863,11 @@ export function ReplayHistorySurface() {
   const replayChartMarkers = alignMarkers(bootstrap?.chart.markers.slice(-MARKER_LIMIT) ?? [], chartTimeframe);
   const viewSymbols = selectedStrategy?.symbols ?? [];
 
-  if (loadingList) return <div className="state-block">Loading sanitized observer history…</div>;
-  if (error) return <div className="state-block text-alert">ERROR: {error}</div>;
+  if (loadingList) return <div className="state-block" role="status" aria-live="polite">Loading sanitized observer history…</div>;
+  if (error) return <div className="state-block text-alert" role="alert">ERROR: {error}</div>;
   if (!sessions.length) {
     return (
-      <div className="state-block observer-empty-state">
+      <div className="state-block observer-empty-state" role="status">
         <strong>No replay history configured.</strong>
         <span>No sanitized dashboard fixture bundles are currently projected into observer history.</span>
       </div>
@@ -1923,7 +1926,7 @@ export function ReplayHistorySurface() {
       <section className="panel replay-detail-panel">
           <div className="panel-header"><h3>{isOverviewMode ? "Portfolio Replay Overview" : "Replay Detail"}</h3><span className={`status-chip status-chip-${freshnessClass}`}>{bootstrap?.freshness_state ?? selected?.freshness_state}</span></div>
           {loadingDetail ? (
-            <div className="state-block">Loading sanitized observer bundle…</div>
+            <div className="state-block" role="status" aria-live="polite">Loading sanitized observer bundle…</div>
           ) : bootstrap && selected ? (
             <div className="panel-body replay-detail-body">
               <div className="observer-title-row replay-frame-title">
@@ -1956,7 +1959,7 @@ export function ReplayHistorySurface() {
                   </div>
                 </div>
               ) : !hasMountedSymbolSession ? (
-                <div className="state-block observer-empty-state">
+                <div className="state-block observer-empty-state" role="status">
                   <strong>No mounted symbol session for {selectedSymbol}.</strong>
                   <span>This replay strategy exposes the symbol in metadata, but no replay session is mounted for it yet.</span>
                 </div>
@@ -1999,7 +2002,7 @@ export function ReplayHistorySurface() {
               </section>
             </div>
           ) : (
-            <div className="state-block">Select a strategy run to open replay detail.</div>
+            <div className="state-block" role="status">Select a strategy run to open replay detail.</div>
           )}
       </section>
     </main>
