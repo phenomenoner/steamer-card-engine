@@ -80,7 +80,21 @@ Cards and/or deck policy should be able to express:
 
 Cards may declare these, but the runtime and operator policy retain final authority.
 
-### 5. Order-event routing hygiene
+### 5. Fill-source hygiene
+
+Real-time P/L and position state must be derived from execution fills, not from submitted order prices.
+
+Recommended live design:
+
+- use active filled callbacks as the primary low-latency source;
+- reconcile periodically with broker readback, such as `get_order_results`, as a safe-net;
+- dedupe by order, sequence, and fill identifiers when available;
+- record whether a fill came from callback or readback;
+- refuse or pause P/L decisions if fill price is unresolved.
+
+Submitted limit prices, limit-up prices, and limit-down prices are not execution prices. They must not be used as entry/exit average fallbacks.
+
+### 6. Order-event routing hygiene
 
 Order changes, cancels, fills, and active reports may arrive mixed together.
 
@@ -93,7 +107,7 @@ Without that, one card can misread another card's lifecycle activity, or one acc
 
 This is not optional.
 
-### 6. Market-day gating (non-trading days / holidays)
+### 7. Market-day gating (non-trading days / holidays)
 
 The runtime must be able to refuse to run **live** or **live sim** when the exchange is closed.
 
@@ -103,8 +117,7 @@ Minimum contract:
 - make the reason operator-inspectable (status surface: closed-day verdict + source)
 - safe default is **skip**, not “run anyway”
 
-Related upstream hardening note:
-- `/root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/TECH_NOTES/2026-04-06_steamer_market-day-gating_twse-official-holiday-json.md`
+Related hardening direction: use an official exchange calendar source and preserve the calendar-source verdict in operator receipts.
 
 ## Live sim and replay sim expectations
 

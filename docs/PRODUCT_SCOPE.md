@@ -43,6 +43,7 @@ Helps draft cards, validate configs, prepare replay jobs, and assist configurati
 - Audit-friendly event, intent, risk, and execution receipts
 - Replaceable `MarketDataAdapter` and `BrokerAdapter` interfaces
 - Day-trading guardrails: emergency stop-loss, forced exit, final-auction flatten controls
+- Bounded live-execution gate with explicit operator arm/disarm, fill-source receipts, and readback reconciliation
 
 ## Non-goals for v0.1
 
@@ -68,6 +69,7 @@ Helps draft cards, validate configs, prepare replay jobs, and assist configurati
 ### Deliberately deferred
 - Deep strategy library
 - Broker-connected or operator-authoritative GUI/control plane
+- Public storage of private broker receipts, account numbers, personal IDs, cloud command IDs, or operator machine paths
 - Hosted multi-tenant service
 - Real credential storage implementation in this repo
 - Multi-market abstraction beyond Taiwan cash
@@ -91,6 +93,7 @@ That includes a practical safety boundary for some broker ecosystems:
 - Migration from the current `sdk_manager_async.py` + `strategy_async.py` world is phased, not hand-wavy.
 - The docs explain why latency matters for day-trading stops and forced exits.
 - Nothing in the repo over-claims live readiness.
+- Public documentation stays contract-focused and avoids private operator receipts or account details.
 
 ## Risks to manage early
 

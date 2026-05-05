@@ -218,6 +218,15 @@ Responsibilities:
 
 The explicit `active_account + user_def` filtering rule is a migration lesson from the current Steamer stack, not an optional nicety.
 
+#### Fill lifecycle ownership
+
+For live execution, the execution engine owns a two-path fill ledger:
+
+1. **active fill callback path** for low-latency position updates;
+2. **periodic broker readback path** for reconciliation and missed-callback recovery.
+
+The engine must compute position/P/L from execution fills only. Submitted limit prices, limit-up prices, and limit-down prices are order constraints, not fill facts. Receipts should record `fill_source` so operators can distinguish callback-driven updates from readback reconciliation.
+
 ### ReplayRunner / LiveSim
 
 Responsibilities:
