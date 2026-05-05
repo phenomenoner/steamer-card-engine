@@ -32,6 +32,8 @@ class RoundTripPlan:
     entry: ExecutionRequest
     exit: ExecutionRequest
     broker_mapping: dict[str, Any]
+    entry_filter: dict[str, Any] = field(default_factory=dict)
+    exit_policy: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -54,6 +56,13 @@ class RoundTripLedger:
         if not isinstance(day_rows, list):
             return 0
         return sum(1 for row in day_rows if isinstance(row, dict) and row.get("symbol") == symbol)
+
+    def count_total_for_day(self, day: date) -> int:
+        payload = self.load()
+        day_rows = payload.get("days", {}).get(day.isoformat(), [])
+        if not isinstance(day_rows, list):
+            return 0
+        return sum(1 for row in day_rows if isinstance(row, dict))
 
     def record_closed(self, *, day: date, symbol: str, plan_id: str, receipt_id: str) -> None:
         payload = self.load()
@@ -110,7 +119,7 @@ class FirstLiveRiskGuard:
             blockers.append({"code": "sell-first-daytrade-required"})
         if self.ledger is not None:
             day = today or datetime.now(UTC).date()
-            used = self.ledger.count_for_day(day, symbol)
+            used = self.ledger.count_total_for_day(day)
             if used >= self.policy.max_round_trips_per_day:
                 blockers.append(
                     {
@@ -128,7 +137,9 @@ class FirstLiveRiskGuard:
         )
 
 
-def build_sell_first_round_trip_plan(*, symbol: str, quantity: int) -> RoundTripPlan:
+def build_sell_first_round_trip_plan(
+    *, symbol: str, quantity: int, entry_filter: dict[str, Any] | None = None, exit_policy: dict[str, Any] | None = None
+) -> RoundTripPlan:
     plan_id = f"rt-{uuid4().hex}"
     entry = ExecutionRequest(
         request_id=f"{plan_id}:entry",
@@ -172,6 +183,8 @@ def build_sell_first_round_trip_plan(*, symbol: str, quantity: int) -> RoundTrip
                 "price_source": "limitup_price",
             },
         },
+        entry_filter=dict(entry_filter or {}),
+        exit_policy=dict(exit_policy or {}),
     )
 
 
@@ -201,6 +214,8 @@ class DryRunRoundTripAdapter:
                 safe_to_replay=True,
             ).to_public_dict(),
             "broker_mapping": plan.broker_mapping,
+            "entry_filter": plan.entry_filter,
+            "exit_policy": plan.exit_policy,
         }
 
 
@@ -221,4 +236,6 @@ def rejected_round_trip_receipt(*, plan: RoundTripPlan, blockers: list[dict[str,
             safe_to_replay=False,
         ).to_public_dict(),
         "exit_receipt": None,
+        "entry_filter": plan.entry_filter,
+        "exit_policy": plan.exit_policy,
     }

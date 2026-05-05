@@ -457,7 +457,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     execute_real_trade_gate.add_argument("--deck", required=True)
     execute_real_trade_gate.add_argument("--auth-profile", required=True)
-    execute_real_trade_gate.add_argument("--symbol", required=True)
+    execute_real_trade_gate.add_argument("--symbol", required=True, action="append", dest="symbols")
     execute_real_trade_gate.add_argument("--quantity", required=True, type=int)
     execute_real_trade_gate.add_argument("--shortable-symbol", action="append", default=[], dest="shortable_symbols")
     execute_real_trade_gate.add_argument("--mode", choices=("dry-run", "live"), default="dry-run")
@@ -2279,7 +2279,7 @@ def main(argv: list[str] | None = None) -> int:
                 receipt_dir=Path(args.receipt_dir),
                 auth_profile_path=args.auth_profile,
                 session_id=args.session_id,
-                symbol=args.symbol,
+                symbol=args.symbols,
                 side=args.side,
                 quantity=args.quantity,
                 operator_id=args.operator_id,
@@ -2297,7 +2297,7 @@ def main(argv: list[str] | None = None) -> int:
                 receipt_dir=Path(args.receipt_dir),
                 auth_profile_path=args.auth_profile,
                 deck_ref=args.deck,
-                symbol=args.symbol,
+                symbol=args.symbols,
                 entry_side=args.entry_side,
                 quantity=args.quantity,
                 exit_delay_seconds=args.exit_delay_seconds,
@@ -2324,7 +2324,7 @@ def main(argv: list[str] | None = None) -> int:
                 receipt_dir=Path(args.receipt_dir),
                 auth_profile_path=args.auth_profile,
                 deck_ref=args.deck,
-                symbol=args.symbol,
+                symbol=args.symbols,
                 quantity=args.quantity,
                 shortable_symbols=args.shortable_symbols,
                 mode=args.mode,
@@ -2384,7 +2384,7 @@ def main(argv: list[str] | None = None) -> int:
                 session_id=args.session_id,
                 deck_ref=args.deck,
                 ttl_seconds=args.ttl_seconds,
-                symbol=args.symbol,
+                symbol=args.symbols,
                 side=args.side,
                 quantity=args.quantity,
                 flatten_mode=args.flatten_mode,

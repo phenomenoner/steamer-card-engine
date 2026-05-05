@@ -754,6 +754,21 @@ def _stage1_policy_blockers(policy: dict[str, Any]) -> list[dict[str, Any]]:
 
     for key, expected in STAGE1_REAL_TRADE_GATE_POLICY.items():
         actual = policy.get(key)
+        if key in {"max_entry_orders_per_run", "max_exit_orders_per_run", "max_round_trips_per_day"}:
+            try:
+                value = int(actual)
+            except (TypeError, ValueError):
+                value = -1
+            if value < 1 or value > 3:
+                blockers.append(
+                    {
+                        "code": f"stage1-policy-{key.replace('_', '-')}-mismatch",
+                        "detail": f"policy.real_trade_gate.{key} must be between 1 and 3 for Gate 5 bounded live smoke",
+                        "expected_range": [1, 3],
+                        "actual": actual,
+                    }
+                )
+            continue
         if actual != expected:
             blockers.append(
                 {
@@ -948,7 +963,7 @@ def operator_execute_real_trade_gate(
     receipt_dir: Path,
     auth_profile_path: str,
     deck_ref: str,
-    symbol: str,
+    symbol: str | list[str],
     quantity: int,
     shortable_symbols: list[str],
     mode: str,
@@ -964,9 +979,12 @@ def operator_execute_real_trade_gate(
     auto_disarm_receipt = _maybe_auto_disarm(state=state, state_file=state_file, receipt_dir=receipt_dir)
 
     resolved_operator = _resolve_operator_id(operator_id)
+    symbols = [symbol] if isinstance(symbol, str) else list(symbol)
+    symbols = list(dict.fromkeys(str(item).strip() for item in symbols if str(item).strip()))
     request = {
         "deck": deck_ref,
-        "symbol": symbol,
+        "symbol": symbols[0] if len(symbols) == 1 else None,
+        "symbols": symbols,
         "quantity": quantity,
         "shortable_symbols": sorted(set(shortable_symbols)),
         "mode": mode,
@@ -979,6 +997,8 @@ def operator_execute_real_trade_gate(
 
     if mode not in {"dry-run", "live"}:
         blockers.append({"code": "invalid-mode", "detail": "mode must be dry-run or live"})
+    if not symbols:
+        blockers.append({"code": "symbols-required", "detail": "at least one --symbol is required"})
     if mode == "live" and not confirm_live_submit:
         blockers.append({"code": "missing-live-submit-confirmation", "detail": "live mode requires --confirm-live-submit"})
 
@@ -990,9 +1010,10 @@ def operator_execute_real_trade_gate(
         deck_id, deck_path = _resolve_deck(deck_ref)
         deck = load_deck_manifest(deck_path)
         deck_symbols = list(deck.symbol_scope)
-        if symbol not in set(deck.symbol_scope):
+        missing_scope = [item for item in symbols if item not in set(deck.symbol_scope)]
+        if missing_scope:
             blockers.append(
-                {"code": "symbol-not-in-deck-scope", "symbol": symbol, "deck_symbol_scope": sorted(deck.symbol_scope)}
+                {"code": "symbol-not-in-deck-scope", "symbols": missing_scope, "deck_symbol_scope": sorted(deck.symbol_scope)}
             )
         actual_cards = list(deck.cards)
         if actual_cards != list(STAGE1_REAL_TRADE_GATE_REQUIRED_CARDS):
@@ -1025,8 +1046,9 @@ def operator_execute_real_trade_gate(
 
     if not state["capabilities"].get("trade_enabled"):
         blockers.append({"code": "trade-disabled", "detail": "auth profile trade_enabled=false"})
-    if symbol not in set(shortable_symbols):
-        blockers.append({"code": "short-capability-unproven", "symbol": symbol})
+    missing_shortable = [item for item in symbols if item not in set(shortable_symbols)]
+    if missing_shortable:
+        blockers.append({"code": "short-capability-unproven", "symbols": missing_shortable})
 
     submission_gate = _submission_gate(state)
     if not submission_gate["allowed"]:
@@ -1043,15 +1065,23 @@ def operator_execute_real_trade_gate(
     )
     ledger = RoundTripLedger(roundtrip_ledger_path)
     guard = FirstLiveRiskGuard(policy=policy, ledger=ledger)
-    risk = guard.evaluate(symbol=symbol, quantity=quantity)
-    blockers.extend(risk.blockers)
+    entry_filter = real_trade_gate_policy.get("entry_filter") if isinstance(real_trade_gate_policy.get("entry_filter"), dict) else {}
+    exit_policy = real_trade_gate_policy.get("exit_policy") if isinstance(real_trade_gate_policy.get("exit_policy"), dict) else {}
+    plans = [
+        build_sell_first_round_trip_plan(
+            symbol=item, quantity=quantity, entry_filter=entry_filter, exit_policy=exit_policy
+        )
+        for item in symbols
+    ]
+    for item in symbols:
+        risk = guard.evaluate(symbol=item, quantity=quantity)
+        blockers.extend(risk.blockers)
 
-    plan = build_sell_first_round_trip_plan(symbol=symbol, quantity=quantity)
-    execution_receipt: dict[str, Any]
+    execution_receipts: list[dict[str, Any]] = []
     status: str
     if blockers:
         status = "refused"
-        execution_receipt = rejected_round_trip_receipt(plan=plan, blockers=blockers)
+        execution_receipts = [rejected_round_trip_receipt(plan=plan, blockers=blockers) for plan in plans]
     else:
         if broker_adapter is not None:
             adapter = broker_adapter
@@ -1073,17 +1103,43 @@ def operator_execute_real_trade_gate(
 
         if blockers or adapter is None:
             status = "refused"
-            execution_receipt = rejected_round_trip_receipt(plan=plan, blockers=blockers)
+            execution_receipts = [rejected_round_trip_receipt(plan=plan, blockers=blockers) for plan in plans]
         else:
-            execution_receipt = adapter.execute_round_trip(plan)
-            status = str(execution_receipt.get("status") or "unknown")
-            if status == "round-trip-closed":
-                ledger.record_closed(
-                    day=_utc_now().date(),
-                    symbol=symbol,
-                    plan_id=plan.plan_id,
-                    receipt_id=str(execution_receipt.get("receipt_id") or plan.plan_id),
-                )
+            statuses: list[str] = []
+            for plan in plans:
+                receipt_item = adapter.execute_round_trip(plan)
+                execution_receipts.append(receipt_item)
+                item_status = str(receipt_item.get("status") or "unknown")
+                statuses.append(item_status)
+                if item_status == "round-trip-closed":
+                    ledger.record_closed(
+                        day=_utc_now().date(),
+                        symbol=plan.symbol,
+                        plan_id=plan.plan_id,
+                        receipt_id=str(receipt_item.get("receipt_id") or plan.plan_id),
+                    )
+                    # Re-check total round-trip limit before the next live leg.
+                    if mode == "live" and plan is not plans[-1]:
+                        next_risk = guard.evaluate(symbol=plan.symbol, quantity=quantity)
+                        if not next_risk.allowed:
+                            blockers.extend(next_risk.blockers)
+                            break
+            if blockers:
+                status = "refused"
+            elif all(item == "dry-run-closed" for item in statuses):
+                status = "dry-run-closed"
+            elif all(item == "round-trip-closed" for item in statuses):
+                status = "round-trip-closed"
+            else:
+                status = "partial"
+
+    execution_receipt = execution_receipts[0] if len(execution_receipts) == 1 else {
+        "schema_version": "steamer-live-execution-multi-roundtrip/v1",
+        "mode": mode,
+        "status": status,
+        "dispatch_suppressed": all(bool(row.get("dispatch_suppressed")) for row in execution_receipts),
+        "round_trips": execution_receipts,
+    }
 
     details: dict[str, Any] = {
         "request": request,
@@ -1093,12 +1149,26 @@ def operator_execute_real_trade_gate(
         "real_trade_gate_policy": real_trade_gate_policy,
         "blockers": blockers,
         "warnings": warnings,
+        "plans": [
+            {
+                "plan_id": plan.plan_id,
+                "entry": asdict(plan.entry),
+                "exit": asdict(plan.exit),
+                "broker_mapping": plan.broker_mapping,
+                "entry_filter": plan.entry_filter,
+                "exit_policy": plan.exit_policy,
+            }
+            for plan in plans
+        ],
         "plan": {
-            "plan_id": plan.plan_id,
-            "entry": asdict(plan.entry),
-            "exit": asdict(plan.exit),
-            "broker_mapping": plan.broker_mapping,
+            "plan_id": plans[0].plan_id if plans else None,
+            "entry": asdict(plans[0].entry) if plans else None,
+            "exit": asdict(plans[0].exit) if plans else None,
+            "broker_mapping": plans[0].broker_mapping if plans else {},
+            "entry_filter": plans[0].entry_filter if plans else {},
+            "exit_policy": plans[0].exit_policy if plans else {},
         },
+        "execution_receipts": execution_receipts,
         "execution_receipt": execution_receipt,
     }
     if auto_disarm_receipt:
@@ -1125,7 +1195,9 @@ def operator_execute_real_trade_gate(
         "boundary": "dry-run default; live mode requires explicit arm + --mode live + --confirm-live-submit + --neoapi-secret-dir",
         "blockers": blockers,
         "warnings": warnings,
+        "plans": details["plans"],
         "plan": details["plan"],
+        "execution_receipts": execution_receipts,
         "execution_receipt": execution_receipt,
         "receipt_path": receipt["receipt_path"],
     }

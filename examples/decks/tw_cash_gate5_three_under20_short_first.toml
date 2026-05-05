@@ -1,0 +1,39 @@
+deck_id = "tw-cash-gate5-three-under20-short-first"
+market = "TW_CASH"
+session = "intraday"
+
+auth_profile = "profiles/tw_cash_password_auth.toml"
+
+cards = [
+  "real-trade-gate-short-first-entry-v1",
+  "real-trade-gate-short-first-cover-v1",
+]
+
+symbol_scope = ["2002", "2834", "1314"]
+
+[policy]
+live_mode = true
+allow_card_symbol_pool = true
+
+[policy.real_trade_gate]
+stage = "stage1-short-capability-smoke"
+entry_side = "sell"
+exit_side = "cover"
+max_entry_orders_per_run = 3
+max_exit_orders_per_run = 3
+max_round_trips_per_day = 3
+requires_shortable_symbol_allowlist = true
+max_quantity = 1000
+boundary = "Gate 5 bounded live smoke: three under-20 sell-first daytrade candidates, one lot each"
+
+[policy.real_trade_gate.entry_filter]
+max_price = 20
+min_change_percent = -3
+max_change_percent = 3
+quantity_per_symbol = 1000
+
+[policy.real_trade_gate.exit_policy]
+take_profit_percent = 2
+stop_loss_percent = -2
+force_cover_time = "13:15:00"
+timezone = "Asia/Taipei"

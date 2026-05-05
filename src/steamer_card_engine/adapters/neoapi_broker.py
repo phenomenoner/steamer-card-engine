@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, time as dt_time
 import re
 import time
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +56,59 @@ def _public_obj(obj: Any) -> dict[str, Any] | None:
     return out
 
 
+
+def _quote_value(payload: Any, *names: str) -> Any:
+    if isinstance(payload, dict):
+        for name in names:
+            if name in payload:
+                return payload.get(name)
+    return _get_attr(payload, *names)
+
+
+def _safe_market_quote(sdk: Any, symbol: str) -> dict[str, Any]:
+    try:
+        sdk.init_realtime()
+        intraday = sdk.marketdata.rest_client.stock.intraday
+        payload = intraday.quote(symbol=symbol)
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+    price = _to_float(_quote_value(payload, "price", "lastPrice", "closePrice"))
+    reference = _to_float(_quote_value(payload, "previousClose", "referencePrice"))
+    change_pct = _to_float(_quote_value(payload, "changePercent", "percentChange"))
+    if change_pct is None and price is not None and reference not in {None, 0}:
+        change_pct = (price - reference) / reference * 100
+    return {
+        "ok": price is not None,
+        "price": price,
+        "reference_price": reference,
+        "change_percent": change_pct,
+    }
+
+
+def _entry_filter_allows(plan: RoundTripPlan, market_quote: dict[str, Any]) -> tuple[bool, list[str]]:
+    issues: list[str] = []
+    policy = plan.entry_filter or {}
+    price = market_quote.get("price")
+    change_pct = market_quote.get("change_percent")
+    max_price = _to_float(policy.get("max_price"))
+    min_change = _to_float(policy.get("min_change_percent"))
+    max_change = _to_float(policy.get("max_change_percent"))
+    if not market_quote.get("ok"):
+        issues.append("entry_market_quote_unavailable")
+    if max_price is not None and (price is None or price >= max_price):
+        issues.append("entry_price_filter_failed")
+    if min_change is not None and (change_pct is None or change_pct < min_change):
+        issues.append("entry_change_percent_below_min")
+    if max_change is not None and (change_pct is None or change_pct > max_change):
+        issues.append("entry_change_percent_above_max")
+    return not issues, issues
+
+
+def _short_pnl_percent(*, entry_price: float, current_price: float) -> float:
+    if entry_price <= 0:
+        return 0.0
+    return (entry_price - current_price) / entry_price * 100
+
 def _sanitize_response(response: Any) -> dict[str, Any]:
     data = getattr(response, "data", None)
     if isinstance(data, list):
@@ -68,6 +122,51 @@ def _sanitize_response(response: Any) -> dict[str, Any]:
         "data": public_data,
     }
 
+
+
+def _filled_qty(row: dict[str, Any]) -> int:
+    return _to_int(row.get("filled_qty") or row.get("filledQty") or row.get("filled_quantity") or row.get("filledQuantity"), 0)
+
+
+def _filled_money(row: dict[str, Any]) -> float | None:
+    return _to_float(row.get("filled_money") or row.get("filledMoney") or row.get("filled_amount") or row.get("filledAmount"))
+
+
+def _filled_avg_price(row: dict[str, Any]) -> float | None:
+    return _to_float(
+        row.get("filled_avg_price")
+        or row.get("filledAvgPrice")
+        or row.get("avg_price")
+        or row.get("avgPrice")
+    )
+
+
+def _filled_price(row: dict[str, Any]) -> float | None:
+    return _to_float(row.get("filled_price") or row.get("filledPrice"))
+
+
+def _average_filled_price(row: dict[str, Any]) -> float | None:
+    avg = _filled_avg_price(row)
+    if avg is not None:
+        return avg
+    price = _filled_price(row)
+    if price is not None:
+        return price
+    qty = _filled_qty(row)
+    money = _filled_money(row)
+    if qty > 0 and money is not None:
+        return money / qty
+    return None
+
+
+def _fill_source(row: dict[str, Any], default: str) -> str:
+    if _filled_avg_price(row) is not None:
+        return f"{default}.filled_avg_price"
+    if _filled_price(row) is not None:
+        return f"{default}.filled_price"
+    if _filled_money(row) is not None and _filled_qty(row) > 0:
+        return f"{default}.filled_money/filled_qty"
+    return "missing"
 
 def _order_no(response: Any) -> str | None:
     data = getattr(response, "data", None)
@@ -92,6 +191,31 @@ def _find_order(rows: list[Any], *, order_no: str | None, symbol: str) -> dict[s
                 continue
         fallback = public
     return fallback
+
+
+@dataclass(slots=True)
+class _FillReportStore:
+    reports: list[dict[str, Any]] = field(default_factory=list)
+
+    def callback(self, code: Any, content: Any) -> None:
+        public = _public_obj(content) or {}
+        public["callback_code"] = str(code) if code is not None else None
+        public["received_at"] = datetime.now().isoformat()
+        self.reports.append(public)
+        self.reports = self.reports[-100:]
+
+    def match(self, *, order_no: str | None, symbol: str) -> dict[str, Any]:
+        matched: dict[str, Any] = {}
+        for row in self.reports:
+            row_order_no = str(row.get("order_no") or row.get("orderNo") or row.get("ord_no") or row.get("order_id") or "")
+            row_symbol = str(row.get("stock_no") or row.get("stockNo") or row.get("symbol") or "")
+            if order_no and row_order_no and row_order_no != order_no:
+                continue
+            if symbol and row_symbol and row_symbol != symbol:
+                continue
+            if _filled_qty(row) > 0 and _average_filled_price(row) is not None:
+                matched = row
+        return matched
 
 
 @dataclass(slots=True)
@@ -211,6 +335,7 @@ class NeoApiBrokerAdapter:
     def execute_round_trip(self, plan: RoundTripPlan) -> dict[str, Any]:
         constants = self._constants()
         sdk = self._sdk()
+        fill_store = _FillReportStore()
         started_at = datetime.now().isoformat()
         receipt: dict[str, Any] = {
             "schema_version": "steamer-live-execution-roundtrip/v1",
@@ -224,6 +349,15 @@ class NeoApiBrokerAdapter:
             "steps": [],
             "issues": [],
         }
+
+        if hasattr(sdk, "set_on_filled"):
+            try:
+                sdk.set_on_filled(fill_store.callback)
+                receipt["active_fill_callback"] = {"registered": True}
+            except Exception as exc:
+                receipt["active_fill_callback"] = {"registered": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        else:
+            receipt["active_fill_callback"] = {"registered": False, "error": "sdk.set_on_filled unavailable"}
 
         login = sdk.apikey_login(
             self.credentials.personal_id,
@@ -263,14 +397,23 @@ class NeoApiBrokerAdapter:
         receipt["quote_gate"] = {
             "ok": bool(getattr(quote, "is_success", False)),
             "status": status,
-            "sell_first_daytrade": bool(status & 8),
+            "sell_first_daytrade": bool(status >= 0 and (status & 8)),
             "limitdown_price": limit_down,
             "limitup_price": limit_up,
         }
-        if not getattr(quote, "is_success", False) or not (status & 8) or limit_down is None or limit_up is None:
+        if not getattr(quote, "is_success", False) or not (status >= 0 and (status & 8)) or limit_down is None or limit_up is None:
             receipt["status"] = "quote-gate-failed"
             receipt["issues"].append("quote_gate_failed")
             return receipt
+
+        if plan.entry_filter:
+            market_quote = _safe_market_quote(sdk, plan.symbol)
+            receipt["entry_filter"] = {"policy": plan.entry_filter, "market_quote": market_quote}
+            entry_allowed, entry_issues = _entry_filter_allows(plan, market_quote)
+            if not entry_allowed:
+                receipt["status"] = "entry-filter-refused"
+                receipt["issues"].extend(entry_issues)
+                return receipt
 
         Order = constants["Order"]
         sell_order = Order(
@@ -294,11 +437,27 @@ class NeoApiBrokerAdapter:
             receipt["issues"].append("entry_place_failed")
             return receipt
 
-        sold_qty, sell_terminal = self._wait_filled(sdk, account, plan.symbol, sell_no)
+        sold_qty, sell_terminal = self._wait_filled(sdk, account, plan.symbol, sell_no, fill_store=fill_store)
         receipt["steps"].append({"step": "entry-fill", "filled_qty": sold_qty, "terminal_order": sell_terminal})
         if sold_qty <= 0:
             receipt["status"] = "entry-not-filled-no-position"
             return receipt
+
+        entry_price = _average_filled_price(sell_terminal)
+        receipt["entry_fill_price"] = {
+            "source": _fill_source(sell_terminal, str(sell_terminal.get("fill_source") or "fill")),
+            "filled_money": _filled_money(sell_terminal),
+            "filled_qty": _filled_qty(sell_terminal),
+            "filled_avg_price": _filled_avg_price(sell_terminal),
+            "filled_price": _filled_price(sell_terminal),
+            "average_price": entry_price,
+        }
+        if entry_price is None:
+            receipt["status"] = "entry-fill-price-missing"
+            receipt["issues"].append("missing_filled_money_or_qty_for_entry_price")
+            return receipt
+        exit_trigger = self._wait_exit_trigger(sdk=sdk, plan=plan, entry_price=entry_price)
+        receipt["exit_trigger"] = exit_trigger
 
         buy_order = Order(
             buy_sell=constants["BSAction"].Buy,
@@ -321,7 +480,7 @@ class NeoApiBrokerAdapter:
             receipt["issues"].append(f"open_short_qty_{sold_qty}")
             return receipt
 
-        bought_qty, buy_terminal = self._wait_filled(sdk, account, plan.symbol, buy_no)
+        bought_qty, buy_terminal = self._wait_filled(sdk, account, plan.symbol, buy_no, fill_store=fill_store)
         receipt["steps"].append({"step": "buyback-fill", "filled_qty": bought_qty, "terminal_order": buy_terminal})
         if bought_qty >= sold_qty:
             receipt["status"] = "round-trip-closed"
@@ -331,16 +490,84 @@ class NeoApiBrokerAdapter:
         receipt["ended_at"] = datetime.now().isoformat()
         return receipt
 
-    def _wait_filled(self, sdk: Any, account: Any, symbol: str, order_no: str | None) -> tuple[int, dict[str, Any]]:
-        terminal: dict[str, Any] = {}
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            result = sdk.stock.get_order_results(account)
-            rows = list(getattr(result, "data", []) or [])
-            terminal = _find_order(rows, order_no=order_no, symbol=symbol)
-            filled_qty = _to_int(terminal.get("filled_qty") or terminal.get("filledQty"), 0)
-            status = _to_int(terminal.get("status"), -1)
-            if filled_qty > 0 or status in {30, 50, 90}:
-                return filled_qty, terminal
+    def _wait_exit_trigger(self, *, sdk: Any, plan: RoundTripPlan, entry_price: float) -> dict[str, Any]:
+        policy = plan.exit_policy or {}
+        take_profit = _to_float(policy.get("take_profit_percent"))
+        stop_loss = _to_float(policy.get("stop_loss_percent"))
+        timezone_name = str(policy.get("timezone") or "Asia/Taipei")
+        force_cover_time = str(policy.get("force_cover_time") or "")
+        deadline = time.time()
+        try:
+            if force_cover_time:
+                hh, mm, ss = [int(part) for part in force_cover_time.split(":")]
+                tz = ZoneInfo(timezone_name)
+                now = datetime.now(tz)
+                force_dt = datetime.combine(now.date(), dt_time(hh, mm, ss), tzinfo=tz)
+                deadline = force_dt.timestamp()
+        except Exception:
+            deadline = time.time()
+        # If no exit policy is supplied, preserve the old stage-1 immediate-cover smoke behavior.
+        if not policy:
+            return {"reason": "immediate-stage1-smoke", "entry_price": entry_price}
+        last_quote: dict[str, Any] = {}
+        while True:
+            market_quote = _safe_market_quote(sdk, plan.symbol)
+            last_quote = market_quote
+            price = market_quote.get("price")
+            if price is not None:
+                pnl_pct = _short_pnl_percent(entry_price=entry_price, current_price=float(price))
+                if take_profit is not None and pnl_pct >= take_profit:
+                    return {"reason": "take-profit", "entry_price": entry_price, "current_price": price, "pnl_percent": pnl_pct}
+                if stop_loss is not None and pnl_pct <= stop_loss:
+                    return {"reason": "stop-loss", "entry_price": entry_price, "current_price": price, "pnl_percent": pnl_pct}
+            if time.time() >= deadline:
+                return {"reason": "force-cover-time", "entry_price": entry_price, "last_quote": last_quote, "deadline_epoch": deadline}
             time.sleep(1)
-        return _to_int(terminal.get("filled_qty") or terminal.get("filledQty"), 0), terminal
+
+    def _wait_filled(
+        self,
+        sdk: Any,
+        account: Any,
+        symbol: str,
+        order_no: str | None,
+        *,
+        fill_store: _FillReportStore | None = None,
+        timeout_seconds: int = 35,
+        readback_interval_seconds: int = 30,
+    ) -> tuple[int, dict[str, Any]]:
+        terminal: dict[str, Any] = {}
+        last_readback = 0.0
+        readback_seen_at: float | None = None
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            if fill_store is not None:
+                active = fill_store.match(order_no=order_no, symbol=symbol)
+                if active:
+                    active = dict(active)
+                    active["fill_source"] = "active_filled_callback"
+                    return _filled_qty(active), active
+
+            now = time.time()
+            should_readback = not terminal or now - last_readback >= readback_interval_seconds
+            if should_readback:
+                last_readback = now
+                result = sdk.stock.get_order_results(account)
+                rows = list(getattr(result, "data", []) or [])
+                terminal = _find_order(rows, order_no=order_no, symbol=symbol)
+                filled_qty = _filled_qty(terminal)
+                status = _to_int(terminal.get("status"), -1)
+                if filled_qty > 0 or status in {30, 50, 90}:
+                    readback_seen_at = now
+
+            # Use readback as a bounded safe-net, but give the lower-latency active
+            # filled callback a short grace window before returning readback data.
+            if readback_seen_at is not None and now - readback_seen_at >= 2:
+                terminal = dict(terminal)
+                terminal["fill_source"] = "order_results_readback"
+                return _filled_qty(terminal), terminal
+            time.sleep(0.2)
+
+        terminal = dict(terminal)
+        if terminal:
+            terminal["fill_source"] = "order_results_readback_timeout"
+        return _filled_qty(terminal), terminal
