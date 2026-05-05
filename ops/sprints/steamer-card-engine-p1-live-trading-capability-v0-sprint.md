@@ -44,6 +44,8 @@ The milestone closes when repo truth contains a coherent, operator-usable P1 pac
 
 Current forcing move:
 - `stage-4 reportable-p1` is closed; maintain pack coherence and prep for operator handoff.
+- Post-close follow-up (non-milestone): CLI-first tradable expansion roadmap checkpointed through Stage 5a fixture/live-shape observe-paper harness (no real broker authority): `/root/.openclaw/workspace/steamer-card-engine/docs/receipts/2026-05-02_cli_first_tradable_stage5a_checkpoint.md`.
+- Stage 5b real live market-data observation and Stage 6 CK-authorized tiny live canary remain out of scope without CK authorization.
 
 ## Path audit + best-case timing
 
@@ -83,7 +85,8 @@ Launch confirmation meaning:
 - The second risk is **milestone collision**: if Sprint A and Product Sprint P1 are allowed to own the same gate, both lines will drift and fake progress.
 - The third risk is **authority ambiguity**: if auth/session posture does not visibly state `trade_enabled`, live-capability claims become unsafe theater.
 - The fourth risk is **market-phase ambiguity at the open**: current repo truth does not yet operationalize 盤前試搓 vs 正式開盤 semantics, pre-open order-style restrictions, or full-session coverage validation; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-08_steamer_card_engine_market-phase-gating-gap_backlog.md` and planning packet `/root/.openclaw/workspace/steamer-card-engine/ops/execution-packets/2026-04-08_steamer-card-engine_market-phase-gating-and-dashboard-truth.packet.md`.
-- The fifth risk is **observer lifecycle truth gap**: repo-visible run artifacts still keep order/fill/position lifecycle lanes empty, so the observer must not synthesize fills/positions from request logs; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-23_steamer_card_engine_observer_lifecycle_source_blocker.md`.
+- The fifth risk is **observer lifecycle truth gap**: if repo-visible receipts do not carry an explicit order/fill/position lifecycle lane, the observer must not synthesize fills/positions from request logs alone; see `/root/.openclaw/workspace/steamer-card-engine/docs/tech-notes/2026-04-23_steamer_card_engine_observer_lifecycle_source_blocker.md`.
+  - Mitigation (still bounded): CLI-first tradable expansion is checkpointed through Stage 5a fixture/live-shape observe-paper harness: `/root/.openclaw/workspace/steamer-card-engine/docs/receipts/2026-05-02_cli_first_tradable_stage5a_checkpoint.md`.
 
 ## Allowed auto-actions
 
@@ -189,3 +192,5 @@ Current sprint read:
 - 2026-04-29 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-04-30 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-05-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
+- 2026-05-02 — checkpointed the post-close CLI-first tradable expansion line through Stage 5a fixture/live-shape observe-paper harness (explicitly no live market-data observation and no broker authority): `/root/.openclaw/workspace/steamer-card-engine/docs/receipts/2026-05-02_cli_first_tradable_stage5a_checkpoint.md`. (Topology unchanged.)
+- 2026-05-05 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
