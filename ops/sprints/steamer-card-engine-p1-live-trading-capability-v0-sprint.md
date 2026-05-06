@@ -194,3 +194,4 @@ Current sprint read:
 - 2026-05-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed (no topology change).
 - 2026-05-02 — checkpointed the post-close CLI-first tradable expansion line through Stage 5a fixture/live-shape observe-paper harness (explicitly no live market-data observation and no broker authority): `/root/.openclaw/workspace/steamer-card-engine/docs/receipts/2026-05-02_cli_first_tradable_stage5a_checkpoint.md`. (Topology unchanged.)
 - 2026-05-05 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
+- 2026-05-06 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
