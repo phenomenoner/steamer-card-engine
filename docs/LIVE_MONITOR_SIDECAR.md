@@ -32,6 +32,22 @@ Sidecar 不可以：
 - 讀取或暴露 credentials、帳號、私有 receipt、部署主機內部資訊。
 - 用 mounted observer candles 假裝成某個 runtime date/symbol 的精確行情。
 
+## Runtime source adapters
+
+Runtime artifacts can be produced by different execution substrates. The sidecar must not hard-code one directory layout as product truth. Runtime discovery is mediated by a small source-adapter contract:
+
+- `discover_dates(root)`：列出 adapter 可辨識的 runtime dates。
+- `discover_run_roots(date)`：列出指定日期的 run roots。
+- `runtime_tick_sources(run_root, date)`：列出該 run 可讀的 tick/event sources。
+- 每個 discovered run 必須揭露 `adapter_id` 與 `source_kind`，讓 receipts/API/debug 可以指出是哪一種 layout 被使用。
+
+目前公開 contract 包含：
+
+- `local-runs` / `runtime-local-runs-layout`：`runs/<lane>/<YYYY-MM-DD>/<run-id>/...`
+- `aws-live-sim` / `runtime-aws-live-sim-layout`：`<runtime-root>/<YYYYMMDD>/<run-id>/...`
+
+若未來加入 S3 archive、replay cache、或其他 runtime substrate，應新增 adapter，而不是把新路徑散落在 importer/API 裡。
+
 ## Runtime store
 
 Runtime store 是 sidecar 的本機 SQLite 索引層。它的目的不是取代原始 artifacts，而是讓 dashboard 可以快速查詢：
@@ -64,10 +80,17 @@ python -m steamer_card_engine.dashboard.runtime_store_cli \
 重要參數：
 
 - `--db`：SQLite runtime store 路徑。
-- `--root`：runtime artifacts root。
+- `--root`：runtime artifacts root；會交給 runtime source adapters 做 discovery。
 - `--date YYYY-MM-DD`：指定匯入日期，可重複。
 - `--latest N`：匯入最新 N 個可發現的 runtime dates。
 - `--receipt`：輸出 machine-readable import receipt。
+
+Receipt 必須包含：
+
+- `run_count` / `tick_count` / `decision_count` / `order_count`
+- `adapters`：本次實際命中的 adapter ids
+- `source_kinds`：本次實際命中的 source layout kinds
+- `warnings`：例如指定日期找不到 run roots 時，必須明確揭露，不可只回傳成功但 silently import 0 rows
 
 優先序：
 
@@ -81,6 +104,7 @@ Sidecar API 是唯讀 surface。主要 runtime endpoints：
 ```text
 GET /api/runtime/dates
 GET /api/runtime/dates/{date}/symbols/{symbol}/bars?timeframe=1m
+GET /api/runtime/dates/{date}/symbols/{symbol}/freshness?lag_threshold_seconds=300
 GET /api/runtime/dates/{date}/decision-aggregates?symbol={symbol}
 ```
 
@@ -92,6 +116,24 @@ API 回傳的 `source_kind` 用來揭露資料來源，例如：
 - `runtime-event-log-market-tick`
 - `runtime-store-sqlite-decision-aggregates`
 - `unavailable`
+
+## Freshness contract
+
+Freshness is a product-level sidecar invariant. During live operation, a healthy monitor should make it possible to distinguish:
+
+- raw tick source is still updating,
+- runtime store importer is behind,
+- API/latest bar is behind,
+- or no raw ticks exist for that date/symbol.
+
+The freshness endpoint compares:
+
+- raw latest tick time from discovered tick sources,
+- raw source file mtime,
+- runtime store `runs.updated_at`,
+- latest API/store bar time.
+
+If raw ticks exist but the API/store bar lags beyond the configured threshold, the state should be `lagging`. If raw ticks exist but no API/store bars exist, the state should be `import-missing`. This is intentionally separate from service health: `200 OK` only proves the sidecar is reachable, not that the runtime feed is fresh.
 
 ## UI truth rule
 

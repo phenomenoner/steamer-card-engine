@@ -14,6 +14,7 @@ from steamer_card_engine.dashboard.fixtures import FixtureDay, repo_root
 from steamer_card_engine.dashboard.history_source_index import STATE_RELATIVE_PATH, build_strategy_history_source_index
 from steamer_card_engine.dashboard.strategy_pipeline import build_strategy_pipeline_view
 from steamer_card_engine.dashboard.runtime_chart import build_runtime_symbol_bars
+from steamer_card_engine.dashboard.runtime_freshness import build_runtime_freshness_snapshot
 from steamer_card_engine.dashboard.runtime_store import import_runtime_files_once
 from steamer_card_engine.dashboard.strategy_powerhouse import build_strategy_powerhouse_view
 from steamer_card_engine.observer import build_mock_observer_session, reset_observer_repository_cache
@@ -615,7 +616,101 @@ def test_runtime_store_imports_event_log_and_root_ticks(tmp_path: Path) -> None:
     symbols = {row[0] for row in conn.execute("SELECT DISTINCT symbol FROM ticks")}
 
     assert receipt.tick_count == 2
+    assert receipt.adapters == ["local-runs"]
     assert symbols == {"1314", "0052"}
+
+
+def test_runtime_store_imports_aws_live_sim_layout_and_reports_adapter(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "20260506" / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest"
+    data_dir = run_root / "data" / "20260506"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text("\n".join([
+        json.dumps({"symbol": "00632R", "price": 11.38, "size": 100, "time": 1778032500000000}),
+        json.dumps({"symbol": "00632R", "price": 11.39, "size": 200, "time": 1778033400000000}),
+    ]) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+    monkeypatch.setenv("STEAMER_DASHBOARD_RUNTIME_DB", str(db))
+    payload = build_runtime_symbol_bars("2026-05-06", "00632R", root=tmp_path)
+
+    assert receipt.run_count == 1
+    assert receipt.tick_count == 2
+    assert receipt.adapters == ["aws-live-sim"]
+    assert receipt.source_kinds == ["runtime-aws-live-sim-layout"]
+    assert receipt.warnings == []
+    conn = sqlite3.connect(db)
+    run_row = conn.execute("SELECT run_id, lane, source_kind FROM runs").fetchone()
+
+    assert run_row == ("20260506:aws-live-sim:ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest", "aws-live-sim", "runtime-aws-live-sim-layout")
+    assert payload["source_kind"] == "runtime-store-sqlite-ticks"
+    assert payload["bars"][-1]["time"] == "2026-05-06T02:10:00Z"
+
+
+def test_runtime_store_receipt_warns_when_root_has_no_discovered_runs(tmp_path: Path) -> None:
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+
+    assert receipt.run_count == 0
+    assert receipt.tick_count == 0
+    assert receipt.adapters == []
+    assert receipt.warnings == ["no runtime run roots discovered for 20260506"]
+
+
+def test_aws_live_sim_adapter_ignores_non_run_directories(tmp_path: Path) -> None:
+    date_root = tmp_path / "20260506"
+    (date_root / "metadata").mkdir(parents=True)
+    data_dir = date_root / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest" / "data" / "20260506"
+    data_dir.mkdir(parents=True)
+    (data_dir / "ticks.jsonl").write_text(json.dumps({"symbol": "00632R", "price": 11.38, "size": 100, "time": 1778032500000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+
+    receipt = import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+
+    assert receipt.run_count == 1
+    assert receipt.tick_count == 1
+    assert receipt.adapters == ["aws-live-sim"]
+
+
+def test_runtime_freshness_detects_import_lag_against_raw_ticks(tmp_path: Path) -> None:
+    data_dir = tmp_path / "20260506" / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest" / "data" / "20260506"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text(json.dumps({"symbol": "00632R", "price": 11.38, "size": 100, "time": 1778032500000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+    ticks.write_text("\n".join([
+        json.dumps({"symbol": "00632R", "price": 11.38, "size": 100, "time": 1778032500000000}),
+        json.dumps({"symbol": "00632R", "price": 11.42, "size": 200, "time": 1778033400000000}),
+    ]) + "\n", encoding="utf-8")
+
+    snapshot = build_runtime_freshness_snapshot(tmp_path, db, "2026-05-06", "00632R", lag_threshold_seconds=60)
+
+    assert snapshot.state == "lagging"
+    assert snapshot.lag_seconds == 900
+    assert snapshot.api_latest_bar_utc == "2026-05-06T01:55:00Z"
+    assert snapshot.raw_latest_tick_utc == "2026-05-06T02:10:00Z"
+
+
+def test_runtime_freshness_reports_fresh_import_missing_and_no_raw_ticks(tmp_path: Path) -> None:
+    data_dir = tmp_path / "20260506" / "ENTRY_MODE=LONG_ONE_VCP__feed=neoapitest" / "data" / "20260506"
+    data_dir.mkdir(parents=True)
+    ticks = data_dir / "ticks.jsonl"
+    ticks.write_text(json.dumps({"symbol": "00632R", "price": 11.38, "size": 100, "time": 1778032500000000}) + "\n", encoding="utf-8")
+    db = tmp_path / "runtime.sqlite"
+    import_runtime_files_once(db, tmp_path, dates=["2026-05-06"])
+
+    fresh = build_runtime_freshness_snapshot(tmp_path, db, "2026-05-06", "00632R", lag_threshold_seconds=60)
+    import_missing = build_runtime_freshness_snapshot(tmp_path, tmp_path / "missing.sqlite", "2026-05-06", "00632R", lag_threshold_seconds=60)
+    no_raw = build_runtime_freshness_snapshot(tmp_path, db, "2026-05-06", "1305", lag_threshold_seconds=60)
+
+    assert fresh.state == "fresh"
+    assert fresh.lag_seconds == 0
+    assert import_missing.state == "import-missing"
+    assert "raw ticks exist" in import_missing.notes[0]
+    assert no_raw.state == "no-raw-ticks"
 
 
 def test_runtime_store_uses_per_date_freshness_not_db_file_mtime(tmp_path: Path, monkeypatch) -> None:
@@ -712,6 +807,7 @@ def test_runtime_store_catalog_from_db_merges_runtime_index_evidence(tmp_path: P
     by_date = {item["date"]: item for item in payload["dates"]}
 
     assert payload["source_kind"] == "runtime-store-sqlite-catalog+local-runs+s3-runtime-archive-cache+fixture-compare-index"
+    assert by_date["2026-05-05"]["lanes"] == {"steamer-card-engine": 1}
     assert by_date["2026-05-05"]["db_tick_count"] == 1
     assert by_date["2026-05-06"]["watchlist_present"] is True
     assert by_date["2026-05-07"]["s3_archive_present"] is True

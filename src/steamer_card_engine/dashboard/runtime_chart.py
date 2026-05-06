@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .fixtures import repo_root
+from .runtime_sources import configured_runtime_root, discover_runtime_run_roots, runtime_tick_sources
 
 
 @dataclass(frozen=True)
@@ -31,23 +32,11 @@ def _normalize_symbol(value: Any) -> str:
 
 
 def _configured_runtime_root() -> Path | None:
-    raw = os.getenv("STEAMER_DASHBOARD_RUNTIME_ROOT")
-    return Path(raw) if raw else None
+    return configured_runtime_root()
 
 
 def _runtime_run_roots(base_root: Path, date: str) -> list[Path]:
-    roots: list[Path] = []
-    dashed = f"{date[:4]}-{date[4:6]}-{date[6:]}"
-    for lane in ("steamer-card-engine", "baseline-bot"):
-        local = base_root / "runs" / lane / dashed
-        if local.exists():
-            roots.extend([item for item in local.iterdir() if item.is_dir() and ("live-sim" in item.name or "neoapi" in item.name)])
-    configured_root = _configured_runtime_root()
-    if configured_root is not None:
-        current = configured_root / date
-        if current.exists():
-            roots.extend([item for item in current.iterdir() if item.is_dir()])
-    return sorted(roots, key=lambda item: item.name, reverse=True)
+    return [item.path for item in discover_runtime_run_roots(base_root, date)]
 
 
 def _event_logs_for_date(base_root: Path, date: str) -> list[Path]:
@@ -62,10 +51,9 @@ def _event_logs_for_date(base_root: Path, date: str) -> list[Path]:
 def _tick_logs_for_date(base_root: Path, date: str) -> list[Path]:
     logs: list[Path] = []
     for root in _runtime_run_roots(base_root, date):
-        for candidate in (
-            root / "data" / date / "ticks.jsonl",
-            root / "ticks.jsonl",
-        ):
+        for candidate in runtime_tick_sources(root, date):
+            if candidate.name == "event-log.jsonl":
+                continue
             if candidate.exists():
                 logs.append(candidate)
     return sorted(logs, key=lambda item: (item.stat().st_mtime, str(item)), reverse=True)

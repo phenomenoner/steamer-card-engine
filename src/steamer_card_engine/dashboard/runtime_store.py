@@ -15,9 +15,9 @@ from .runtime_chart import (
     _parse_epoch_like_time,
     _parse_event_tick,
     _parse_recorded_tick,
-    _runtime_run_roots,
     _ticks_to_bars,
 )
+from .runtime_sources import discover_runtime_dates, discover_runtime_run_roots, runtime_tick_sources
 
 SCHEMA_VERSION = "steamer-dashboard-runtime-store-v9"
 
@@ -31,6 +31,9 @@ class RuntimeImportReceipt:
     tick_count: int
     decision_count: int
     order_count: int
+    adapters: list[str]
+    source_kinds: list[str]
+    warnings: list[str]
 
 
 def connect_runtime_store(db_path: str | Path) -> sqlite3.Connection:
@@ -177,8 +180,8 @@ def _file_line_records(path: Path) -> Iterable[tuple[int, dict[str, Any]]]:
                 yield line_no, payload
 
 
-def _runtime_run_id(date: str, run_root: Path) -> str:
-    return f"{date}:{_lane_for_run_root(run_root)}:{run_root.name}"
+def _runtime_run_id(date: str, run_root: Path, lane: str | None = None) -> str:
+    return f"{date}:{lane or _lane_for_run_root(run_root)}:{run_root.name}"
 
 
 def _lane_for_run_root(run_root: Path) -> str:
@@ -193,8 +196,8 @@ def _lane_for_run_root(run_root: Path) -> str:
     return "unknown"
 
 
-def _upsert_run(conn: sqlite3.Connection, date: str, run_root: Path) -> str:
-    run_id = _runtime_run_id(date, run_root)
+def _upsert_run(conn: sqlite3.Connection, date: str, run_root: Path, lane: str | None = None, source_kind: str = "runtime-files") -> str:
+    run_id = _runtime_run_id(date, run_root, lane=lane)
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     conn.execute(
         """
@@ -206,7 +209,7 @@ def _upsert_run(conn: sqlite3.Connection, date: str, run_root: Path) -> str:
             source_kind=excluded.source_kind,
             updated_at=excluded.updated_at
         """,
-        (run_id, f"{date[:4]}-{date[4:6]}-{date[6:]}", _lane_for_run_root(run_root), str(run_root), "runtime-files", None, now),
+        (run_id, f"{date[:4]}-{date[4:6]}-{date[6:]}", lane or _lane_for_run_root(run_root), str(run_root), source_kind, None, now),
     )
     return run_id
 
@@ -247,14 +250,23 @@ def import_runtime_files_once(db_path: str | Path, root: str | Path, dates: list
     conn = connect_runtime_store(db_path)
     compact_dates = [_parse_date(item) for item in dates] if dates else _discover_dates(root_path)
     run_count = tick_count = decision_count = order_count = 0
+    adapters: set[str] = set()
+    source_kinds: set[str] = set()
+    warnings: list[str] = []
     with conn:
         for date in compact_dates:
-            for run_root in _runtime_run_roots(root_path, date):
-                run_id = _upsert_run(conn, date, run_root)
+            discovered_roots = discover_runtime_run_roots(root_path, date)
+            if not discovered_roots:
+                warnings.append(f"no runtime run roots discovered for {date}")
+            for discovered in discovered_roots:
+                adapters.add(discovered.adapter_id)
+                source_kinds.add(discovered.source_kind)
+                run_root = discovered.path
+                run_id = _upsert_run(conn, date, run_root, lane=discovered.lane or discovered.adapter_id, source_kind=discovered.source_kind)
                 _purge_run_artifacts(conn, run_id)
                 run_count += 1
                 data_dir = run_root / "data" / date
-                for tick_path in (data_dir / "ticks.jsonl", run_root / "ticks.jsonl", run_root / "event-log.jsonl"):
+                for tick_path in runtime_tick_sources(run_root, date):
                     tick_count += _import_tick_source(conn, run_id, date, tick_path)
                 decision_path = data_dir / "decisions.jsonl"
                 decision_count += _import_decisions(conn, run_id, date, decision_path)
@@ -269,24 +281,14 @@ def import_runtime_files_once(db_path: str | Path, root: str | Path, dates: list
         tick_count=tick_count,
         decision_count=decision_count,
         order_count=order_count,
+        adapters=sorted(adapters),
+        source_kinds=sorted(source_kinds),
+        warnings=warnings,
     )
 
 
 def _discover_dates(root: Path) -> list[str]:
-    dates: set[str] = set()
-    lanes = [root / "runs" / "steamer-card-engine", root / "runs" / "baseline-bot"]
-    configured_root = os.getenv("STEAMER_DASHBOARD_RUNTIME_ROOT")
-    if configured_root:
-        lanes.append(Path(configured_root))
-    for lane in lanes:
-        if not lane.exists():
-            continue
-        for item in lane.iterdir():
-            if item.is_dir() and len(item.name) == 8 and item.name.isdigit():
-                dates.add(item.name)
-            elif item.is_dir() and len(item.name) == 10 and item.name[4] == "-" and item.name[7] == "-":
-                dates.add(item.name.replace("-", ""))
-    return sorted(dates, reverse=True)
+    return discover_runtime_dates(root)
 
 
 def _tick_row(conn: sqlite3.Connection, run_id: str, date: str, tick: Tick, source_path: Path, line_no: int, symbol: str) -> tuple[Any, ...]:

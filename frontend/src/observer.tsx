@@ -178,6 +178,11 @@ function symbolAliases(symbol: string | null | undefined): string[] {
   return [...aliases].filter(Boolean);
 }
 
+function runtimeSymbolParam(symbol: string | null | undefined): string {
+  const raw = typeof symbol === "string" ? symbol.trim() : "";
+  return raw.replace(/\.TW$/i, "");
+}
+
 function resolveMountedSymbolSessionId(
   symbol: string | null | undefined,
   strategy: StrategyRun | null | undefined,
@@ -386,7 +391,16 @@ function toUtcTimestamp(value: string): UTCTimestamp {
   return Math.floor(new Date(value).getTime() / 1000) as UTCTimestamp;
 }
 
-function formatChartTime(timestamp: UTCTimestamp | number): string {
+function formatChartTickTime(timestamp: UTCTimestamp | number): string {
+  return new Date(Number(timestamp) * 1000).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Taipei",
+  });
+}
+
+function formatChartCrosshairTime(timestamp: UTCTimestamp | number): string {
   return new Date(Number(timestamp) * 1000).toLocaleString("en-US", {
     month: "2-digit",
     day: "2-digit",
@@ -898,8 +912,8 @@ function ObserverChart({ candles, markers, mode = "live" }: { candles: Candle[];
         autoSize: true,
         layout: { background: { color: "#0a1016" }, textColor: "#8ba8bb" },
         grid: { vertLines: { color: "rgba(141,170,186,0.08)" }, horzLines: { color: "rgba(141,170,186,0.08)" } },
-        timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
-        localization: { timeFormatter: (time: UTCTimestamp | number) => formatChartTime(time as number) },
+        timeScale: { timeVisible: true, secondsVisible: false, borderColor: "rgba(141,170,186,0.2)", tickMarkFormatter: (time: UTCTimestamp | number) => formatChartTickTime(time as number) },
+        localization: { timeFormatter: (time: UTCTimestamp | number) => formatChartCrosshairTime(time as number) },
         rightPriceScale: { borderColor: "rgba(141,170,186,0.2)" },
         crosshair: { vertLine: { color: "rgba(89,221,156,0.28)" }, horzLine: { color: "rgba(89,221,156,0.28)" } },
       });
@@ -1221,7 +1235,7 @@ export function ObserverSurface() {
       }
       const timeframe = chartTimeframe === "auto" ? "1m" : chartTimeframe;
       try {
-        const payload = await getJson<RuntimeBarsPayload>(`/api/runtime/dates/${selectedProductDate}/symbols/${selectedSymbol.replace(".TW", "")}/bars?timeframe=${timeframe}`);
+        const payload = await getJson<RuntimeBarsPayload>(`/api/runtime/dates/${selectedProductDate}/symbols/${runtimeSymbolParam(selectedSymbol)}/bars?timeframe=${timeframe}`);
         if (cancelled) return;
         setRuntimeBars(payload);
         setRuntimeBarsError(null);
@@ -1416,6 +1430,8 @@ export function ObserverSurface() {
   const breadcrumbSymbol = selectedSymbol ?? bootstrap.symbol ?? defaultDetailSymbol;
   const hasRuntimeSelection = Boolean(!isOverviewMode && selectedProductDate && selectedSymbol);
   const runtimeChartAvailable = Boolean(runtimeBars && runtimeBars.source_kind !== "unavailable" && runtimeBars.bar_count > 0 && runtimeBars.bars.length > 0);
+  const missingMountedSessionSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
+  const runtimeChartOnlySelection = runtimeChartAvailable && missingMountedSessionSelection;
   const chartCandles = runtimeChartAvailable ? (runtimeBars?.bars ?? []) : (hasRuntimeSelection ? [] : aggregateCandles(bootstrap.chart.candles, chartTimeframe));
   const chartMarkers = runtimeChartAvailable ? [] : (hasRuntimeSelection ? [] : alignMarkers(bootstrap.chart.markers.slice(-MARKER_LIMIT), chartTimeframe));
   const runtimeSourceLabel = runtimeBars?.source_kind && runtimeBars.source_kind !== "unavailable"
@@ -1425,7 +1441,6 @@ export function ObserverSurface() {
   const poolSourceLabel = symbolPoolLabel(effectivePool.source_kind);
   const poolSubcopy = symbolPoolSubcopy(effectivePool.source_kind);
   const universeSymbols = effectivePool.symbols.length ? effectivePool.symbols : (effectivePool.sample_symbols.length ? effectivePool.sample_symbols : effectivePool.top_symbols);
-  const missingMountedSessionSelection = Boolean(selectedSymbol) && !hasMountedSymbolSession;
   const overviewSummary = summarizeStrategyOverview(selectedStrategy, viewSymbols, overviewBootstraps.length ? overviewBootstraps : [bootstrap]);
   const handleSymbolSelection = (symbol: string) => {
     const mountedSessionId = resolveMountedSymbolSessionId(symbol, selectedStrategy, sessionIdsBySymbol);
@@ -1467,11 +1482,11 @@ export function ObserverSurface() {
               <StrategySelector cards={productCards} value={selectedProductCardId} onChange={setSelectedProductCardId} />
               <ViewModeSelector isOverviewMode={isOverviewMode} onChange={handleViewModeChange} />
               <SymbolSelector symbols={detailSymbols} value={detailSymbolValue} disabled={isOverviewMode} onChange={handleSymbolSelection} />
-              <p className="card-meta observer-focus-helper">Overview summarizes strategy-card truth. Switch View to Symbol Detail, then choose a symbol; chart-backed symbols load chart/orders/fills/timeline, while unavailable symbols show a no-chart-backed-data state.</p>
+              <p className="card-meta observer-focus-helper">Overview summarizes strategy-card truth. Switch View to Symbol Detail, then choose a symbol; runtime-backed symbols load exact date/symbol bars from the runtime DB, mounted symbols additionally expose orders/fills/timeline, while symbols with no ticks show a clear no-runtime-bars state.</p>
             </div>
             <div className="observer-top-meta observer-top-meta-live observer-focus-meta-grid">
               <div><span className="mini-label">current path</span><strong>{isOverviewMode ? `Overview · mounted ${breadcrumbSymbol}` : `Symbol Detail · ${breadcrumbSymbol}`}</strong></div>
-              <div><span className="mini-label">chart symbol</span><strong>{isOverviewMode ? `${bootstrap.symbol} (overview reference)` : runtimeChartAvailable ? `${runtimeBars?.symbol} · runtime bars` : hasRuntimeSelection ? `no exact runtime bars · ${selectedSymbol}` : missingMountedSessionSelection ? `not chart-backed · ${selectedSymbol}` : bootstrap.symbol}</strong></div>
+              <div><span className="mini-label">chart symbol</span><strong>{isOverviewMode ? `${bootstrap.symbol} (overview reference)` : runtimeChartAvailable ? `${runtimeBars?.symbol} · runtime DB bars` : hasRuntimeSelection ? `no runtime ticks · ${selectedSymbol}` : missingMountedSessionSelection ? `not chart-backed · ${selectedSymbol}` : bootstrap.symbol}</strong></div>
               <div><span className="mini-label">chart source</span><strong>{chartSourceLabel}</strong></div>
               <div><span className="mini-label">strategy card</span><strong>{selectedProductCard ? `${selectedProductCard.lane}/${selectedProductCard.card_id}` : "runtime detail pending"}</strong></div>
               <div><span className="mini-label">symbol source</span><strong>{productDeck ? `date/card universe · ${productDeck.universe?.symbol_count ?? detailSymbols.length}` : selectedStrategy.symbols_source_kind}</strong></div>
@@ -1485,7 +1500,7 @@ export function ObserverSurface() {
 
       <section className="panel observer-status-strip">
         <div className="panel-header">
-          <h3>Chart-backed Observer Session · provenance</h3>
+          <h3>{runtimeChartOnlySelection ? "Runtime DB Chart · provenance" : "Chart-backed Observer Session · provenance"}</h3>
           <div className="observer-chip-row">
             <span className={`status-chip status-chip-${freshnessClass}`}>LIVE FRESHNESS · {bootstrap.freshness_state.toUpperCase()}</span>
             <span className={`status-chip status-chip-${streamTone(state.streamState, state.sequenceGaps.length > 0)}`}>{streamLabel(state.streamState, state.sequenceGaps.length)}</span>
@@ -1493,7 +1508,7 @@ export function ObserverSurface() {
           </div>
         </div>
         <div className="panel-body observer-status-body observer-top-meta">
-          <div><span className="mini-label">observer session id</span><strong>{missingMountedSessionSelection ? `not linked to ${selectedSymbol}` : bootstrap.session_id}</strong></div>
+          <div><span className="mini-label">observer session id</span><strong>{runtimeChartOnlySelection ? `runtime DB only · no mounted session for ${selectedSymbol}` : missingMountedSessionSelection ? `not linked to ${selectedSymbol}` : bootstrap.session_id}</strong></div>
           <div><span className="mini-label">latest seq</span><strong>{state.latestSeq}</strong></div>
           <div><span className="mini-label">feed lag</span><strong>{bootstrap.health.feed_freshness_seconds}s</strong></div>
           <div><span className="mini-label">generated</span><strong>{formatTimestamp(bootstrap.generated_at)}</strong></div>
@@ -1547,7 +1562,7 @@ export function ObserverSurface() {
       <div className="observer-grid">
         <section className="panel observer-chart-panel">
           <div className="panel-header">
-            <h3>{isOverviewMode ? `Strategy Card Overview · mounted symbol ${bootstrap.symbol}` : runtimeChartAvailable ? `Runtime Bar Chart · ${runtimeBars?.symbol} · ${chartTimeframe === "auto" ? "1m" : chartTimeframe}` : hasRuntimeSelection ? `No exact runtime bars · ${selectedProductDate} · ${selectedSymbol}` : missingMountedSessionSelection ? `No chart-backed data · ${selectedSymbol}` : `Symbol Detail · ${bootstrap.symbol} · ${chartTimeframe === "auto" ? bootstrap.timeframe : chartTimeframe} Bar Chart`}</h3>
+            <h3>{isOverviewMode ? `Strategy Card Overview · mounted symbol ${bootstrap.symbol}` : runtimeChartAvailable ? `Runtime DB Bar Chart · ${runtimeBars?.symbol} · ${chartTimeframe === "auto" ? "1m" : chartTimeframe}` : hasRuntimeSelection ? `No runtime ticks · ${selectedProductDate} · ${selectedSymbol}` : missingMountedSessionSelection ? `No chart-backed data · ${selectedSymbol}` : `Symbol Detail · ${bootstrap.symbol} · ${chartTimeframe === "auto" ? bootstrap.timeframe : chartTimeframe} Bar Chart`}</h3>
             {!isOverviewMode ? <div className="observer-chart-controls"><span className="pill">snapshot + stream reconcile</span><TimeframeSelector value={chartTimeframe} onChange={setChartTimeframe} /></div> : null}
           </div>
           <div className="panel-body observer-chart-wrap">
@@ -1571,20 +1586,26 @@ export function ObserverSurface() {
                   <div><span className="mini-label">active receipt seq</span><strong>{bootstrap.latest_seq}</strong></div>
                 </div>
               </div>
-            ) : hasRuntimeSelection && !runtimeChartAvailable ? (
+            ) : runtimeChartAvailable ? (
+              <>
+                {runtimeChartOnlySelection ? <ReconciliationStateBlock label="runtime DB" state="derived" reason="Exact runtime bars are available for this date/symbol. No mounted observer execution session is linked, so orders/fills/timeline remain hidden instead of borrowing another symbol's observer state." /> : null}
+                {runtimeBarsError ? <ReconciliationStateBlock label="runtime bars" state="degraded" reason={runtimeBarsError} /> : null}
+                <ObserverChart candles={chartCandles} markers={chartMarkers} mode="runtime" />
+              </>
+            ) : hasRuntimeSelection ? (
               <div className="state-block observer-empty-state" role="status">
-                <strong>No exact runtime bars for {selectedProductDate} / {selectedSymbol}.</strong>
-                <span>Mounted observer candles are intentionally not used as fallback for a runtime date/symbol selection, to avoid showing stale cross-date prices.</span>
+                <strong>No runtime ticks for {selectedProductDate} / {selectedSymbol}.</strong>
+                <span>The runtime DB and mounted observer lanes were checked. This symbol currently has no verified ticks/bars for the selected date, so the chart is intentionally empty instead of falling back to stale cross-symbol data.</span>
               </div>
             ) : missingMountedSessionSelection ? (
               <div className="state-block observer-empty-state" role="status">
-                <strong>No runtime or mounted chart data for {selectedSymbol}.</strong>
-                <span>This symbol is in the selected runtime/date universe, but no verified runtime bars or mounted observer chart session are available yet. Chart/timeline are intentionally not shown to avoid stale data.</span>
+                <strong>No mounted chart session for {selectedSymbol}.</strong>
+                <span>This symbol is in the selected universe, but no mounted observer chart session is linked yet.</span>
               </div>
             ) : (
               <>
                 {runtimeBarsError ? <ReconciliationStateBlock label="runtime bars" state="degraded" reason={runtimeBarsError} /> : null}
-                <ObserverChart candles={chartCandles} markers={chartMarkers} mode={runtimeChartAvailable ? "runtime" : "live"} />
+                <ObserverChart candles={chartCandles} markers={chartMarkers} mode="live" />
               </>
             )}
           </div>

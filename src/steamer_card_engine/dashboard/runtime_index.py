@@ -6,25 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from .fixtures import DATE_DIR_PATTERN, discover_fixture_days, repo_root
+from .runtime_sources import discover_runtime_dates, discover_runtime_run_roots
 
-def _count_runtime_runs(runs_root: Path) -> dict[str, dict[str, int]]:
+def _count_runtime_runs(root: Path, dates: set[str]) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = defaultdict(dict)
-    if not runs_root.exists():
-        return {}
-    for lane_dir in sorted(runs_root.iterdir()):
-        if not lane_dir.is_dir():
-            continue
-        lane = lane_dir.name
-        for date_dir in sorted(lane_dir.iterdir()):
-            if not date_dir.is_dir() or not DATE_DIR_PATTERN.fullmatch(date_dir.name):
-                continue
-            runtime_runs = [
-                run_dir
-                for run_dir in date_dir.iterdir()
-                if run_dir.is_dir() and ("live-sim" in run_dir.name or "neoapi" in run_dir.name)
-            ]
-            if runtime_runs:
-                counts[date_dir.name][lane] = len(runtime_runs)
+    for date in dates:
+        for run_root in discover_runtime_run_roots(root, date):
+            dashed = f"{run_root.date[:4]}-{run_root.date[4:6]}-{run_root.date[6:]}"
+            lane = run_root.lane or run_root.adapter_id
+            counts[dashed][lane] = counts[dashed].get(lane, 0) + 1
     return dict(counts)
 
 
@@ -86,13 +76,15 @@ def build_runtime_dates_index(root: Path | None = None) -> dict[str, Any]:
         catalog = build_runtime_dates_catalog_from_store(store_path)
         if catalog is not None:
             db_dates = {item["date"]: item for item in catalog["dates"]}
-    local_counts = _count_runtime_runs(base_root / "runs")
     fixture_days = discover_fixture_days(base_root)
     fixture_by_date = {item.date: item for item in fixture_days}
     s3_by_date = _list_s3_runtime_dates(base_root)
     watchlist_dates = _list_watchlist_dates(base_root)
 
-    all_dates = sorted(set(local_counts) | set(s3_by_date) | set(fixture_by_date) | watchlist_dates | set(db_dates), reverse=True)
+    adapter_dates = {f"{d[:4]}-{d[4:6]}-{d[6:]}" for d in discover_runtime_dates(base_root)}
+    candidate_dates = set(s3_by_date) | set(fixture_by_date) | watchlist_dates | set(db_dates) | adapter_dates
+    local_counts = _count_runtime_runs(base_root, candidate_dates)
+    all_dates = sorted(set(local_counts) | candidate_dates, reverse=True)
     dates: list[dict[str, Any]] = []
     for date in all_dates:
         lanes = local_counts.get(date, {})

@@ -14,6 +14,7 @@ from .aggregator import DashboardDataError, build_card_detail, build_day_bundle,
 from .fixtures import repo_root
 from .strategy_pipeline import StrategyPipelineDataError, build_strategy_pipeline_view
 from .runtime_chart import build_runtime_symbol_bars
+from .runtime_freshness import build_runtime_freshness_snapshot
 from .runtime_index import build_runtime_dates_index
 from .runtime_store import build_decision_aggregates_from_store
 from .strategy_powerhouse import StrategyPowerhouseDataError, build_strategy_powerhouse_view
@@ -53,6 +54,11 @@ def create_app() -> FastAPI:
             return {"date": date, "symbol": symbol, "source_kind": "unavailable", "aggregate_count": 0, "aggregates": []}
         payload = build_decision_aggregates_from_store(store_path, date, symbol=symbol, limit=limit)
         return payload or {"date": date, "symbol": symbol, "source_kind": "unavailable", "aggregate_count": 0, "aggregates": []}
+
+    @app.get("/api/runtime/dates/{date}/symbols/{symbol}/freshness")
+    def runtime_symbol_freshness(date: str, symbol: str, lag_threshold_seconds: int = 300) -> dict:
+        store_path = os.getenv("STEAMER_DASHBOARD_RUNTIME_DB")
+        return build_runtime_freshness_snapshot(root, store_path, date, symbol, lag_threshold_seconds=lag_threshold_seconds).as_dict()
 
     @app.get("/api/days/{date}/deck")
     def deck(date: str) -> dict:
