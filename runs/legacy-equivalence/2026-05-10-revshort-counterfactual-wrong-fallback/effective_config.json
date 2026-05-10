@@ -1,0 +1,17 @@
+{
+  "allow_blind_open": false,
+  "enable_angle": true,
+  "enable_zz": true,
+  "fallback_pct": 3.0,
+  "honey_sweet_profit_pct": 5.0,
+  "market_gate": 5,
+  "require_recent_high": true,
+  "strong_up_pct": 3.0,
+  "strong_up_pct_abs": 5.0,
+  "sweet_ok": true,
+  "trend_conflict_override_slope": -15.0,
+  "trend_conflict_slope_threshold": 5.0,
+  "vcp_breakout_vol_mult": 2.5,
+  "vcp_min_trend_slope": 10.0,
+  "vcp_tightness_pct": 0.35
+}

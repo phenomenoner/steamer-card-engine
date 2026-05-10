@@ -1,0 +1,308 @@
+{
+  "aggregate_by_gate": {
+    "REV_SHORT_AFTER_UP": {
+      "candidate_enter_true": 2091,
+      "enter_match_rate": 0.996212791066179,
+      "enter_mismatches": 2163,
+      "legacy_enter_true": 1474,
+      "reason_match_rate": 0.83934915334957,
+      "reason_mismatches": 91753,
+      "rows": 571133
+    }
+  },
+  "data_root": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data",
+  "dataset_count": 7,
+  "datasets": [
+    {
+      "date": "20260121",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 0,
+          "candidate_reasons_top10": {
+            "blocked_blind_open": 6,
+            "no_recent_high": 5414,
+            "not_strong_up": 14870,
+            "now_time_5": 34204,
+            "sweet": 3784,
+            "zz_not_down": 20
+          },
+          "enter_match_rate": 0.9901025764177158,
+          "enter_mismatches": 577,
+          "first_mismatch": {
+            "candidate_enter": false,
+            "candidate_reason": "now_time_5",
+            "date": "20260121",
+            "gate": "REV_SHORT_AFTER_UP",
+            "legacy_enter": false,
+            "legacy_reason": "not_strong_up",
+            "line_no": 2,
+            "machine": "dt3",
+            "state_now_time": "09:00:00.091203",
+            "state_now_ts": 1768957200.041855,
+            "symbol": "2303"
+          },
+          "legacy_enter_true": 577,
+          "legacy_reasons_top10": {
+            "above_ema": 82,
+            "angle": 5476,
+            "blocked_blind_open": 6,
+            "enter_rev_short": 577,
+            "no_recent_high": 6192,
+            "not_strong_up": 33602,
+            "sweet": 3784,
+            "zz_not_down": 8579
+          },
+          "reason_match_rate": 0.4132903358605784,
+          "reason_mismatches": 34204,
+          "rows": 58298
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260121/decisions.jsonl"
+    },
+    {
+      "date": "20260122",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 2085,
+          "candidate_reasons_top10": {
+            "above_ema": 44,
+            "angle": 6293,
+            "enter_rev_short": 2085,
+            "no_recent_high": 68778,
+            "not_strong_up": 9335,
+            "now_time_5": 55966,
+            "sweet": 4447,
+            "too_shallow": 82,
+            "trend_conflict: sl2/3(4.48/6.0200000000000005)> 5.0 & sl1(-5.92) > -15.0": 12,
+            "zz_not_down": 9105
+          },
+          "enter_match_rate": 0.9898613856319523,
+          "enter_mismatches": 1585,
+          "first_mismatch": {
+            "candidate_enter": false,
+            "candidate_reason": "now_time_5",
+            "date": "20260122",
+            "gate": "REV_SHORT_AFTER_UP",
+            "legacy_enter": false,
+            "legacy_reason": "now_time_3",
+            "line_no": 2,
+            "machine": "dt3",
+            "state_now_time": "09:00:00.413904",
+            "state_now_ts": 1769043600.400953,
+            "symbol": "3481"
+          },
+          "legacy_enter_true": 890,
+          "legacy_reasons_top10": {
+            "angle": 7884,
+            "enter_rev_short": 890,
+            "lot_limit_reached: limit=1": 886,
+            "no_funds: avail=8400.0": 886,
+            "no_recent_high": 80021,
+            "not_strong_up": 11865,
+            "now_time_3": 37580,
+            "sweet": 4447,
+            "too_shallow": 82,
+            "zz_not_down": 11736
+          },
+          "reason_match_rate": 0.6318883409133069,
+          "reason_mismatches": 57548,
+          "rows": 156333
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260122/decisions.jsonl"
+    },
+    {
+      "date": "20260123",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 2,
+          "candidate_reasons_top10": {
+            "angle": 519,
+            "blocked_blind_open": 5,
+            "enter_rev_short": 2,
+            "not_strong_up": 10659,
+            "now_time_5": 20376,
+            "sweet": 3863,
+            "zz_not_down": 432
+          },
+          "enter_match_rate": 1.0,
+          "enter_mismatches": 0,
+          "first_mismatch": null,
+          "legacy_enter_true": 2,
+          "legacy_reasons_top10": {
+            "angle": 519,
+            "blocked_blind_open": 5,
+            "enter_rev_short": 2,
+            "not_strong_up": 10659,
+            "now_time_5": 20376,
+            "sweet": 3863,
+            "zz_not_down": 432
+          },
+          "reason_match_rate": 1.0,
+          "reason_mismatches": 0,
+          "rows": 35856
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260123/decisions.jsonl"
+    },
+    {
+      "date": "20260126",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 0,
+          "candidate_reasons_top10": {
+            "angle": 1963,
+            "blocked_blind_open": 6,
+            "no_recent_high": 24975,
+            "not_strong_up": 11715,
+            "now_time_5": 41667,
+            "trend_conflict: sl2/3(5.5/8.13)> 5.0 & sl1(-5.01) > -15.0": 1,
+            "zz_not_down": 3744
+          },
+          "enter_match_rate": 0.9999881052919556,
+          "enter_mismatches": 1,
+          "first_mismatch": {
+            "candidate_enter": false,
+            "candidate_reason": "trend_conflict: sl2/3(5.5/8.13)> 5.0 & sl1(-5.01) > -15.0",
+            "date": "20260126",
+            "gate": "REV_SHORT_AFTER_UP",
+            "legacy_enter": true,
+            "legacy_reason": "enter_rev_short",
+            "line_no": 57794,
+            "machine": "dt3",
+            "state_now_time": "09:51:22.731620",
+            "state_now_ts": 1769392282.701316,
+            "symbol": "6770"
+          },
+          "legacy_enter_true": 1,
+          "legacy_reasons_top10": {
+            "angle": 1963,
+            "blocked_blind_open": 6,
+            "enter_rev_short": 1,
+            "no_recent_high": 24975,
+            "not_strong_up": 11715,
+            "now_time_5": 41667,
+            "zz_not_down": 3744
+          },
+          "reason_match_rate": 0.9999881052919556,
+          "reason_mismatches": 1,
+          "rows": 84071
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260126/decisions.jsonl"
+    },
+    {
+      "date": "20260127",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 2,
+          "candidate_reasons_top10": {
+            "angle": 4608,
+            "blocked_blind_open": 6,
+            "enter_rev_short": 2,
+            "no_recent_high": 4560,
+            "not_strong_up": 31424,
+            "now_time_5": 44356,
+            "sweet": 38777,
+            "zz_not_down": 5519
+          },
+          "enter_match_rate": 1.0,
+          "enter_mismatches": 0,
+          "first_mismatch": null,
+          "legacy_enter_true": 2,
+          "legacy_reasons_top10": {
+            "angle": 4608,
+            "blocked_blind_open": 6,
+            "enter_rev_short": 2,
+            "no_recent_high": 4560,
+            "not_strong_up": 31424,
+            "now_time_5": 44356,
+            "sweet": 38777,
+            "zz_not_down": 5519
+          },
+          "reason_match_rate": 1.0,
+          "reason_mismatches": 0,
+          "rows": 129252
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260127/decisions.jsonl"
+    },
+    {
+      "date": "20260128",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 0,
+          "candidate_reasons_top10": {
+            "blocked_blind_open": 3,
+            "not_strong_up": 6357,
+            "now_time_5": 2835
+          },
+          "enter_match_rate": 1.0,
+          "enter_mismatches": 0,
+          "first_mismatch": null,
+          "legacy_enter_true": 0,
+          "legacy_reasons_top10": {
+            "blocked_blind_open": 3,
+            "not_strong_up": 6357,
+            "now_time_5": 2835
+          },
+          "reason_match_rate": 1.0,
+          "reason_mismatches": 0,
+          "rows": 9195
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260128/decisions.jsonl"
+    },
+    {
+      "date": "20260129",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 2,
+          "candidate_reasons_top10": {
+            "angle": 230,
+            "blocked_blind_open": 10,
+            "enter_rev_short": 2,
+            "no_recent_high": 19553,
+            "not_strong_up": 20742,
+            "now_time_5": 46163,
+            "sweet": 10936,
+            "zz_not_down": 492
+          },
+          "enter_match_rate": 1.0,
+          "enter_mismatches": 0,
+          "first_mismatch": null,
+          "legacy_enter_true": 2,
+          "legacy_reasons_top10": {
+            "angle": 230,
+            "blocked_blind_open": 10,
+            "enter_rev_short": 2,
+            "no_recent_high": 19553,
+            "not_strong_up": 20742,
+            "now_time_5": 46163,
+            "sweet": 10936,
+            "zz_not_down": 492
+          },
+          "reason_match_rate": 1.0,
+          "reason_mismatches": 0,
+          "rows": 98128
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260129/decisions.jsonl"
+    }
+  ],
+  "gates": [
+    "REV_SHORT_AFTER_UP"
+  ],
+  "kind": "steamer_card_engine.legacy_decision_trace_equivalence.v1",
+  "mismatch_samples_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-multiday/mismatch_samples.jsonl",
+  "report_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-multiday/consistency_report.md",
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-multiday/summary.json",
+  "verdict": "FAIL_NEEDS_COMPATIBILITY_MAPPING"
+}

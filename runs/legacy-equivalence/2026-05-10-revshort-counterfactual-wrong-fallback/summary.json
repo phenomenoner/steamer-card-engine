@@ -1,0 +1,74 @@
+{
+  "aggregate_by_gate": {
+    "REV_SHORT_AFTER_UP": {
+      "candidate_enter_true": 0,
+      "enter_match_rate": 0.9999796184575248,
+      "enter_mismatches": 2,
+      "legacy_enter_true": 2,
+      "reason_match_rate": 0.9999796184575248,
+      "reason_mismatches": 2,
+      "rows": 98128
+    }
+  },
+  "data_root": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data",
+  "dataset_count": 1,
+  "datasets": [
+    {
+      "date": "20260129",
+      "gates": {
+        "REV_SHORT_AFTER_UP": {
+          "candidate_enter_true": 0,
+          "candidate_reasons_top10": {
+            "angle": 230,
+            "blocked_blind_open": 10,
+            "no_recent_high": 19553,
+            "not_strong_up": 20742,
+            "now_time_5": 46163,
+            "sweet": 10936,
+            "too_shallow": 2,
+            "zz_not_down": 492
+          },
+          "enter_match_rate": 0.9999796184575248,
+          "enter_mismatches": 2,
+          "first_mismatch": {
+            "candidate_enter": false,
+            "candidate_reason": "too_shallow",
+            "date": "20260129",
+            "gate": "REV_SHORT_AFTER_UP",
+            "legacy_enter": true,
+            "legacy_reason": "enter_rev_short",
+            "line_no": 59468,
+            "machine": "dt3",
+            "state_now_time": "09:42:30.837771",
+            "state_now_ts": 1769650950.80803,
+            "symbol": "8039"
+          },
+          "legacy_enter_true": 2,
+          "legacy_reasons_top10": {
+            "angle": 230,
+            "blocked_blind_open": 10,
+            "enter_rev_short": 2,
+            "no_recent_high": 19553,
+            "not_strong_up": 20742,
+            "now_time_5": 46163,
+            "sweet": 10936,
+            "zz_not_down": 492
+          },
+          "reason_match_rate": 0.9999796184575248,
+          "reason_mismatches": 2,
+          "rows": 98128
+        }
+      },
+      "machine": "dt3",
+      "source": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260129/decisions.jsonl"
+    }
+  ],
+  "gates": [
+    "REV_SHORT_AFTER_UP"
+  ],
+  "kind": "steamer_card_engine.legacy_decision_trace_equivalence.v1",
+  "mismatch_samples_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-counterfactual-wrong-fallback/mismatch_samples.jsonl",
+  "report_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-counterfactual-wrong-fallback/consistency_report.md",
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-revshort-counterfactual-wrong-fallback/summary.json",
+  "verdict": "FAIL_NEEDS_COMPATIBILITY_MAPPING"
+}
