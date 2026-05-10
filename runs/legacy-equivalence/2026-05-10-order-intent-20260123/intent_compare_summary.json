@@ -1,0 +1,95 @@
+{
+  "artifacts": {
+    "actual_order_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/order_intents_actual_legacy.jsonl",
+    "candidate_enter_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/order_intents_candidate.jsonl",
+    "intent_diff": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/intent_diff.jsonl",
+    "legacy_enter_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/order_intents_legacy.jsonl",
+    "report": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/intent_compare_report.md",
+    "scenario_spec": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/scenario_spec.json",
+    "summary": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-order-intent-20260123/intent_compare_summary.json"
+  },
+  "comparisons": {
+    "legacy_enter_vs_actual_order_submit": {
+      "extra_in_right": [],
+      "left": "legacy_enter",
+      "left_count": 2,
+      "match": true,
+      "missing_from_right": [],
+      "right": "actual_enter_order_submit",
+      "right_count": 2
+    },
+    "legacy_enter_vs_candidate_enter": {
+      "extra_in_right": [],
+      "left": "legacy_enter",
+      "left_count": 2,
+      "match": true,
+      "missing_from_right": [],
+      "right": "candidate_enter",
+      "right_count": 2
+    }
+  },
+  "end_local": null,
+  "gate": "REV_SHORT_AFTER_UP",
+  "independent_candidate": false,
+  "intent_summaries": {
+    "actual_orders": {
+      "actions": {
+        "enter": 2,
+        "stop": 1
+      },
+      "count": 3,
+      "name": "actual_orders",
+      "row_kinds": {
+        "actual_order_submit": 3
+      },
+      "symbols": {
+        "2367": 2,
+        "3323": 1
+      }
+    },
+    "candidate_enter": {
+      "actions": {
+        "enter": 2
+      },
+      "count": 2,
+      "name": "candidate_enter",
+      "row_kinds": {
+        "enter_order_intent": 2
+      },
+      "symbols": {
+        "2367": 1,
+        "3323": 1
+      }
+    },
+    "legacy_enter": {
+      "actions": {
+        "enter": 2
+      },
+      "count": 2,
+      "name": "legacy_enter",
+      "row_kinds": {
+        "enter_order_intent": 2
+      },
+      "symbols": {
+        "2367": 1,
+        "3323": 1
+      }
+    }
+  },
+  "kind": "steamer_card_engine.order_intent_compare.v1",
+  "known_gaps": [
+    "candidate trace may be same source as legacy unless independent_candidate=true",
+    "entry intents only; exits/stops/trailing are out of scope",
+    "multiset compare; sequence/timing parity is out of scope",
+    "broker/account/position/open-order snapshots are out of scope",
+    "REV_SHORT_AFTER_UP short-entry order shape is hardcoded in v1"
+  ],
+  "live_replacement_confidence": false,
+  "scope": "entry-intent-smoke-only",
+  "sources": {
+    "candidate_decisions": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260123/decisions.jsonl",
+    "legacy_decisions": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260123/decisions.jsonl",
+    "legacy_orders": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260123/orders.jsonl"
+  },
+  "verdict": "PASS_ENTER_INTENT_SMOKE_ONLY"
+}

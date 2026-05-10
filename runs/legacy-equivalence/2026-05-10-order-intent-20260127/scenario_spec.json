@@ -1,0 +1,15 @@
+{
+  "end_local": null,
+  "gate": "REV_SHORT_AFTER_UP",
+  "independent_candidate": false,
+  "kind": "steamer_card_engine.order_intent_scenario.v1",
+  "known_gaps": [
+    "candidate trace may be same source as legacy unless independent_candidate=true",
+    "entry intents only; exits/stops/trailing are out of scope",
+    "multiset compare; sequence/timing parity is out of scope",
+    "broker/account/position/open-order snapshots are out of scope",
+    "REV_SHORT_AFTER_UP short-entry order shape is hardcoded in v1"
+  ],
+  "live_replacement_confidence": false,
+  "scope": "entry-intent-smoke-only"
+}
