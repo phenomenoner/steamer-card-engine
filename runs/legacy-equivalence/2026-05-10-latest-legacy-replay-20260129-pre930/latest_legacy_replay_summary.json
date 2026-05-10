@@ -1,0 +1,16 @@
+{
+  "date": "20260129",
+  "end_local": "09:30:00",
+  "enter_true": 0,
+  "gate": "REV_SHORT_AFTER_UP",
+  "kind": "steamer_card_engine.latest_legacy_replay.v1",
+  "machine": "dt3",
+  "reason_top20": {
+    "blocked_blind_open": 10,
+    "now_time_5": 50381,
+    "sweet": 158
+  },
+  "rows": 50549,
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-latest-legacy-replay-20260129-pre930/latest_legacy_replay_summary.json",
+  "trace_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-latest-legacy-replay-20260129-pre930/latest_legacy_replay_decisions.jsonl"
+}
