@@ -1,0 +1,116 @@
+{
+  "end_local": "09:30:00",
+  "gate": "REV_SHORT_AFTER_UP",
+  "kind": "steamer_card_engine.triangle_compare.v1",
+  "pairwise": {
+    "A_vs_B": {
+      "enter_true_delta": 0,
+      "left": "A_historical",
+      "reason_delta_top20_scope": {
+        "now_time_5": 4218,
+        "sweet": -3683
+      },
+      "right": "B_latest_legacy_replay",
+      "row_delta": 535,
+      "symbol_count_delta": 0
+    },
+    "A_vs_C": {
+      "enter_true_delta": 0,
+      "left": "A_historical",
+      "reason_delta_top20_scope": {
+        "now_time_5": 4218,
+        "sweet": -3683
+      },
+      "right": "C_card_candidate",
+      "row_delta": 535,
+      "symbol_count_delta": 0
+    },
+    "B_vs_C": {
+      "enter_true_delta": 0,
+      "left": "B_latest_legacy_replay",
+      "reason_delta_top20_scope": {},
+      "right": "C_card_candidate",
+      "row_delta": 0,
+      "symbol_count_delta": 0
+    }
+  },
+  "report_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-triangle-compare-20260129-pre930/triangle_compare_report.md",
+  "sources": {
+    "A_historical": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260129/decisions.jsonl",
+    "B_latest_legacy_replay": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-latest-legacy-replay-20260129-pre930/latest_legacy_replay_decisions.jsonl",
+    "C_card_candidate": "generated-from-B-state"
+  },
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-triangle-compare-20260129-pre930/triangle_compare_summary.json",
+  "traces": {
+    "A_historical": {
+      "enter_true": 0,
+      "name": "A_historical",
+      "reason_top20": {
+        "blocked_blind_open": 10,
+        "now_time_5": 46163,
+        "sweet": 3841
+      },
+      "rows": 50014,
+      "symbol_count": 10,
+      "symbol_top20": {
+        "1605": 13980,
+        "2367": 16022,
+        "3006": 4683,
+        "3450": 2687,
+        "4533": 3249,
+        "4919": 3671,
+        "6188": 1538,
+        "6485": 2166,
+        "6588": 39,
+        "8039": 1979
+      }
+    },
+    "B_latest_legacy_replay": {
+      "enter_true": 0,
+      "name": "B_latest_legacy_replay",
+      "reason_top20": {
+        "blocked_blind_open": 10,
+        "now_time_5": 50381,
+        "sweet": 158
+      },
+      "rows": 50549,
+      "symbol_count": 10,
+      "symbol_top20": {
+        "1605": 14040,
+        "2367": 16339,
+        "3006": 4683,
+        "3450": 2687,
+        "4533": 3249,
+        "4919": 3671,
+        "6188": 1538,
+        "6485": 2166,
+        "6588": 197,
+        "8039": 1979
+      }
+    },
+    "C_card_candidate": {
+      "enter_true": 0,
+      "name": "C_card_candidate",
+      "reason_top20": {
+        "blocked_blind_open": 10,
+        "now_time_5": 50381,
+        "sweet": 158
+      },
+      "rows": 50549,
+      "symbol_count": 10,
+      "symbol_top20": {
+        "1605": 14040,
+        "2367": 16339,
+        "3006": 4683,
+        "3450": 2687,
+        "4533": 3249,
+        "4919": 3671,
+        "6188": 1538,
+        "6485": 2166,
+        "6588": 197,
+        "8039": 1979
+      }
+    }
+  },
+  "verdict": "PASS_BC_SEMANTICS"
+}
