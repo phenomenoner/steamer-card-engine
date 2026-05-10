@@ -1,0 +1,151 @@
+{
+  "artifacts": {
+    "actual_order_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/order_intents_actual_legacy.jsonl",
+    "candidate_enter_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/order_intents_candidate.jsonl",
+    "intent_diff": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/intent_diff.jsonl",
+    "legacy_enter_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/order_intents_legacy.jsonl",
+    "report": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/intent_compare_report.md",
+    "scenario_spec": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/scenario_spec.json",
+    "summary": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/intent_compare_summary.json"
+  },
+  "comparisons": {
+    "candidate_enter_vs_actual_order_submit": {
+      "extra_in_right": [],
+      "left": "candidate_enter",
+      "left_count": 2,
+      "match": true,
+      "missing_from_right": [],
+      "right": "actual_enter_order_submit",
+      "right_count": 2
+    },
+    "legacy_enter_vs_actual_order_submit": {
+      "extra_in_right": [],
+      "left": "legacy_enter",
+      "left_count": 2,
+      "match": true,
+      "missing_from_right": [],
+      "right": "actual_enter_order_submit",
+      "right_count": 2
+    },
+    "legacy_enter_vs_candidate_enter": {
+      "extra_in_right": [],
+      "left": "legacy_enter",
+      "left_count": 2,
+      "match": true,
+      "missing_from_right": [],
+      "right": "candidate_enter",
+      "right_count": 2
+    }
+  },
+  "end_local": null,
+  "gate": "REV_SHORT_AFTER_UP",
+  "independent_candidate": true,
+  "intent_summaries": {
+    "actual_orders": {
+      "actions": {
+        "enter": 2,
+        "stop": 2
+      },
+      "count": 4,
+      "name": "actual_orders",
+      "row_kinds": {
+        "actual_order_submit": 4
+      },
+      "symbols": {
+        "1301": 2,
+        "2337": 2
+      }
+    },
+    "candidate_enter": {
+      "actions": {
+        "enter": 2
+      },
+      "count": 2,
+      "name": "candidate_enter",
+      "row_kinds": {
+        "enter_order_intent": 2
+      },
+      "symbols": {
+        "1301": 1,
+        "2337": 1
+      }
+    },
+    "legacy_enter": {
+      "actions": {
+        "enter": 2
+      },
+      "count": 2,
+      "name": "legacy_enter",
+      "row_kinds": {
+        "enter_order_intent": 2
+      },
+      "symbols": {
+        "1301": 1,
+        "2337": 1
+      }
+    }
+  },
+  "kind": "steamer_card_engine.order_intent_compare.v1",
+  "known_gaps": [
+    "candidate trace may be same source as legacy unless independent_candidate=true",
+    "entry intents only; exits/stops/trailing are out of scope",
+    "multiset compare; sequence/timing parity is out of scope",
+    "broker/account/position/open-order snapshots are out of scope",
+    "REV_SHORT_AFTER_UP short-entry order shape is hardcoded in v1"
+  ],
+  "live_replacement_confidence": false,
+  "scope": "entry-intent-smoke-only",
+  "sources": {
+    "candidate_decisions": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-orderlayer/latest_legacy_replay_decisions.jsonl",
+    "legacy_decisions": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260127/decisions.jsonl",
+    "legacy_orders": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260127/orders.jsonl"
+  },
+  "timing_comparisons": {
+    "candidate_enter_vs_actual_order_submit": {
+      "deltas": [
+        {
+          "abs_delta_seconds": 4.4677689999953145,
+          "delta_seconds": 4.4677689999953145,
+          "index": 1,
+          "left_time": "10:25:56.685231",
+          "right_time": "10:26:01.153",
+          "symbol": "1301"
+        },
+        {
+          "abs_delta_seconds": 8.797582999999577,
+          "delta_seconds": -8.797582999999577,
+          "index": 1,
+          "left_time": "11:14:02.496583",
+          "right_time": "11:13:53.699",
+          "symbol": "2337"
+        }
+      ],
+      "left": "candidate_enter",
+      "match": false,
+      "max_abs_delta_seconds": 8.797582999999577,
+      "problems": [
+        {
+          "abs_delta_seconds": 4.4677689999953145,
+          "class": "clock_alignment_diff",
+          "delta_seconds": 4.4677689999953145,
+          "index": 1,
+          "left_time": "10:25:56.685231",
+          "right_time": "10:26:01.153",
+          "symbol": "1301"
+        },
+        {
+          "abs_delta_seconds": 8.797582999999577,
+          "class": "clock_alignment_diff",
+          "delta_seconds": -8.797582999999577,
+          "index": 1,
+          "left_time": "11:14:02.496583",
+          "right_time": "11:13:53.699",
+          "symbol": "2337"
+        }
+      ],
+      "right": "actual_enter_order_submit",
+      "tolerance_seconds": 2.0
+    }
+  },
+  "verdict": "PASS_ENTER_INTENT_SMOKE_INDEPENDENT_CANDIDATE"
+}

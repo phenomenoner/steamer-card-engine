@@ -193,6 +193,60 @@ def classify_signature_gap(sig: tuple[Any, ...]) -> str:
     return "unknown"
 
 
+def _seconds_of_day(value: Any) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    # Allow HH:MM:SS, HH:MM:SS.micro, and ISO-ish time strings.
+    try:
+        t = _parse_time(text)
+        if t is None:
+            return None
+        return float(t.hour * 3600 + t.minute * 60 + t.second) + float(t.microsecond) / 1_000_000
+    except Exception:
+        return None
+
+
+def compare_timing_by_symbol(
+    left: list[dict[str, Any]],
+    right: list[dict[str, Any]],
+    *,
+    left_name: str,
+    right_name: str,
+    tolerance_seconds: float,
+) -> dict[str, Any]:
+    deltas: list[dict[str, Any]] = []
+    problems: list[dict[str, Any]] = []
+    symbols = sorted({str(i.get("symbol")) for i in left if i.get("action") == "enter"} | {str(i.get("symbol")) for i in right if i.get("action") == "enter"})
+    for symbol in symbols:
+        left_rows = sorted([i for i in left if i.get("action") == "enter" and str(i.get("symbol")) == symbol], key=lambda i: _seconds_of_day(i.get("local_time")) or -1)
+        right_rows = sorted([i for i in right if i.get("action") == "enter" and str(i.get("symbol")) == symbol], key=lambda i: _seconds_of_day(i.get("local_time")) or -1)
+        if len(left_rows) != len(right_rows):
+            problems.append({"symbol": symbol, "class": "order_lifecycle_diff", "left_count": len(left_rows), "right_count": len(right_rows)})
+        for idx, (lrow, rrow) in enumerate(zip(left_rows, right_rows), start=1):
+            lt = _seconds_of_day(lrow.get("local_time"))
+            rt = _seconds_of_day(rrow.get("local_time"))
+            if lt is None or rt is None:
+                problems.append({"symbol": symbol, "class": "schema_gap", "index": idx, "left_time": lrow.get("local_time"), "right_time": rrow.get("local_time")})
+                continue
+            delta = rt - lt
+            item = {"symbol": symbol, "index": idx, "left_time": lrow.get("local_time"), "right_time": rrow.get("local_time"), "delta_seconds": delta, "abs_delta_seconds": abs(delta)}
+            deltas.append(item)
+            if abs(delta) > tolerance_seconds:
+                problems.append({"class": "clock_alignment_diff", **item})
+    return {
+        "left": left_name,
+        "right": right_name,
+        "tolerance_seconds": tolerance_seconds,
+        "match": not problems,
+        "deltas": deltas,
+        "problems": problems,
+        "max_abs_delta_seconds": max([d["abs_delta_seconds"] for d in deltas], default=None),
+    }
+
+
 def summarize_intents(name: str, intents: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "name": name,
@@ -213,6 +267,10 @@ def build_report(summary: dict[str, Any]) -> str:
     lines.extend(["## Comparisons", ""])
     for key, comp in summary["comparisons"].items():
         lines.extend([f"### {key}", f"- match: {comp['match']}", f"- left_count: {comp['left_count']}", f"- right_count: {comp['right_count']}", f"- missing_from_right: `{comp['missing_from_right']}`", f"- extra_in_right: `{comp['extra_in_right']}`", ""])
+    if summary.get("timing_comparisons"):
+        lines.extend(["## Timing comparisons", ""])
+        for key, comp in summary["timing_comparisons"].items():
+            lines.extend([f"### {key}", f"- match: {comp['match']}", f"- tolerance_seconds: {comp['tolerance_seconds']}", f"- max_abs_delta_seconds: {comp['max_abs_delta_seconds']}", f"- problems: `{comp['problems']}`", ""])
     lines.extend([
         "## Scope / confidence",
         f"- scope: `{summary.get('scope')}`",
@@ -242,8 +300,17 @@ def run(args: argparse.Namespace) -> int:
     comparisons = {
         "legacy_enter_vs_candidate_enter": compare_intent_multisets(legacy_enter, candidate_enter, left_name="legacy_enter", right_name="candidate_enter"),
     }
+    timing_comparisons: dict[str, Any] = {}
     if legacy_orders:
         comparisons["legacy_enter_vs_actual_order_submit"] = compare_intent_multisets(legacy_enter, actual_enter_orders, left_name="legacy_enter", right_name="actual_enter_order_submit")
+        comparisons["candidate_enter_vs_actual_order_submit"] = compare_intent_multisets(candidate_enter, actual_enter_orders, left_name="candidate_enter", right_name="actual_enter_order_submit")
+        timing_comparisons["candidate_enter_vs_actual_order_submit"] = compare_timing_by_symbol(
+            candidate_enter,
+            actual_enter_orders,
+            left_name="candidate_enter",
+            right_name="actual_enter_order_submit",
+            tolerance_seconds=args.timing_tolerance_seconds,
+        )
 
     independent_candidate = legacy_decisions != candidate_decisions
     raw_match = all(c["match"] for c in comparisons.values())
@@ -297,6 +364,7 @@ def run(args: argparse.Namespace) -> int:
         "live_replacement_confidence": False,
         "independent_candidate": independent_candidate,
         "known_gaps": scenario_spec["known_gaps"],
+        "timing_comparisons": timing_comparisons,
         "sources": {
             "legacy_decisions": str(legacy_decisions),
             "candidate_decisions": str(candidate_decisions),
@@ -324,6 +392,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--legacy-orders")
     parser.add_argument("--gate", default="REV_SHORT_AFTER_UP")
     parser.add_argument("--end-local")
+    parser.add_argument("--timing-tolerance-seconds", type=float, default=2.0)
     return parser
 
 

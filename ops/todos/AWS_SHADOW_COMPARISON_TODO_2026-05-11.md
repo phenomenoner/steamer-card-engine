@@ -47,7 +47,7 @@ Current order-intent v1 is entry-intent smoke only, not live replacement confide
 
 ### P0 — next local replay gate
 
-- [ ] Implement **independent replay enter-order comparison**.
+- [x] Implement **independent replay enter-order comparison**.
   - Do not use legacy `decisions.jsonl` as candidate input.
   - Candidate path must be: `ticks.jsonl -> latest legacy/card replay state -> card-engine decision trace -> order intent`.
   - Compare against legacy actual orders on days with `orders.jsonl` entries.
@@ -70,7 +70,7 @@ Current order-intent v1 is entry-intent smoke only, not live replacement confide
     WAL + docs ingest + local commit
     ```
 
-- [ ] Extend replay beyond pre-09:30 into **post-09:30 actual-entry windows**.
+- [x] Extend replay beyond pre-09:30 into **post-09:30 actual-entry windows**.
   - Target first days with actual legacy entries, currently observed:
     ```text
     dt3/20260123
@@ -85,7 +85,7 @@ Current order-intent v1 is entry-intent smoke only, not live replacement confide
 
 ### P0 — shadow comparison substrate
 
-- [ ] Implement **AWS shadow observer worker dry-run hook**.
+- [x] Implement **AWS shadow observer worker dry-run hook**.
   - Must run observer-only.
   - Must not submit orders.
   - Must not call EC2 start/stop.
@@ -112,7 +112,7 @@ Current order-intent v1 is entry-intent smoke only, not live replacement confide
     WAL + local commit
     ```
 
-- [ ] Add verify/archive integration plan for shadow artifacts.
+- [x] Add verify/archive integration plan for shadow artifacts.
   - Do not modify live cron until dry-run evidence is clean.
   - Integration target:
     ```text
@@ -245,6 +245,36 @@ Current order-intent v1 is entry-intent smoke only, not live replacement confide
     ingest docs if changed
     local commit
     ```
+
+
+## 2026-05-11 P0 update
+
+Closed to local/dry-run level:
+
+```text
+- independent replay enter-order comparison
+- post-09:30 actual-entry windows for 20260123 / 20260127
+- AWS shadow observer worker dry-run hook
+- verify/archive dry-run integration plan
+```
+
+Key receipts:
+
+```text
+docs/receipts/2026-05-11_aws_shadow_comparison_p0_closure.md
+runs/legacy-equivalence/2026-05-11-order-intent-independent-20260123/
+runs/legacy-equivalence/2026-05-11-order-intent-independent-20260127/
+runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/
+runs/shadow-comparison/2026-05-11-observer-dry-run-20260127/
+```
+
+Important blocker carried forward:
+
+```text
+Order shape parity passes on independent actual-entry days, but timing parity does not.
+20260123 max_abs_delta_seconds=684.645048; 20260127 max_abs_delta_seconds=8.797583.
+Treat as clock_alignment_diff / feature-replay-substrate gap before live confidence.
+```
 
 ## Evidence gates before real-money validation
 

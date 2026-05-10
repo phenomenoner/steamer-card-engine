@@ -1,0 +1,13 @@
+{
+  "day": "20260127",
+  "inputs": {
+    "candidate_decisions": "runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-orderlayer/latest_legacy_replay_decisions.jsonl",
+    "legacy_decisions": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260127/decisions.jsonl",
+    "legacy_orders": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data/dt3/20260127/orders.jsonl"
+  },
+  "kind": "steamer_card_engine.aws_shadow_scenario.v1",
+  "observer_only": true,
+  "owns_ec2_lifecycle": false,
+  "run_goal": "REV_SHORT_AFTER_UP entry order intent only",
+  "submits_orders": false
+}

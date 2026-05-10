@@ -40,6 +40,8 @@ def test_latest_legacy_replay_emits_rows(tmp_path: Path) -> None:
         },
         max_rows=None,
         end_local=None,
+        enforce_one_enter_per_symbol=False,
+        symbols=None,
     )
     assert len(rows) == 2
     assert rows[0]["state"]["open_px"] == 10.0

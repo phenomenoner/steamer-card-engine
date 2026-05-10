@@ -1,0 +1,25 @@
+{
+  "active_universe_count": 5,
+  "artifacts": {
+    "active_universe": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/active_universe.json",
+    "broker_state_snapshots": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/broker_state_snapshots.jsonl",
+    "card_shadow_order_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/card_shadow_order_intents.jsonl",
+    "intent_compare_summary": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/intent_compare_summary.json",
+    "intent_diff": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/intent_diff.jsonl",
+    "legacy_order_intents": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/legacy_order_intents.jsonl",
+    "scenario_spec": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/scenario_spec.json",
+    "summary_md": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-observer-dry-run-20260123/summary.md"
+  },
+  "card_shadow_intent_count": 2,
+  "created_at": "2026-05-10T16:26:16.374185Z",
+  "day": "20260123",
+  "intent_diff_count": 0,
+  "kind": "steamer_card_engine.aws_shadow_observer_dry_run.v1",
+  "legacy_intent_count": 2,
+  "live_replacement_confidence": false,
+  "observer_only": true,
+  "owns_ec2_lifecycle": false,
+  "run_goal": "REV_SHORT_AFTER_UP entry order intent only",
+  "submits_orders": false,
+  "verdict": "PASS_SHADOW_OBSERVER_DRY_RUN_ARTIFACTS"
+}

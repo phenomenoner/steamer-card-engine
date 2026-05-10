@@ -9,6 +9,7 @@ from steamer_card_engine.order_intent_compare import (
     intent_signature,
     load_order_intents,
     parse_order_result,
+    compare_timing_by_symbol,
 )
 
 
@@ -50,3 +51,11 @@ def test_counterfactual_quantity_tif_and_symbol_mismatch_flags() -> None:
     assert result["missing_from_right"][0]["class"] == "order_lifecycle_diff"
     assert result["extra_in_right"][0]["class"] == "order_lifecycle_diff"
     assert intent_signature(left[0]) != intent_signature(right[0])
+
+
+def test_compare_timing_by_symbol_flags_clock_alignment() -> None:
+    left = [{"symbol": "1", "action": "enter", "local_time": "09:30:00.000"}]
+    right = [{"symbol": "1", "action": "enter", "local_time": "09:30:05.000"}]
+    result = compare_timing_by_symbol(left, right, left_name="candidate", right_name="actual", tolerance_seconds=2.0)
+    assert result["match"] is False
+    assert result["problems"][0]["class"] == "clock_alignment_diff"

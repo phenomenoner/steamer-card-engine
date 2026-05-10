@@ -178,6 +178,8 @@ def replay_session(
     cfg: dict[str, Any],
     max_rows: int | None,
     end_local: str | None = None,
+    enforce_one_enter_per_symbol: bool = False,
+    symbols: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     session_dir = data_root / machine / date
     ticks_path = session_dir / "ticks.jsonl"
@@ -187,6 +189,7 @@ def replay_session(
     last_close_by_symbol = load_last_close_from_decisions(decisions_path)
     states: dict[str, SymbolReplayState] = {}
     rows: list[dict[str, Any]] = []
+    entered_symbols: set[str] = set()
     evaluator = GATE_EVALUATORS[gate]
 
     with ticks_path.open("r", encoding="utf-8") as file:
@@ -203,6 +206,8 @@ def replay_session(
             bid = tick.get("bid")
             ts = _tick_ts(tick)
             if not symbol or not isinstance(price, (int, float)) or not isinstance(bid, (int, float)) or ts is None:
+                continue
+            if symbols is not None and symbol not in symbols:
                 continue
             # Bound the replay universe to symbols that historical legacy actually
             # evaluated. The live bot has an active target list; raw ticks contain
@@ -276,9 +281,17 @@ def replay_session(
                 "vcp_current_vol_ratio": 0.0,
             }
             decision = evaluator(state, cfg)
+            enter = decision.enter
+            reason = decision.reason
+            if enforce_one_enter_per_symbol and enter:
+                if symbol in entered_symbols:
+                    enter = False
+                    reason = "lot_limit_reached_replay"
+                else:
+                    entered_symbols.add(symbol)
             output_state = dict(state)
             output_state["now_time"] = now_time.isoformat()
-            rows.append({"symbol": symbol, "gate": gate, "enter": decision.enter, "reason": decision.reason, "state": output_state})
+            rows.append({"symbol": symbol, "gate": gate, "enter": enter, "reason": reason, "state": output_state})
     return rows
 
 
@@ -287,7 +300,8 @@ def run(args: argparse.Namespace) -> int:
     output_dir = resolve_output_dir(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     cfg = load_config(Path(args.config).resolve() if args.config else None)
-    rows = replay_session(data_root=data_root, machine=args.machine, date=args.date, gate=args.gate, cfg=cfg, max_rows=args.max_rows, end_local=args.end_local)
+    symbols = {item.strip() for item in (args.symbols or "").split(",") if item.strip()} or None
+    rows = replay_session(data_root=data_root, machine=args.machine, date=args.date, gate=args.gate, cfg=cfg, max_rows=args.max_rows, end_local=args.end_local, enforce_one_enter_per_symbol=args.enforce_one_enter_per_symbol, symbols=symbols)
     if not rows:
         raise LegacyEquivalenceError("replay emitted no rows")
     trace_path = output_dir / "latest_legacy_replay_decisions.jsonl"
@@ -303,6 +317,8 @@ def run(args: argparse.Namespace) -> int:
         "rows": len(rows),
         "end_local": args.end_local,
         "enter_true": sum(1 for row in rows if row["enter"]),
+        "enforce_one_enter_per_symbol": args.enforce_one_enter_per_symbol,
+        "symbols": sorted(symbols) if symbols else None,
         "reason_top20": dict(__import__("collections").Counter(row["reason"] for row in rows).most_common(20)),
         "trace_path": str(trace_path),
         "summary_path": str(summary_path),
@@ -322,6 +338,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config")
     parser.add_argument("--max-rows", type=int)
     parser.add_argument("--end-local", help="Optional inclusive local time upper bound, e.g. 09:30:00")
+    parser.add_argument("--enforce-one-enter-per-symbol", action="store_true", help="Replay a minimal order-layer lot limit: only the first enter per symbol remains enter=true.")
+    parser.add_argument("--symbols", help="Optional comma-separated symbol filter for scoped replay.")
     return parser
 
 
