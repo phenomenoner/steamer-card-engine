@@ -52,12 +52,39 @@ class TimeAwareEMA:
         return self.ema
 
 
+def resample_and_median3_for_angle(times: list[float], prices: list[float]) -> tuple[list[float], list[float]]:
+    if not times or not prices:
+        return [], []
+    start_sec = math.floor(times[0])
+    end_sec = math.floor(times[-1])
+    sec_times: list[float] = []
+    sec_prices: list[float] = []
+    last_price = float(prices[0])
+    j = 0
+    n = len(times)
+    for sec in range(start_sec + 1, end_sec + 2):
+        while j < n and times[j] <= sec:
+            last_price = float(prices[j])
+            j += 1
+        sec_times.append(float(sec))
+        sec_prices.append(last_price)
+    if len(sec_prices) >= 3:
+        filt = list(sec_prices)
+        for i in range(1, len(sec_prices) - 1):
+            a, b, c = sec_prices[i - 1], sec_prices[i], sec_prices[i + 1]
+            filt[i] = sorted((a, b, c))[1]
+        sec_prices = filt
+    x0 = sec_times[0]
+    xs = [(t - x0) / 60.0 for t in sec_times]
+    return xs, sec_prices
+
+
 def regression_angle(times: list[float], prices: list[float]) -> float | None:
     if len(prices) < 10:
         return None
-    x0 = times[0]
-    xs = [(t - x0) / 60.0 for t in times]
-    ys = prices
+    xs, ys = resample_and_median3_for_angle(times, prices)
+    if len(ys) < 2:
+        return None
     n = len(ys)
     sum_x = sum(xs)
     sum_y = sum(ys)

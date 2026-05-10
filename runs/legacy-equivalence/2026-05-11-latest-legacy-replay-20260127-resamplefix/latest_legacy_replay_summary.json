@@ -1,0 +1,27 @@
+{
+  "date": "20260127",
+  "end_local": "11:20:00",
+  "enforce_one_enter_per_symbol": true,
+  "enter_true": 2,
+  "gate": "REV_SHORT_AFTER_UP",
+  "kind": "steamer_card_engine.latest_legacy_replay.v1",
+  "machine": "dt3",
+  "reason_top20": {
+    "above_ema": 18,
+    "angle": 6272,
+    "blocked_blind_open": 2,
+    "enter_rev_short": 2,
+    "lot_limit_reached_replay": 678,
+    "no_recent_high": 4560,
+    "not_strong_up": 19956,
+    "now_time_5": 26828,
+    "zz_not_down": 8067
+  },
+  "rows": 66383,
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-resamplefix/latest_legacy_replay_summary.json",
+  "symbols": [
+    "1301",
+    "2337"
+  ],
+  "trace_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-resamplefix/latest_legacy_replay_decisions.jsonl"
+}

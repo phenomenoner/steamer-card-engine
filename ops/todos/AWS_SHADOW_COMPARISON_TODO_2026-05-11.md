@@ -283,10 +283,17 @@ Timing probe receipt:
 docs/receipts/2026-05-11_aws_shadow_timing_gap_probe.md
 ```
 
-Next timing-specific P0:
+Timing blocker closed for entry-order replay smoke:
 
 ```text
-Reproduce legacy slope_down_ok sampling path exactly: price queue source, timestamp cutoff inclusivity, min-span behavior, and duplicate timestamp ordering.
+Root cause: replay used raw tick regression; legacy uses tick -> 1-second last-price resample -> median3 -> regression angle.
+After resample + median3 fix: 20260123 max_abs_delta_seconds=0.041462; 20260127 max_abs_delta_seconds=0.047904.
+```
+
+Timing closure receipt:
+
+```text
+docs/receipts/2026-05-11_aws_shadow_timing_gap_closed.md
 ```
 
 ## Evidence gates before real-money validation
