@@ -96,3 +96,30 @@ mode: read-only SSM/runtime inspection; no EC2 start/stop; no broker orders
 ```
 
 If remote runtime is present, next safe move is observer-only hook enable under the existing lifecycle. If remote runtime is missing, blocker is deployment/runtime availability, not strategy parity.
+
+## 2026-05-11 01:10 one-shot schedule hardening
+
+Added one-shot follow-up jobs so the readiness/takeoff line does not depend on human memory:
+
+```text
+08:30 readiness readback
+  jobId: 1d5c15ad-4d95-4b20-8ded-418bb1dd802d
+  action: read-only remote runtime inspection after existing 08:25 power-on
+
+08:33 takeoff execute/fail-safe
+  jobId: 98a14a49-67d9-4c72-a748-100a768cbd38
+  action: only connect observer-only takeoff if readiness proves preconditions; otherwise record blocker
+
+08:50 post-kickoff receipt check
+  jobId: 97a85311-b97c-47b3-ae05-f0d3fcd87762
+  action: inspect readiness/takeoff/kickoff/verify receipts and report result
+```
+
+All one-shots are constrained:
+
+```text
+- no EC2 start/stop
+- no broker orders
+- no lifecycle cron mutation
+- no real-money enablement
+```
