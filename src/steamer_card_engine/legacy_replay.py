@@ -242,9 +242,20 @@ def replay_session(
                 slope_ok_1, slope_1, slope_2, slope_3 = False, None, None, None
             else:
                 zz_trend = update_zz(st, price, cfg)
-                slope_ok_1, slope_1 = recent_angle(st, ts, int(cfg.get("slope_cond_min", 5)), 10, float(cfg.get("slope_cond_threshold", -2.0)))
-                _slope_ok_2, slope_2 = recent_angle(st, ts, int(cfg.get("slope_cond_min_2", 10)), 10, float(cfg.get("slope_cond_threshold_2", -2.0)))
-                _slope_ok_3, slope_3 = recent_angle(st, ts, int(cfg.get("slope_cond_min_3", 15)), 10, float(cfg.get("slope_cond_threshold_3", -2.0)))
+                _slope_ok_1, slope_1 = recent_angle(st, ts, int(cfg.get("slope_cond_min", 5)), 10, float(cfg.get("slope_cond_threshold", -5.0)))
+                _slope_ok_2, slope_2 = recent_angle(st, ts, int(cfg.get("slope_cond_min_2", 10)), 10, float(cfg.get("slope_cond_threshold_2", -10.0)))
+                _slope_ok_3, slope_3 = recent_angle(st, ts, int(cfg.get("slope_cond_min_3", 15)), 10, float(cfg.get("slope_cond_threshold_3", -15.0)))
+                threshold_1 = float(cfg.get("slope_cond_threshold", -5.0))
+                threshold_2 = float(cfg.get("slope_cond_threshold_2", -10.0))
+                threshold_3 = float(cfg.get("slope_cond_threshold_3", -15.0))
+                sl_1 = slope_1 if slope_1 is not None else 999.0
+                sl_2 = slope_2 if slope_2 is not None else 999.0
+                sl_3 = slope_3 if slope_3 is not None else 999.0
+                slope_ok_1 = bool(
+                    sl_1 < threshold_1
+                    or ((sl_1 < 0) and (sl_2 < threshold_2))
+                    or ((sl_1 < 0) and (sl_2 < 0) and (sl_3 < threshold_3))
+                )
             state = {
                 "symbol": symbol,
                 "px": price,

@@ -272,8 +272,21 @@ Important blocker carried forward:
 
 ```text
 Order shape parity passes on independent actual-entry days, but timing parity does not.
-20260123 max_abs_delta_seconds=684.645048; 20260127 max_abs_delta_seconds=8.797583.
+Initial timing gap: 20260123 max_abs_delta_seconds=684.645048; 20260127 max_abs_delta_seconds=8.797583.
+After restoring legacy three-stage slope gate: 20260123 max_abs_delta_seconds=191.042596; 20260127 max_abs_delta_seconds=8.797583.
 Treat as clock_alignment_diff / feature-replay-substrate gap before live confidence.
+```
+
+Timing probe receipt:
+
+```text
+docs/receipts/2026-05-11_aws_shadow_timing_gap_probe.md
+```
+
+Next timing-specific P0:
+
+```text
+Reproduce legacy slope_down_ok sampling path exactly: price queue source, timestamp cutoff inclusivity, min-span behavior, and duplicate timestamp ordering.
 ```
 
 ## Evidence gates before real-money validation

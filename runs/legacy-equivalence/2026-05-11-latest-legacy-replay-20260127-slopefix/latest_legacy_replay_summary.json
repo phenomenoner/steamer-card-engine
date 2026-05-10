@@ -1,0 +1,38 @@
+{
+  "date": "20260127",
+  "end_local": "11:20:00",
+  "enforce_one_enter_per_symbol": true,
+  "enter_true": 2,
+  "gate": "REV_SHORT_AFTER_UP",
+  "kind": "steamer_card_engine.latest_legacy_replay.v1",
+  "machine": "dt3",
+  "reason_top20": {
+    "above_ema": 25,
+    "angle": 6134,
+    "blocked_blind_open": 2,
+    "enter_rev_short": 2,
+    "lot_limit_reached_replay": 680,
+    "no_recent_high": 4560,
+    "not_strong_up": 19956,
+    "now_time_5": 26828,
+    "trend_conflict: sl2/3(4.31/5.22)> 5.0 & sl1(-9.4) > -15.0": 2,
+    "trend_conflict: sl2/3(4.38/5.33)> 5.0 & sl1(-8.86) > -15.0": 2,
+    "trend_conflict: sl2/3(4.52/5.47)> 5.0 & sl1(-8.07) > -15.0": 2,
+    "trend_conflict: sl2/3(4.55/5.5)> 5.0 & sl1(-7.84) > -15.0": 2,
+    "trend_conflict: sl2/3(4.6/5.57)> 5.0 & sl1(-7.16) > -15.0": 2,
+    "trend_conflict: sl2/3(4.62/5.59)> 5.0 & sl1(-6.91) > -15.0": 2,
+    "trend_conflict: sl2/3(4.65/5.63)> 5.0 & sl1(-6.46) > -15.0": 2,
+    "trend_conflict: sl2/3(4.68/5.67)> 5.0 & sl1(-6.25) > -15.0": 2,
+    "trend_conflict: sl2/3(4.7/5.68)> 5.0 & sl1(-6.23) > -15.0": 2,
+    "trend_conflict: sl2/3(4.76/5.74)> 5.0 & sl1(-5.87) > -15.0": 2,
+    "trend_conflict: sl2/3(4.79/5.82)> 5.0 & sl1(-5.19) > -15.0": 1,
+    "zz_not_down": 8067
+  },
+  "rows": 66383,
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-slopefix/latest_legacy_replay_summary.json",
+  "symbols": [
+    "1301",
+    "2337"
+  ],
+  "trace_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-11-latest-legacy-replay-20260127-slopefix/latest_legacy_replay_decisions.jsonl"
+}

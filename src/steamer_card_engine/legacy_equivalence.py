@@ -23,6 +23,9 @@ DEFAULT_GATE_CONFIG: dict[str, Any] = {
     "strong_up_pct": 3.0,
     "strong_up_pct_abs": 5.0,
     "fallback_pct": 1.2,
+    "slope_cond_threshold": -5.0,
+    "slope_cond_threshold_2": -10.0,
+    "slope_cond_threshold_3": -15.0,
     "trend_conflict_slope_threshold": 5.0,
     "trend_conflict_override_slope": -15.0,
     # January 2026 legacy traces match the documented >5% profit-buffer semantics
