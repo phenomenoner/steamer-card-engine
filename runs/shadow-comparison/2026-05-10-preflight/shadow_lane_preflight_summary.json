@@ -1,0 +1,216 @@
+{
+  "blockers": [],
+  "dry_run_manifest": null,
+  "duplicate_lifecycle_roles": {},
+  "kind": "steamer_card_engine.shadow_lane_preflight.v1",
+  "live_cron_meta": {
+    "command": "openclaw cron list",
+    "exit_code": 0,
+    "stderr": "Config warnings:\n- plugins.entries.openclaw-model-allocation-control-plane: plugin disabled (disabled in config) but config is present\n"
+  },
+  "live_lifecycle_roles": {
+    "archive_upload": [
+      "32bf7bac-be39-443d-bf7d-30d2fb496b50"
+    ],
+    "ec2_power_on": [
+      "5137f344-041a-48be-933e-edd7ce34607f"
+    ],
+    "ec2_stop_guardrail": [
+      "c2eeb4f3-6a84-4910-ac7a-25938dda18da"
+    ],
+    "sim_kickoff": [
+      "e7ee7135-1378-40bf-a5c6-e23aa8757648"
+    ],
+    "sim_verify_autoheal": [
+      "337bf8c5-bde8-4ab8-af54-36cbba4c5dbd"
+    ]
+  },
+  "live_steamer_rows": [
+    {
+      "job_id": "46f20216-e3af-4a91-813c-1ca2e85b3689",
+      "line": "46f20216-e3af-4a91-813c-1ca2e85b3689 steamer-alpha-harvest... cron 5 * * * * @ Asia/Taipei ... in 23m     33m ago    ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "776d5f0e-e58e-47d6-b52c-2dc7c99608fc",
+      "line": "776d5f0e-e58e-47d6-b52c-2dc7c99608fc steamer-alpha-harvest... cron 15 */6 * * * @ Asia/Taip... in 33m     5h ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.4",
+      "role": null
+    },
+    {
+      "job_id": "5e9cb598-8362-4968-a040-92fd3f78631e",
+      "line": "5e9cb598-8362-4968-a040-92fd3f78631e pm: steamer strategy ... cron 27 */4 * * 1-5 @ Asia/Ta... in 45m     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "3ee7afec-1b4b-4eb3-bb84-c75c15d8af7f",
+      "line": "3ee7afec-1b4b-4eb3-bb84-c75c15d8af7f steamer: EC2 late-rec... cron */5 8-9 * * 1-5 @ Asia/T... in 8h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "dcd240b4-d174-4315-9932-1ef1d696905b",
+      "line": "dcd240b4-d174-4315-9932-1ef1d696905b steamer: data QA (dai... cron 3 8 * * 1-5 @ Asia/Taipe... in 8h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "d173c71d-9231-4599-91ce-6915fce987f5",
+      "line": "d173c71d-9231-4599-91ce-6915fce987f5 tw-intraday: watchlis... cron 10 8 * * 1-5 @ Asia/Taip... in 8h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "5137f344-041a-48be-933e-edd7ce34607f",
+      "line": "5137f344-041a-48be-933e-edd7ce34607f steamer: EC2 power-on... cron 25 8 * * 1-5 @ Asia/Taip... in 9h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": "ec2_power_on"
+    },
+    {
+      "job_id": "e7ee7135-1378-40bf-a5c6-e23aa8757648",
+      "line": "e7ee7135-1378-40bf-a5c6-e23aa8757648 steamer: online sim k... cron 35 8 * * 1-5 @ Asia/Taip... in 9h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": "sim_kickoff"
+    },
+    {
+      "job_id": "337bf8c5-bde8-4ab8-af54-36cbba4c5dbd",
+      "line": "337bf8c5-bde8-4ab8-af54-36cbba4c5dbd steamer: online sim v... cron 45 8 * * 1-5 @ Asia/Taip... in 9h      3d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": "sim_verify_autoheal"
+    },
+    {
+      "job_id": "26d37fdc-5475-4a50-9d10-4cecb970f230",
+      "line": "26d37fdc-5475-4a50-9d10-4cecb970f230 steamer: card-engine ... cron 55 8 * * 1-5 @ Asia/Taip... in 9h      3d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "34a3f667-9964-486f-b1ad-0a7fb0247d77",
+      "line": "34a3f667-9964-486f-b1ad-0a7fb0247d77 steamer: experiment r... cron 10 10,22 * * 1-5 @ Asia/... in 10h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "b79a14ea-b9a9-40d1-a138-1d3612769df1",
+      "line": "b79a14ea-b9a9-40d1-a138-1d3612769df1 steamer: candidate fu... cron 20 10,22 * * 1-5 @ Asia/... in 11h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "d5d69735-dc4c-4aa9-a2d0-499b00c77ea4",
+      "line": "d5d69735-dc4c-4aa9-a2d0-499b00c77ea4 controller: Steamer p... cron 10 13 * * 1-5 @ Asia/Tai... in 13h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       cron-lite  openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "ac9002f2-f086-4ee1-8fb3-de222b4e7d67",
+      "line": "ac9002f2-f086-4ee1-8fb3-de222b4e7d67 controller: steamer-c... cron 25 13 * * 1-5 @ Asia/Tai... in 14h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       cron-lite  openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "32bf7bac-be39-443d-bf7d-30d2fb496b50",
+      "line": "32bf7bac-be39-443d-bf7d-30d2fb496b50 steamer: EC2 archive/... cron 40 13 * * 1-5 @ Asia/Tai... in 14h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": "archive_upload"
+    },
+    {
+      "job_id": "12896787-8527-4625-9459-7a5fd8fcdef6",
+      "line": "12896787-8527-4625-9459-7a5fd8fcdef6 steamer: powerhouse E... cron 45 13 * * 1-5 @ Asia/Tai... in 14h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "c2eeb4f3-6a84-4910-ac7a-25938dda18da",
+      "line": "c2eeb4f3-6a84-4910-ac7a-25938dda18da steamer: EC2 stop gua... cron 46 13 * * 1-5 @ Asia/Tai... in 14h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": "ec2_stop_guardrail"
+    },
+    {
+      "job_id": "ae8ae7d6-e8ab-40f2-a861-fa113d9894f8",
+      "line": "ae8ae7d6-e8ab-40f2-a861-fa113d9894f8 tw-intraday: eod pape... cron 10 14 * * 1-5 @ Asia/Tai... in 14h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "c90615ec-0b14-4977-8eca-3a1ebbe4b617",
+      "line": "c90615ec-0b14-4977-8eca-3a1ebbe4b617 steamer ops: replay r... cron 0 15 * * 1-5 @ Asia/Taip... in 15h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "158fad66-051f-4673-b642-d894eae8ada3",
+      "line": "158fad66-051f-4673-b642-d894eae8ada3 steamer: reconcile (d... cron 10 15 * * 1-5 @ Asia/Tai... in 15h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "9ed099ae-d8c6-4871-98e1-4bc4dfd6a308",
+      "line": "9ed099ae-d8c6-4871-98e1-4bc4dfd6a308 slow-cook: x-scout (t... cron 20 21 * * 1-5 @ Asia/Tai... in 22h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "e0732a93-2ac1-44ba-80e4-bfb6c5df7a42",
+      "line": "e0732a93-2ac1-44ba-80e4-bfb6c5df7a42 powerhouse xscout ingest cron 35 21 * * 1-5 @ Asia/Tai... in 22h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "dcd68363-58fd-4bdb-9f58-1e88c6f5e7f9",
+      "line": "dcd68363-58fd-4bdb-9f58-1e88c6f5e7f9 steamer-alpha-harvest... cron 40 21 * * * @ Asia/Taipe... in 22h     2h ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "c177aaad-5eca-4083-96ae-03d9c2c35e73",
+      "line": "c177aaad-5eca-4083-96ae-03d9c2c35e73 steamer: powerhouse n... cron 40 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "5daeef7d-f6f3-4ada-9e82-7a6d1e22dea6",
+      "line": "5daeef7d-f6f3-4ada-9e82-7a6d1e22dea6 steamer: strategy ICU... cron 47 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "5c36724a-6c10-4c29-8690-c4b3fc53580a",
+      "line": "5c36724a-6c10-4c29-8690-c4b3fc53580a steamer: autonomous s... cron 50 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "5da01641-16f3-4864-99c4-d2415359b059",
+      "line": "5da01641-16f3-4864-99c4-d2415359b059 steamer: investment o... cron 52 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "213c25b0-5023-409d-a1f7-43dd9bb8808b",
+      "line": "213c25b0-5023-409d-a1f7-43dd9bb8808b steamer: experiment-c... cron 53 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "bdea45d0-d0e1-4133-9424-22d56f2a75a1",
+      "line": "bdea45d0-d0e1-4133-9424-22d56f2a75a1 steamer: candidate-fu... cron 56 22 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "59c6aec3-06eb-499b-b173-af7aea14c49e",
+      "line": "59c6aec3-06eb-499b-b173-af7aea14c49e steamer: portfolio st... cron 05 23 * * 1-5 @ Asia/Tai... in 23h     2d ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-...",
+      "role": null
+    },
+    {
+      "job_id": "bc54e531-db79-4cbb-a051-30fab49b2d21",
+      "line": "bc54e531-db79-4cbb-a051-30fab49b2d21 steamer-alpha-harvest... cron 35 23 * * * @ Asia/Taipe... in 24h     6m ago     ok        isolated  none -> telegram:2118296735 (explicit)                           steamer... openai-codex/gpt-5.4",
+      "role": null
+    },
+    {
+      "job_id": "57b9dde4-cd62-4f2d-8227-b883653b31ae",
+      "line": "57b9dde4-cd62-4f2d-8227-b883653b31ae steamer weekend: repr... cron 5 10 * * 6 @ Asia/Taipei... in 5d      2d ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "2c7f9568-8245-42a9-a8c7-016c0e645fda",
+      "line": "2c7f9568-8245-42a9-a8c7-016c0e645fda slow-cook: x-scout we... cron 20 21 * * 0,6 @ Asia/Tai... in 6d      2h ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "161e6f51-dca8-4f56-8c3d-4f19d31d4e1c",
+      "line": "161e6f51-dca8-4f56-8c3d-4f19d31d4e1c powerhouse ingest xsc... cron 35 21 * * 0,6 @ Asia/Tai... in 6d      2h ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-5.2",
+      "role": null
+    },
+    {
+      "job_id": "192548e6-1d2c-4e1e-bf00-008edfe2e162",
+      "line": "192548e6-1d2c-4e1e-bf00-008edfe2e162 steamer weekend: coun... cron 35 14 * * 0 @ Asia/Taipe... in 7d      9h ago     ok        isolated  announce -> telegram:2118296735 (explicit)                       steamer... openai-codex/gpt-5.2",
+      "role": null
+    }
+  ],
+  "manifest_forbidden_lifecycle_hits": [],
+  "missing_roles": [],
+  "recommended_next_step": "Add an EC2-side observer worker manifest only after this preflight passes and the manifest contains no start/stop lifecycle ownership.",
+  "report_path": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-10-preflight/shadow_lane_preflight_report.md",
+  "rules": {
+    "shadow_lane_must_not_start_or_stop_ec2": true,
+    "shadow_lane_should_archive_under_existing_archive_job": true,
+    "shadow_lane_should_launch_under_existing_kickoff": true
+  },
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-10-preflight/shadow_lane_preflight_summary.json",
+  "verdict": "PASS_SHADOW_PREFLIGHT_DRY_RUN"
+}

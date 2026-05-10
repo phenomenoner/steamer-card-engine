@@ -1,0 +1,46 @@
+{
+  "kind": "steamer_card_engine.aws_shadow_observer_manifest.v1",
+  "mode": "dry_run_plan_only",
+  "enabled": false,
+  "live_replacement_confidence": false,
+  "lifecycle_ownership": {
+    "ec2_start_owner": "existing_cron:5137f344-041a-48be-933e-edd7ce34607f",
+    "kickoff_owner": "existing_cron:e7ee7135-1378-40bf-a5c6-e23aa8757648",
+    "verify_owner": "existing_cron:337bf8c5-bde8-4ab8-af54-36cbba4c5dbd",
+    "archive_owner": "existing_cron:32bf7bac-be39-443d-bf7d-30d2fb496b50",
+    "ec2_stop_owner": "existing_cron:c2eeb4f3-6a84-4910-ac7a-25938dda18da",
+    "shadow_may_start_or_stop_ec2": false
+  },
+  "remote_paths": {
+    "repo": "/opt/trading/current",
+    "sim_day_root": "/opt/trading/current/data/sim/${DAY}",
+    "normal_sim_run_id": "ENTRY_MODE=LONG_ONE_VCP__VCP_MIN_TREND_SLOPE=2__tick_volume_mode=auto__feed=neoapitest",
+    "shadow_artifact_root": "/opt/trading/current/data/sim/${DAY}/_shadow_compare/order_intent_v1"
+  },
+  "initial_run_goal": "REV_SHORT_AFTER_UP entry order intent only; observer mode; no order submission",
+  "required_artifacts": [
+    "scenario_spec.json",
+    "active_universe.json",
+    "broker_state_snapshots.jsonl",
+    "legacy_order_intents.jsonl",
+    "card_shadow_order_intents.jsonl",
+    "intent_diff.jsonl",
+    "intent_compare_summary.json",
+    "summary.md"
+  ],
+  "must_match_fields": [
+    "symbol",
+    "action",
+    "side",
+    "quantity",
+    "price_basis",
+    "order_type",
+    "order_time_in_force"
+  ],
+  "excluded_initially": [
+    "live order submission",
+    "exit/trailing stop parity",
+    "actual fill parity",
+    "new EC2 lifecycle ownership"
+  ]
+}
