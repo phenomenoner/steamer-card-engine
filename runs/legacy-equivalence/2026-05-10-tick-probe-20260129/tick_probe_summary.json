@@ -1,0 +1,50 @@
+{
+  "before_first_tick_samples": 0,
+  "data_root": "/workspace/CC/StrategyExecuter_Steamer-Antigravity/.data",
+  "date": "20260129",
+  "field_summary": {
+    "max_seen": {
+      "compared": 800,
+      "match_rate": 1.0,
+      "max_abs_error": 0.10000000000000142,
+      "mean_abs_error": 0.0004999999999999805,
+      "mismatches": 0,
+      "timestamp_ambiguous_matches": 4
+    },
+    "min_seen": {
+      "compared": 800,
+      "match_rate": 1.0,
+      "max_abs_error": 0.0,
+      "mean_abs_error": 0.0,
+      "mismatches": 0,
+      "timestamp_ambiguous_matches": 0
+    },
+    "open_px": {
+      "compared": 800,
+      "match_rate": 1.0,
+      "max_abs_error": 0.0,
+      "mean_abs_error": 0.0,
+      "mismatches": 0,
+      "timestamp_ambiguous_matches": 0
+    },
+    "px": {
+      "compared": 800,
+      "match_rate": 1.0,
+      "max_abs_error": 0.5,
+      "mean_abs_error": 0.010187499999999971,
+      "mismatches": 0,
+      "timestamp_ambiguous_matches": 58
+    }
+  },
+  "gate": "REV_SHORT_AFTER_UP",
+  "kind": "steamer_card_engine.legacy_tick_probe.v1",
+  "machine": "dt3",
+  "mismatch_samples": [],
+  "missing_symbol_samples": 0,
+  "report_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-tick-probe-20260129/tick_probe_report.md",
+  "sampled_decisions": 800,
+  "summary_path": "/root/.openclaw/workspace/steamer-card-engine/runs/legacy-equivalence/2026-05-10-tick-probe-20260129/tick_probe_summary.json",
+  "symbols_with_ticks": 10,
+  "tolerance": 1e-07,
+  "verdict": "PASS_FEASIBLE"
+}
