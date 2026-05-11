@@ -123,3 +123,73 @@ All one-shots are constrained:
 - no lifecycle cron mutation
 - no real-money enablement
 ```
+
+## 2026-05-11 08:35 readiness result
+
+Read-only SSM check succeeded against a running/Online EC2 instance, but takeoff is blocked: `/opt/trading/current` lacks `steamer_card_engine`, `tools/aws_shadow_observer_dry_run.py`, and the dry-run manifest. Local hook/manifest preflight remains green (`PASS_SHADOW_PREFLIGHT_DRY_RUN`, tests `2 passed`). Do not enable kickoff/verify seams yet; next same-risk action is a disabled-by-default observer-only payload deploy/readback, with no lifecycle cron mutation and no broker orders. Receipt: `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-takeoff-readiness-20260511T003906Z/takeoff_readiness_report.md`.
+
+
+## 2026-05-11 08:58 staging/post-close orchestration update
+
+Disabled observer-only payload has been staged on EC2 under:
+
+```text
+/opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled
+```
+
+Verifier receipts:
+
+```text
+local preflight: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/local_preflight/shadow_lane_preflight_summary.json
+local tests: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/local_pytest_uv.log (4 passed)
+S3/presign: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/s3_presign.json
+remote stage SSM: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/ssm_stage_invocation.json
+remote smoke: PASS_SHADOW_OBSERVER_DRY_RUN_ARTIFACTS
+remote smoke root: /opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled/smoke/observer_artifacts
+```
+
+Safety readback:
+
+```text
+STEAMER_SHADOW_COMPARISON_ENABLED=0
+STEAMER_SHADOW_OBSERVER_ONLY=1
+STEAMER_SHADOW_SUBMITS_ORDERS=0
+observer_only=true
+submits_orders=false
+owns_ec2_lifecycle=false
+```
+
+Today sim root preflight at ~08:56 TPE returned `MISSING_ROOT`, so collection is scheduled post-close rather than claiming current-day data exists now.
+
+One-shot post-close jobs:
+
+```text
+13:35 TPE collect: 38079ba0-7727-4f75-b66e-58279c05fe7f
+13:50 TPE readback: 366df94a-56f9-40c5-9463-6e0e6ca2cf26
+```
+
+Topology impact: only temporary one-shot OpenClaw jobs were added; existing EC2 lifecycle cron, live cron, broker auth/order paths, and `/opt/trading/current` symlink were not mutated.
+
+
+S3 staging cleanup: source payload object was removed after successful remote SHA/readback; receipt: `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/s3_cleanup.log`.
+
+
+## 2026-05-11 08:51 post-kickoff receipt check
+
+Verdict: `SHADOW_OBSERVER_TAKEOFF_BLOCKED_FAIL_SAFE`.
+
+- 08:30 readiness job `1d5c15ad-4d95-4b20-8ded-418bb1dd802d`: `BLOCKED_REMOTE_RUNTIME_MISSING_SHADOW_RELEASE`.
+- 08:33 execute/fail-safe job `98a14a49-67d9-4c72-a748-100a768cbd38`: `NO_TAKEOFF_BLOCKED`; did not connect 08:35/08:45 observer seam.
+- Existing 08:35 kickoff cron `e7ee7135-1378-40bf-a5c6-e23aa8757648`: cron history status `error`; no shadow observer seam had been connected.
+- Existing 08:45 verify cron `337bf8c5-bde8-4ab8-af54-36cbba4c5dbd`: cron history status `ok`, summary `NO_REPLY`.
+- Read-only SSM check confirmed `/opt/trading/current` still lacks shadow hook/manifest and no shadow artifact root exists for `2026-05-11`.
+- Disabled staged payload exists at `/opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled`, but remains unwired and disabled-by-default.
+
+Receipts:
+
+```text
+/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-post-kickoff-receipt-check-20260511T010024Z/post_kickoff_receipt_check_report.md
+/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-post-kickoff-receipt-check-20260511T010024Z/post_kickoff_receipt_check_receipt.json
+```
+
+Side effects: no EC2 start/stop, no broker orders, no lifecycle/live cron mutation, no auth broadening.

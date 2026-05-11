@@ -321,3 +321,109 @@ docs/AWS_SHADOW_OBSERVER_MANIFEST_DRY_RUN_2026-05-10.json
 docs/receipts/2026-05-10_order_intent_equivalence_goal_opened.md
 docs/receipts/2026-05-10_shadow_lane_preflight.md
 ```
+
+## 2026-05-11 08:35 takeoff readiness WAL
+
+- Verdict: `BLOCKED_REMOTE_RUNTIME_MISSING_SHADOW_RELEASE`. EC2 is running and SSM Online, but `/opt/trading/current` lacks the `steamer-card-engine` shadow observer worker/manifest.
+- Local substrate remains green: manifest preflight `PASS_SHADOW_PREFLIGHT_DRY_RUN`; observer dry-run tests `2 passed`.
+- No EC2 lifecycle, cron, broker, auth, or remote file mutation was made.
+- Next same-risk move: deploy/stage disabled-by-default observer-only shadow payload to EC2, then rerun read-only SSM readback before enabling any 08:35/08:45 seam.
+- Receipt: `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-takeoff-readiness-20260511T003906Z/takeoff_readiness_report.md`.
+
+## 2026-05-11 08:42 takeoff execute/fail-safe WAL
+
+- Verdict: `NO_TAKEOFF_BLOCKED`.
+- Checked readiness/WAL first; precondition was not met because remote runtime was not read back as present.
+- Exact blocker remains `BLOCKED_REMOTE_RUNTIME_MISSING_SHADOW_RELEASE`: `/opt/trading/current` lacks `steamer_card_engine`, `tools/aws_shadow_observer_dry_run.py`, and `docs/AWS_SHADOW_OBSERVER_MANIFEST_DRY_RUN_2026-05-10.json`.
+- No observer seam was connected; no disabled payload staging was performed inside this fail-safe job because that would exceed the cron gate.
+- No EC2 lifecycle, cron, broker, auth, live cron, or remote file mutation was made.
+- Next required step: separate disabled-by-default observer-only payload staging/readback slice with SHA256 guards and `STEAMER_SHADOW_COMPARISON_ENABLED=0`, then rerun read-only readiness.
+- Receipt: `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-takeoff-execute-failsafe-20260511T004657Z/takeoff_execute_failsafe_report.md`.
+
+
+## 2026-05-11 08:58 staging/post-close orchestration update
+
+Disabled observer-only payload has been staged on EC2 under:
+
+```text
+/opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled
+```
+
+Verifier receipts:
+
+```text
+local preflight: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/local_preflight/shadow_lane_preflight_summary.json
+local tests: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/local_pytest_uv.log (4 passed)
+S3/presign: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/s3_presign.json
+remote stage SSM: /root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/ssm_stage_invocation.json
+remote smoke: PASS_SHADOW_OBSERVER_DRY_RUN_ARTIFACTS
+remote smoke root: /opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled/smoke/observer_artifacts
+```
+
+Safety readback:
+
+```text
+STEAMER_SHADOW_COMPARISON_ENABLED=0
+STEAMER_SHADOW_OBSERVER_ONLY=1
+STEAMER_SHADOW_SUBMITS_ORDERS=0
+observer_only=true
+submits_orders=false
+owns_ec2_lifecycle=false
+```
+
+Today sim root preflight at ~08:56 TPE returned `MISSING_ROOT`, so collection is scheduled post-close rather than claiming current-day data exists now.
+
+One-shot post-close jobs:
+
+```text
+13:35 TPE collect: 38079ba0-7727-4f75-b66e-58279c05fe7f
+13:50 TPE readback: 366df94a-56f9-40c5-9463-6e0e6ca2cf26
+```
+
+Topology impact: only temporary one-shot OpenClaw jobs were added; existing EC2 lifecycle cron, live cron, broker auth/order paths, and `/opt/trading/current` symlink were not mutated.
+
+
+S3 staging cleanup: source payload object was removed after successful remote SHA/readback; receipt: `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-postclose-orchestration-20260511T005222Z/s3_cleanup.log`.
+
+
+## 2026-05-11 08:51 post-kickoff receipt check
+
+Verdict: `SHADOW_OBSERVER_TAKEOFF_BLOCKED_FAIL_SAFE`.
+
+- 08:30 readiness job `1d5c15ad-4d95-4b20-8ded-418bb1dd802d`: `BLOCKED_REMOTE_RUNTIME_MISSING_SHADOW_RELEASE`.
+- 08:33 execute/fail-safe job `98a14a49-67d9-4c72-a748-100a768cbd38`: `NO_TAKEOFF_BLOCKED`; did not connect 08:35/08:45 observer seam.
+- Existing 08:35 kickoff cron `e7ee7135-1378-40bf-a5c6-e23aa8757648`: cron history status `error`; no shadow observer seam had been connected.
+- Existing 08:45 verify cron `337bf8c5-bde8-4ab8-af54-36cbba4c5dbd`: cron history status `ok`, summary `NO_REPLY`.
+- Read-only SSM check confirmed `/opt/trading/current` still lacks shadow hook/manifest and no shadow artifact root exists for `2026-05-11`.
+- Disabled staged payload exists at `/opt/trading/shadow_payloads/20260511T0054Z-shadow-observer-disabled`, but remains unwired and disabled-by-default.
+
+Receipts:
+
+```text
+/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-post-kickoff-receipt-check-20260511T010024Z/post_kickoff_receipt_check_report.md
+/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-post-kickoff-receipt-check-20260511T010024Z/post_kickoff_receipt_check_receipt.json
+```
+
+Side effects: no EC2 start/stop, no broker orders, no lifecycle/live cron mutation, no auth broadening.
+
+
+## 2026-05-11 09:20 resume deploy/fix/test update
+
+Verdict: `SHADOW_OBSERVER_REMOTE_RUNTIME_READY_AND_SIM_RUNNING`.
+
+- `/opt/trading/current` has now been patched from the disabled staged payload with:
+  - `src/steamer_card_engine`
+  - compatibility symlink `steamer_card_engine -> src/steamer_card_engine`
+  - `tools/aws_shadow_observer_dry_run.py`
+  - `docs/AWS_SHADOW_OBSERVER_MANIFEST_DRY_RUN_2026-05-10.json`
+  - `SHADOW_PAYLOAD_DISABLED.env`
+- Safety env remains disabled-by-default: `STEAMER_SHADOW_COMPARISON_ENABLED=0`, `STEAMER_SHADOW_OBSERVER_ONLY=1`, `STEAMER_SHADOW_SUBMITS_ORDERS=0`.
+- Remote deploy receipt: `/opt/trading/current/.shadow_deploy_receipt_20260511T0118Z.json`; rollback backup root: `/opt/trading/current/.shadow_deploy_backup/20260511T0118Z`.
+- Manual deterministic kickoff script succeeded: `python3 /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/tools/steamer_ec2_kickoff_daily.py` -> `NO_REPLY`, exit 0.
+- Manual deterministic verify/autoheal succeeded: `python3 /root/.openclaw/workspace/StrategyExecuter_Steamer-Antigravity/projects/steamer/tools/steamer_ec2_autoheal_verify_daily.py` -> `NO_REPLY`, exit 0.
+- Immediate observer-only collect succeeded and produced required artifacts with active universe count 50:
+  `/root/.openclaw/workspace/steamer-card-engine/runs/shadow-comparison/2026-05-11-resume-deploy-20260511T011329Z/immediate_shadow_collect/postclose_collect_report.json`.
+- Durable collect runner added: `tools/aws_shadow_postclose_collect.py`.
+- One-shot post-close collect scheduled for 2026-05-11 13:35 TPE: `8400d7fd-5a48-4948-adc6-d0b567fb5d42`.
+
+Topology impact: changed. Added one temporary one-shot OpenClaw job for post-close observer collection; existing EC2 power/kickoff/verify/archive/stop cron owners remain unchanged. Remote `/opt/trading/current` content changed, but `/opt/trading/current` symlink target did not change.
