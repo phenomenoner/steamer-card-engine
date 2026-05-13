@@ -199,3 +199,4 @@ Current sprint read:
 - 2026-05-08 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
 - 2026-05-11 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
 - 2026-05-12 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
+- 2026-05-13 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; AWS shadow comparison Day 3 observer-only one-shots were checkpointed in `ops/checkpoints/2026-05-12_aws-shadow-day3-cron-setup.md` (Topology changed: added three one-shot cron jobs for 2026-05-13; no broker authority).
