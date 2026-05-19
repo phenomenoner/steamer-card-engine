@@ -198,3 +198,4 @@ Current sprint read:
 - 2026-05-15 — progress pass: stage-4 remains closed; checked upstream status/topology for collision; committed the AWS shadow comparison daily intake/preflight checkpoint doc `ops/checkpoints/2026-05-14_aws-shadow-daily-intake-preflight.md` (Topology unchanged; observer-only/no-order; no EC2/SSM mutation; no broker authority).
 - 2026-05-18 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
 - 2026-05-19 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
+- 2026-05-20 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
