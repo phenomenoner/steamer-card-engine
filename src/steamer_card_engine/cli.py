@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 
+from steamer_card_engine.dt3_legacy import normalize_dt3_legacy_bundle
 from steamer_card_engine.manifest import (
     ManifestValidationError,
     load_auth_profile,
@@ -177,6 +178,27 @@ def build_parser() -> argparse.ArgumentParser:
     run_live.add_argument("--fill-model", default="sim-fill-v1")
     run_live.add_argument("--dry-run", action="store_true")
     run_live.add_argument("--json", action="store_true", dest="as_json")
+
+    normalize_dt3 = sim_sub.add_parser(
+        "normalize-dt3-legacy",
+        help="Normalize DT3 legacy raw ticks/decisions/orders into a SIM artifact bundle",
+    )
+    normalize_dt3.add_argument("--source-dir", required=True)
+    normalize_dt3.add_argument("--output-dir", required=True)
+    normalize_dt3.add_argument("--session-date", required=True)
+    normalize_dt3.add_argument("--scenario-id", required=True)
+    normalize_dt3.add_argument("--run-id", required=True)
+    normalize_dt3.add_argument("--lane", default="baseline-bot")
+    normalize_dt3.add_argument("--deck-id", default="dt3-legacy-deck")
+    normalize_dt3.add_argument("--card-id", default="dt3-legacy-rev-short-card")
+    normalize_dt3.add_argument("--card-version", default="legacy/v0")
+    normalize_dt3.add_argument(
+        "--intent-source",
+        choices=("order-first", "decision-first", "executable-decision-first"),
+        default="order-first",
+        help="Use first successful order, first raw enter-like decision, or first lot-limit-executable decision as the intent oracle",
+    )
+    normalize_dt3.add_argument("--json", action="store_true", dest="as_json")
 
     compare = sim_sub.add_parser(
         "compare",
@@ -708,6 +730,29 @@ def main(argv: list[str] | None = None) -> int:
                     "Normalized baseline bundle "
                     f"run_id={summary['run_id']} output={summary['bundle_dir']} "
                     f"anomalies={summary['counts']['anomalies']}"
+                )
+            return 0
+
+        if args.command == "sim" and args.sim_command == "normalize-dt3-legacy":
+            summary = normalize_dt3_legacy_bundle(
+                source_dir=Path(args.source_dir),
+                output_dir=Path(args.output_dir),
+                session_date=args.session_date,
+                scenario_id=args.scenario_id,
+                run_id=args.run_id,
+                lane=args.lane,
+                deck_id=args.deck_id,
+                card_id=args.card_id,
+                card_version=args.card_version,
+                intent_source=args.intent_source,
+            )
+            if args.as_json:
+                _print_json(summary)
+            else:
+                print(
+                    "Normalized DT3 legacy bundle "
+                    f"run_id={summary['run_id']} output={summary['bundle_dir']} "
+                    f"fills={summary['counts']['fills']} pnl={summary['pnl_summary']['realized_pnl_gross']}"
                 )
             return 0
 
