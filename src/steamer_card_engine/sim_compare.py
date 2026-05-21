@@ -866,10 +866,49 @@ def compare_bundles(
             "execution_model mismatch (hard stop): canonical execution_model hash differs"
         )
 
-    status = "fail" if hard_fail_reasons else "pass"
-
     baseline_pnl = _parse_json(baseline_result.bundle_dir / "pnl-summary.json", default={})
     candidate_pnl = _parse_json(candidate_result.bundle_dir / "pnl-summary.json", default={})
+
+    for lane_name, result in (("baseline", baseline_result), ("candidate", candidate_result)):
+        critical = result.anomalies_by_severity.get("critical", 0)
+        major = result.anomalies_by_severity.get("major", 0)
+        if critical or major:
+            hard_fail_reasons.append(
+                f"{lane_name}: critical/major anomalies present "
+                f"(critical={critical}, major={major})"
+            )
+
+    for count_name in ("fills", "orders", "intents", "risk"):
+        if baseline_result.counts[count_name] != candidate_result.counts[count_name]:
+            hard_fail_reasons.append(
+                f"{count_name} count mismatch: "
+                f"baseline={baseline_result.counts[count_name]} "
+                f"candidate={candidate_result.counts[count_name]}"
+            )
+
+    def _num_equal(left: Any, right: Any, *, tolerance: float = 1e-9) -> bool:
+        if left is None or right is None:
+            return left is right
+        try:
+            return abs(float(left) - float(right)) <= tolerance
+        except (TypeError, ValueError):
+            return left == right
+
+    for field in ("realized_pnl_gross", "fees_total", "taxes_total", "realized_pnl_net"):
+        if not _num_equal(baseline_pnl.get(field), candidate_pnl.get(field)):
+            hard_fail_reasons.append(
+                f"pnl-summary.{field} mismatch: "
+                f"baseline={baseline_pnl.get(field)} candidate={candidate_pnl.get(field)}"
+            )
+
+    for field in ("per_symbol_totals", "exit_reason_counts"):
+        if baseline_pnl.get(field, {}) != candidate_pnl.get(field, {}):
+            hard_fail_reasons.append(
+                f"pnl-summary.{field} mismatch: "
+                f"baseline={baseline_pnl.get(field, {})} candidate={candidate_pnl.get(field, {})}"
+            )
+
+    status = "fail" if hard_fail_reasons else "pass"
 
     diff_payload = {
         "compare_version": "m2-decision-grade/v0",
