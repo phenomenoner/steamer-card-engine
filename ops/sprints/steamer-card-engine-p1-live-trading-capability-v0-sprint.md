@@ -199,3 +199,4 @@ Current sprint read:
 - 2026-05-18 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
 - 2026-05-19 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
 - 2026-05-20 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; post-close Stage 5a checkpoint remains bounded (no topology change).
+- 2026-06-01 — progress pass: re-checked sprint surfaces + upstream Steamer status/topology for collision; stage-4 remains closed; upstream 2026-05-27 status repair preserved the bounded shadow-only/no-broker-authority posture, and the post-close Stage 5a checkpoint remains bounded (no topology change).
