@@ -74,6 +74,192 @@ def test_cli_query_strategy_catalog_by_regime(capsys) -> None:
     assert "gap-reclaim-v1" in captured.out
 
 
+def test_cli_validate_consolidation_handoff_blocked_no_entry(capsys, tmp_path: Path) -> None:
+    packet = tmp_path / "card_engine_handoff.dry-run.v1.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "disabled",
+                "local_packet_valid": False,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": [
+                    "card_engine_side_validation_not_run",
+                    "session_plan_validation_failed",
+                ],
+                "live_trading_claim": False,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["handoff_accepted"] is True
+    assert payload["status"] == "blocked_no_entry"
+    assert payload["replay_ready"] is False
+    assert payload["order_authority"] == "disabled"
+    assert "session_plan_validation_failed" in payload["no_entry_reasons"]
+
+
+def test_cli_validate_consolidation_handoff_replay_pending(capsys, tmp_path: Path) -> None:
+    packet = tmp_path / "card_engine_handoff.dry-run.v1.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "disabled",
+                "local_packet_valid": True,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": ["card_engine_side_validation_not_run"],
+                "live_trading_claim": False,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet)])
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "handoff_accepted=True" in captured.out
+    assert "status=local_packet_valid_pending_replay" in captured.out
+    assert "replay_ready=True" in captured.out
+
+
+def test_cli_validate_consolidation_handoff_rejects_order_authority(capsys, tmp_path: Path) -> None:
+    packet = tmp_path / "unsafe_handoff.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "enabled",
+                "local_packet_valid": True,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": ["card_engine_side_validation_not_run"],
+                "live_trading_claim": False,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet)])
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "order_authority_must_be_disabled" in captured.out
+
+
+def test_cli_validate_consolidation_handoff_invalid_local_packet_is_not_replay_pending(
+    capsys, tmp_path: Path
+) -> None:
+    packet = tmp_path / "invalid_local_handoff.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "disabled",
+                "local_packet_valid": False,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": ["card_engine_side_validation_not_run"],
+                "live_trading_claim": False,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert payload["status"] == "blocked_no_entry"
+    assert payload["replay_ready"] is False
+    assert payload["no_entry_reasons"] == ["local_packet_valid_false"]
+
+
+def test_cli_validate_consolidation_handoff_rejects_unresolved_replay_pending_errors(
+    capsys, tmp_path: Path
+) -> None:
+    packet = tmp_path / "unresolved_replay_pending_handoff.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "disabled",
+                "local_packet_valid": True,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": [
+                    "card_engine_side_validation_not_run",
+                    "unexpected_contract_error",
+                ],
+                "live_trading_claim": False,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet)])
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "local_packet_valid_has_unresolved_errors:unexpected_contract_error" in captured.out
+
+
+def test_cli_validate_consolidation_handoff_rejects_live_trading_claim(capsys, tmp_path: Path) -> None:
+    packet = tmp_path / "unsafe_live_claim.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema": "card_engine_handoff.dry_run.v1",
+                "research_only": True,
+                "not_trading_advice": True,
+                "order_authority": "disabled",
+                "local_packet_valid": True,
+                "card_engine_side_validation": "not_run",
+                "packet_valid": False,
+                "validation_errors": ["card_engine_side_validation_not_run"],
+                "live_trading_claim": True,
+                "session_plan": "contracts/session_plan.dry-run.v1.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code = main(["handoff", "validate-consolidation", "--packet", str(packet)])
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "live_trading_claim_must_be_false" in captured.out
+
+
 def test_operator_status_json_disarmed_gate(capsys, tmp_path: Path) -> None:
     state_file = tmp_path / "operator_state.json"
     receipt_dir = tmp_path / "receipts"

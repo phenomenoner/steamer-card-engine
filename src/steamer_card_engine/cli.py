@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from steamer_card_engine.dt3_legacy import normalize_dt3_legacy_bundle
+from steamer_card_engine.handoff import HandoffValidationError, validate_consolidation_handoff
 from steamer_card_engine.manifest import (
     ManifestValidationError,
     load_auth_profile,
@@ -119,6 +120,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     catalog_query.add_argument("--limit", type=int)
     catalog_query.add_argument("--json", action="store_true", dest="as_json")
+
+    handoff = subparsers.add_parser(
+        "handoff",
+        help="Validate downstream handoff packets without execution authority",
+    )
+    handoff_sub = handoff.add_subparsers(dest="handoff_command", required=True)
+    validate_consolidation = handoff_sub.add_parser(
+        "validate-consolidation",
+        help="Validate a Steamer consolidation dry-run handoff packet",
+    )
+    validate_consolidation.add_argument("--packet", required=True)
+    validate_consolidation.add_argument("--json", action="store_true", dest="as_json")
 
     replay = subparsers.add_parser("replay", help="Replay and analysis commands")
     replay_sub = replay.add_subparsers(dest="replay_command", required=True)
@@ -431,6 +444,13 @@ def _handle_manifest_error(error: ManifestValidationError) -> int:
     return 2
 
 
+def _handle_handoff_error(error: HandoffValidationError) -> int:
+    print(f"Validation failed for consolidation handoff packet: {error.path}", flush=True)
+    for issue in error.errors:
+        print(f"- {issue}", flush=True)
+    return 2
+
+
 def _slugify(value: str) -> str:
     lowered = value.strip().lower()
     slug = re.sub(r"[^a-z0-9]+", "-", lowered)
@@ -672,6 +692,18 @@ def main(argv: list[str] | None = None) -> int:
                         print(entry.card_id)
             return 0
 
+        if args.command == "handoff" and args.handoff_command == "validate-consolidation":
+            summary = validate_consolidation_handoff(Path(args.packet))
+            if args.as_json:
+                _print_json(summary)
+            else:
+                print(
+                    "Consolidation handoff accepted "
+                    f"handoff_accepted={summary['handoff_accepted']} "
+                    f"status={summary['status']} replay_ready={summary['replay_ready']}"
+                )
+            return 0
+
         if args.command == "replay" and args.replay_command == "run":
             summary = _emit_replay_candidate_bundle(args)
             if args.as_json:
@@ -860,6 +892,8 @@ def main(argv: list[str] | None = None) -> int:
     except SimCompareError as error:
         print(f"SIM comparability command failed: {error}", flush=True)
         return 2
+    except HandoffValidationError as error:
+        return _handle_handoff_error(error)
 
     if args.command == "operator" and args.operator_command == "inspect":
         print(f"Inspect placeholder for target={args.target}")

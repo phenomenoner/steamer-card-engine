@@ -121,6 +121,24 @@ Responsibilities:
 - enforce submission gate against non-active arm windows with explicit disarmed refusal for seed order-smoke checks
 - write action receipts for arm/disarm/flatten/refusals
 
+### 6. Handoff validation commands
+
+Used for validating upstream dry-run packets before any replay/live-sim execution claim.
+
+Examples:
+
+```bash
+steamer-card-engine handoff validate-consolidation --packet /path/to/card_engine_handoff.dry-run.v1.json --json
+```
+
+Responsibilities:
+
+- validate that a Steamer consolidation handoff packet is research-only and non-trading
+- require `order_authority=disabled` and `live_trading_claim=false`
+- accept a fail-closed packet as a truthful `blocked_no_entry` preflight
+- treat `local_packet_valid=true` as replay-pending only; `packet_valid=true` requires a separate card-engine-side validation pass
+- avoid replay/live-sim or live-trading claims until a separate replay/live-sim verifier runs
+
 ## Governance rules
 
 - Authoring commands can be widely available.
@@ -203,6 +221,7 @@ Current implementation status:
 - ✅ seed operator posture controls: `operator status|arm-live|disarm-live|flatten` + TTL policy + action receipts
 - ✅ `operator submit-order-smoke` explicit refusal while disarmed (seed smoke surface; no broker submission)
 - ✅ operator auto-disarm now closes invalid arm-scope TTL metadata (missing/malformed `expires_at`) in addition to normal TTL expiry
+- ✅ `handoff validate-consolidation` accepts Steamer consolidation dry-run packets as either replay-pending or truthful blocked/no-entry preflight; it does not execute replay/live-sim
 
 Next evolution order remains:
 
